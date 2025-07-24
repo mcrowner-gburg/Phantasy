@@ -1,6 +1,5 @@
 import { useQuery } from "@tanstack/react-query";
 import { NavigationSidebar } from "@/components/navigation-sidebar";
-import { MobileNavigation } from "@/components/mobile-navigation";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -27,8 +26,8 @@ export default function Dashboard() {
     return (
       <div className="flex">
         <NavigationSidebar />
-        <div className="flex-1 ml-64">
-          <div className="p-8">
+        <div className="flex-1 lg:ml-64 pt-16 lg:pt-0">
+          <div className="p-4 lg:p-8">
             <div className="animate-pulse">
               <div className="h-8 bg-gray-700 rounded w-1/4 mb-4"></div>
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
@@ -39,7 +38,6 @@ export default function Dashboard() {
             </div>
           </div>
         </div>
-        <MobileNavigation />
       </div>
     );
   }
@@ -56,16 +54,16 @@ export default function Dashboard() {
       <NavigationSidebar user={user || authUser?.user} />
       
       {/* Main Content */}
-      <div className="flex-1 ml-64 lg:ml-64">
+      <div className="flex-1 lg:ml-64 pt-16 lg:pt-0">
         {/* Top Header */}
-        <header className="phish-card border-b phish-border px-8 py-4">
-          <div className="flex justify-between items-center">
+        <header className="phish-card border-b phish-border px-4 lg:px-8 py-4">
+          <div className="flex flex-col lg:flex-row lg:justify-between lg:items-center space-y-4 lg:space-y-0">
             <div>
               <h2 className="text-2xl font-bold">Dashboard</h2>
               <p className="phish-text">Welcome back to {tour?.name || "your fantasy Phish league"}</p>
             </div>
-            <div className="flex items-center space-x-4">
-              <div className="relative">
+            <div className="flex flex-col sm:flex-row items-stretch sm:items-center space-y-2 sm:space-y-0 sm:space-x-4">
+              <div className="relative self-start sm:self-auto">
                 <Bell className="phish-text hover:text-white cursor-pointer" size={20} />
                 <Badge className="absolute -top-1 -right-1 bg-orange-500 text-white text-xs w-4 h-4 p-0 flex items-center justify-center">
                   3
@@ -79,7 +77,7 @@ export default function Dashboard() {
           </div>
         </header>
 
-        <main className="p-8 space-y-8 pb-20 lg:pb-8">
+        <main className="p-4 lg:p-8 space-y-6 lg:space-y-8">
           {/* Scoring System Info */}
           <Card className="glassmorphism border-gray-600 mb-6">
             <CardContent className="p-4">
@@ -422,8 +420,6 @@ export default function Dashboard() {
           </Card>
         </main>
       </div>
-      
-      <MobileNavigation />
     </div>
   );
 }

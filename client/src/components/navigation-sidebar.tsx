@@ -1,7 +1,9 @@
 import { Link, useLocation } from "wouter";
-import { Music, Home, Trophy, Calendar, Users, User, Bell, Plus } from "lucide-react";
+import { Music, Home, Trophy, Calendar, Users, User, Menu, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
+import { useState } from "react";
 import UserMenu from "@/components/user-menu";
 
 interface NavigationSidebarProps {
@@ -14,6 +16,7 @@ interface NavigationSidebarProps {
 
 export function NavigationSidebar({ user }: NavigationSidebarProps) {
   const [location] = useLocation();
+  const [isOpen, setIsOpen] = useState(false);
 
   const navItems = [
     { path: "/", icon: Home, label: "Dashboard" },
@@ -23,8 +26,8 @@ export function NavigationSidebar({ user }: NavigationSidebarProps) {
     { path: "/leagues", icon: Users, label: "My Leagues" },
   ];
 
-  return (
-    <div className="w-64 bg-black h-screen fixed left-0 top-0 z-50 overflow-y-auto">
+  const SidebarContent = () => (
+    <div className="h-full flex flex-col">
       <div className="p-6">
         <div className="flex items-center mb-8">
           <Music className="text-green-500 text-2xl mr-3" size={24} />
@@ -35,11 +38,16 @@ export function NavigationSidebar({ user }: NavigationSidebarProps) {
           {navItems.map((item) => {
             const isActive = location === item.path || (item.path !== "/" && location.startsWith(item.path));
             return (
-              <Link key={item.path} href={item.path} className={`flex items-center px-4 py-3 rounded-lg transition-colors ${
-                isActive 
-                  ? "text-green-500 bg-gray-800" 
-                  : "text-gray-400 hover:text-white hover:bg-gray-800"
-              }`}>
+              <Link 
+                key={item.path} 
+                href={item.path} 
+                className={`flex items-center px-4 py-3 rounded-lg transition-colors ${
+                  isActive 
+                    ? "text-green-500 bg-gray-800" 
+                    : "text-gray-400 hover:text-white hover:bg-gray-800"
+                }`}
+                onClick={() => setIsOpen(false)} // Close mobile menu on navigation
+              >
                 <item.icon className="mr-3" size={20} />
                 <span className="font-medium">{item.label}</span>
               </Link>
@@ -49,7 +57,7 @@ export function NavigationSidebar({ user }: NavigationSidebarProps) {
       </div>
       
       {user && (
-        <div className="absolute bottom-0 left-0 right-0 p-6 border-t border-gray-700">
+        <div className="mt-auto p-6 border-t border-gray-700">
           <div className="flex items-center justify-between">
             <div className="flex items-center">
               <div className="w-10 h-10 bg-green-500 rounded-full flex items-center justify-center mr-3">
@@ -65,5 +73,28 @@ export function NavigationSidebar({ user }: NavigationSidebarProps) {
         </div>
       )}
     </div>
+  );
+
+  return (
+    <>
+      {/* Mobile Menu Button */}
+      <div className="lg:hidden fixed top-4 left-4 z-50">
+        <Sheet open={isOpen} onOpenChange={setIsOpen}>
+          <SheetTrigger asChild>
+            <Button variant="outline" size="icon" className="bg-black border-gray-700 text-white hover:bg-gray-800">
+              <Menu size={20} />
+            </Button>
+          </SheetTrigger>
+          <SheetContent side="left" className="w-64 bg-black text-white p-0 border-gray-700">
+            <SidebarContent />
+          </SheetContent>
+        </Sheet>
+      </div>
+
+      {/* Desktop Sidebar */}
+      <div className="hidden lg:block w-64 bg-black h-screen fixed left-0 top-0 z-40 overflow-y-auto">
+        <SidebarContent />
+      </div>
+    </>
   );
 }

@@ -78,6 +78,15 @@ PhishDraft is a fantasy sports application specifically designed for Phish conce
 - **User Experience**: Clear success messages, redirect flows, and error handling
 - **Login Integration**: Added "Forgot your password?" link to login page for easy access
 
+### July 24, 2025 - Mobile-Responsive Collapsible Sidebar Implementation
+- **NEW**: Mobile-responsive sidebar that no longer takes up half the phone screen
+- **Collapsible Design**: Sidebar now collapses into a hamburger menu on mobile devices
+- **Sheet Component**: Uses shadcn Sheet component for smooth mobile overlay experience
+- **Responsive Layout**: Desktop shows fixed sidebar, mobile shows collapsible menu button
+- **Improved Navigation**: Menu automatically closes after navigation on mobile
+- **Layout Optimization**: Added proper spacing and padding for mobile viewport
+- **Removed Fixed Mobile Nav**: Eliminated bottom mobile navigation in favor of unified sidebar approach
+
 ## User Preferences
 
 Preferred communication style: Simple, everyday language.
