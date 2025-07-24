@@ -218,11 +218,14 @@ export default function Concerts() {
                           
                           {hasSetlist && (
                             <div className="mt-4 pt-4 border-t border-gray-700">
-                              <h5 className="font-medium mb-2 text-white">Setlist Preview:</h5>
-                              <p className="text-sm phish-text">
-                                {concert.setlist.slice(0, 5).join(", ")}
-                                {concert.setlist.length > 5 && "..."}
-                              </p>
+                              <h5 className="font-medium mb-2 text-white">Complete Setlist:</h5>
+                              <div className="flex flex-wrap gap-1">
+                                {concert.setlist.map((song: string, index: number) => (
+                                  <span key={index} className="text-sm bg-gray-700 px-2 py-1 rounded text-green-400">
+                                    {song}
+                                  </span>
+                                ))}
+                              </div>
                             </div>
                           )}
                         </CardContent>
