@@ -12,7 +12,7 @@ const DEMO_USER_ID = 1;
 
 export default function Dashboard() {
   const { data: dashboardData, isLoading } = useQuery({
-    queryKey: ["/api/dashboard", { userId: DEMO_USER_ID }],
+    queryKey: [`/api/dashboard?userId=${DEMO_USER_ID}`],
   });
 
   if (isLoading) {
