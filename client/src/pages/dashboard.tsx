@@ -187,7 +187,7 @@ export default function Dashboard() {
                         <div 
                           key={concert.id || index} 
                           className="border phish-border rounded-lg p-4 hover:border-green-500 transition-colors cursor-pointer"
-                          onClick={() => window.open(`https://phish.net/setlists/phish-${format(new Date(concert.date), "MM-dd-yyyy")}-${concert.venue.toLowerCase().replace(/\s+/g, '-').replace(/[^a-z0-9-]/g, '')}-${concert.city.toLowerCase().replace(/\s+/g, '-')}-${concert.state.toLowerCase()}.html`, '_blank')}
+                          onClick={() => window.open(`https://phish.net/setlists/phish-${format(new Date(concert.date), "MMMM-dd-yyyy").toLowerCase()}-${concert.venue.toLowerCase().replace(/\s+/g, '-').replace(/[^a-z0-9-]/g, '')}-${concert.city.toLowerCase().replace(/\s+/g, '-')}-${concert.state.toLowerCase()}-usa.html`, '_blank')}
                         >
                           <div className="flex justify-between items-start mb-2">
                             <div>
@@ -234,7 +234,7 @@ export default function Dashboard() {
                           <div 
                             key={concert.id || index} 
                             className="border phish-border rounded-lg p-4 hover:border-green-500 transition-colors cursor-pointer"
-                            onClick={() => window.open(`https://phish.net/setlists/phish-${format(new Date(concert.date), "MM-dd-yyyy")}-${concert.venue.toLowerCase().replace(/\s+/g, '-').replace(/[^a-z0-9-]/g, '')}-${concert.city.toLowerCase().replace(/\s+/g, '-')}-${concert.state.toLowerCase()}.html`, '_blank')}
+                            onClick={() => window.open(`https://phish.net/setlists/phish-${format(new Date(concert.date), "MMMM-dd-yyyy").toLowerCase()}-${concert.venue.toLowerCase().replace(/\s+/g, '-').replace(/[^a-z0-9-]/g, '')}-${concert.city.toLowerCase().replace(/\s+/g, '-')}-${concert.state.toLowerCase()}-usa.html`, '_blank')}
                           >
                             <div className="flex justify-between items-start mb-2">
                               <div>

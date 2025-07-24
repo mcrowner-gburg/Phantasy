@@ -81,7 +81,11 @@ export default function Concerts() {
                     const isSpecial = format(new Date(concert.date), "MM-dd") === "12-31";
                     
                     return (
-                      <Card key={concert.id} className="bg-black bg-opacity-50 border border-gray-600 hover:border-green-500 transition-colors">
+                      <Card 
+                        key={concert.id} 
+                        className="bg-black bg-opacity-50 border border-gray-600 hover:border-green-500 transition-colors cursor-pointer"
+                        onClick={() => window.open(`https://phish.net/setlists/phish-${format(new Date(concert.date), "MMMM-dd-yyyy").toLowerCase()}-${concert.venue.toLowerCase().replace(/\s+/g, '-').replace(/[^a-z0-9-]/g, '')}-${concert.city.toLowerCase().replace(/\s+/g, '-')}-${concert.state.toLowerCase()}-usa.html`, '_blank')}
+                      >
                         <CardContent className="p-4">
                           <div className="flex justify-between items-start mb-3">
                             <Badge className={status.color}>
@@ -107,7 +111,7 @@ export default function Concerts() {
                           
                           <Button variant="outline" className="w-full mt-4 border-gray-600 hover:border-green-500">
                             <ExternalLink className="mr-2" size={14} />
-                            View Details
+                            View on Phish.net
                           </Button>
                         </CardContent>
                       </Card>
@@ -162,7 +166,7 @@ export default function Concerts() {
                       <Card 
                         key={concert.id} 
                         className="bg-black bg-opacity-30 border border-gray-600 hover:border-green-500 transition-colors cursor-pointer"
-                        onClick={() => window.open(`https://phish.net/setlists/phish-${format(new Date(concert.date), "MM-dd-yyyy")}-${concert.venue.toLowerCase().replace(/\s+/g, '-').replace(/[^a-z0-9-]/g, '')}-${concert.city.toLowerCase().replace(/\s+/g, '-')}-${concert.state.toLowerCase()}.html`, '_blank')}
+                        onClick={() => window.open(`https://phish.net/setlists/phish-${format(new Date(concert.date), "MMMM-dd-yyyy").toLowerCase()}-${concert.venue.toLowerCase().replace(/\s+/g, '-').replace(/[^a-z0-9-]/g, '')}-${concert.city.toLowerCase().replace(/\s+/g, '-')}-${concert.state.toLowerCase()}-usa.html`, '_blank')}
                       >
                         <CardContent className="p-4">
                           <div className="flex items-center justify-between">
