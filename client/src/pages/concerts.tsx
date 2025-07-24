@@ -159,7 +159,11 @@ export default function Concerts() {
                     const hasSetlist = concert.setlist && concert.setlist.length > 0;
                     
                     return (
-                      <Card key={concert.id} className="bg-black bg-opacity-30 border border-gray-600 hover:border-green-500 transition-colors">
+                      <Card 
+                        key={concert.id} 
+                        className="bg-black bg-opacity-30 border border-gray-600 hover:border-green-500 transition-colors cursor-pointer"
+                        onClick={() => window.open(`https://phish.net/setlists/phish-${format(new Date(concert.date), "MM-dd-yyyy")}-${concert.venue.toLowerCase().replace(/\s+/g, '-').replace(/[^a-z0-9-]/g, '')}-${concert.city.toLowerCase().replace(/\s+/g, '-')}-${concert.state.toLowerCase()}.html`, '_blank')}
+                      >
                         <CardContent className="p-4">
                           <div className="flex items-center justify-between">
                             <div className="flex items-center space-x-4">

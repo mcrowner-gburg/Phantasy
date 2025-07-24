@@ -184,7 +184,11 @@ export default function Dashboard() {
                   <div className="space-y-4">
                     {recentConcerts?.length > 0 ? (
                       recentConcerts.map((concert: any, index: number) => (
-                        <div key={concert.id || index} className="border phish-border rounded-lg p-4 hover:border-green-500 transition-colors cursor-pointer">
+                        <div 
+                          key={concert.id || index} 
+                          className="border phish-border rounded-lg p-4 hover:border-green-500 transition-colors cursor-pointer"
+                          onClick={() => window.open(`https://phish.net/setlists/phish-${format(new Date(concert.date), "MM-dd-yyyy")}-${concert.venue.toLowerCase().replace(/\s+/g, '-').replace(/[^a-z0-9-]/g, '')}-${concert.city.toLowerCase().replace(/\s+/g, '-')}-${concert.state.toLowerCase()}.html`, '_blank')}
+                        >
                           <div className="flex justify-between items-start mb-2">
                             <div>
                               <p className="font-bold text-green-500">{format(new Date(concert.date), "MMM dd, yyyy")}</p>
@@ -227,7 +231,11 @@ export default function Dashboard() {
                         const isNYE = format(new Date(concert.date), "MM-dd") === "12-31";
                         
                         return (
-                          <div key={concert.id || index} className="border phish-border rounded-lg p-4 hover:border-green-500 transition-colors cursor-pointer">
+                          <div 
+                            key={concert.id || index} 
+                            className="border phish-border rounded-lg p-4 hover:border-green-500 transition-colors cursor-pointer"
+                            onClick={() => window.open(`https://phish.net/setlists/phish-${format(new Date(concert.date), "MM-dd-yyyy")}-${concert.venue.toLowerCase().replace(/\s+/g, '-').replace(/[^a-z0-9-]/g, '')}-${concert.city.toLowerCase().replace(/\s+/g, '-')}-${concert.state.toLowerCase()}.html`, '_blank')}
+                          >
                             <div className="flex justify-between items-start mb-2">
                               <div>
                                 <p className="font-bold text-green-500">{format(new Date(concert.date), "MMM dd, yyyy")}</p>
