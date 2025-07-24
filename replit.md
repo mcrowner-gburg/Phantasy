@@ -4,6 +4,15 @@
 
 PhishDraft is a fantasy sports application specifically designed for Phish concerts, where users can draft songs and earn points based on actual concert performances. The application allows users to create and join leagues, draft songs with rarity-based scoring, track upcoming concerts, and compete on leaderboards.
 
+## Recent Changes
+
+### July 24, 2025 - Dashboard Concert Integration
+- Successfully integrated Phish.net API v5 for authentic concert data
+- Updated dashboard to display last 3 completed shows in "Recent Shows" section
+- Limited upcoming concerts to 3 shows with proper venue and location details
+- Fixed dashboard routing and API query implementation for proper data fetching
+- Dashboard now shows real Phish concert venues: Forest Hills Stadium, United Center, Hampton Coliseum
+
 ## User Preferences
 
 Preferred communication style: Simple, everyday language.
