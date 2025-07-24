@@ -3,6 +3,7 @@ import { createServer, type Server } from "http";
 import { storage } from "./storage";
 import { insertUserSchema, insertTourSchema, insertLeagueSchema, insertDraftedSongSchema, insertSongPerformanceSchema } from "@shared/schema";
 import { z } from "zod";
+import { phishApi } from "./services/phish-api";
 
 export async function registerRoutes(app: Express): Promise<Server> {
   // Authentication routes
@@ -189,11 +190,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Draft routes
   app.get("/api/drafted-songs", async (req, res) => {
     try {
-      const userId = parseInt(req.query.userId as string);
-      const leagueId = parseInt(req.query.leagueId as string);
+      const userIdStr = req.query.userId as string;
+      const leagueIdStr = req.query.leagueId as string;
       
-      if (!userId || !leagueId) {
+      if (!userIdStr || !leagueIdStr) {
         return res.status(400).json({ message: "User ID and League ID required" });
+      }
+      
+      const userId = parseInt(userIdStr);
+      const leagueId = parseInt(leagueIdStr);
+      
+      if (isNaN(userId) || isNaN(leagueId)) {
+        return res.status(400).json({ message: "Invalid User ID or League ID" });
       }
       
       const draftedSongs = await storage.getDraftedSongs(userId, leagueId);
@@ -224,8 +232,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           draftData.userId,
           draftData.leagueId,
           "draft",
-          `You drafted "${song.title}"`,
-          song.rarityScore || 0
+          `You drafted "${song.title}"`
         );
       }
       
@@ -238,19 +245,67 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Concert routes
   app.get("/api/concerts", async (req, res) => {
     try {
-      const concerts = await storage.getConcerts();
+      // Get recent shows from Phish.net API
+      const recentShows = await phishApi.getRecentShows(20);
+      
+      // Transform Phish.net data to our format
+      const concerts = recentShows.map(show => ({
+        id: parseInt(show.showid),
+        tourId: 1, // Associate with current tour
+        date: new Date(show.showdate),
+        venue: show.venue,
+        city: show.city,
+        state: show.state,
+        country: show.country,
+        setlist: [], // Will be populated when setlist is fetched
+        isCompleted: true, // Recent shows are completed
+      }));
+      
       res.json(concerts);
     } catch (error) {
+      console.error("Error fetching concerts:", error);
       res.status(500).json({ message: "Failed to fetch concerts" });
     }
   });
 
   app.get("/api/concerts/upcoming", async (req, res) => {
     try {
-      const concerts = await storage.getUpcomingConcerts();
+      // Get upcoming shows from Phish.net API
+      const upcomingShows = await phishApi.getUpcomingShows();
+      
+      // Transform Phish.net data to our format
+      const concerts = upcomingShows.map(show => ({
+        id: parseInt(show.showid),
+        tourId: 1, // Associate with current tour
+        date: new Date(show.showdate),
+        venue: show.venue,
+        city: show.city,
+        state: show.state,
+        country: show.country,
+        setlist: [],
+        isCompleted: false,
+      }));
+      
       res.json(concerts);
     } catch (error) {
+      console.error("Error fetching upcoming concerts:", error);
       res.status(500).json({ message: "Failed to fetch upcoming concerts" });
+    }
+  });
+
+  app.get("/api/concerts/:id/setlist", async (req, res) => {
+    try {
+      const showId = req.params.id;
+      const setlistData = await phishApi.getSetlist(showId);
+      
+      if (!setlistData) {
+        return res.status(404).json({ message: "Setlist not found" });
+      }
+      
+      res.json(setlistData);
+    } catch (error) {
+      console.error("Error fetching setlist:", error);
+      res.status(500).json({ message: "Failed to fetch setlist" });
     }
   });
 
@@ -288,7 +343,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.get("/api/concerts/:id/performances", async (req, res) => {
     try {
-      const concertId = parseInt(req.params.id);
+      const concertIdStr = req.params.id;
+      const concertId = parseInt(concertIdStr);
+      
+      if (isNaN(concertId)) {
+        return res.status(400).json({ message: "Invalid concert ID" });
+      }
+      
       const performances = await storage.getConcertPerformances(concertId);
       res.json(performances);
     } catch (error) {
@@ -335,8 +396,19 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Get recent activities
       const recentActivities = await storage.getUserActivities(userId, currentLeague.id);
       
-      // Get upcoming concerts
-      const upcomingConcerts = await storage.getUpcomingConcerts();
+      // Get upcoming concerts from Phish.net API
+      const upcomingShows = await phishApi.getUpcomingShows();
+      const upcomingConcerts = upcomingShows.map(show => ({
+        id: parseInt(show.showid),
+        tourId: 1,
+        date: new Date(show.showdate),
+        venue: show.venue,
+        city: show.city,
+        state: show.state,
+        country: show.country,
+        setlist: [],
+        isCompleted: false,
+      }));
       
       // Get league standings
       const leagueStandings = await storage.getLeagueStandings(currentLeague.id);

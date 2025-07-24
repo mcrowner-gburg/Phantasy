@@ -23,7 +23,7 @@ export class PhishNetService {
     this.apiKey =
       process.env.PHISH_NET_API_KEY ||
       process.env.PHISH_API_KEY ||
-      "	6F27E04F96EAC8C2C21B";
+      "6F27E04F96EAC8C2C21B";
   }
 
   async getUpcomingShows(): Promise<PhishNetShow[]> {

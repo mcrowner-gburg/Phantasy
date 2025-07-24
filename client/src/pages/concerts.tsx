@@ -55,8 +55,21 @@ export default function Concerts() {
         </header>
 
         <main className="p-8 pb-20 lg:pb-8 space-y-8">
+          {/* API Status Info */}
+          <Card className="glassmorphism border-gray-600">
+            <CardContent className="p-4">
+              <div className="flex items-center justify-between">
+                <h3 className="text-lg font-bold">Live Data from Phish.net</h3>
+                <Badge className="bg-green-500 text-black">Connected</Badge>
+              </div>
+              <p className="text-sm phish-text mt-2">
+                Showing live concert data and setlists from the official Phish.net API
+              </p>
+            </CardContent>
+          </Card>
+
           {/* Upcoming Shows */}
-          {upcomingConcerts?.length > 0 && (
+          {upcomingConcerts?.length > 0 ? (
             <Card className="glassmorphism border-gray-600">
               <CardContent className="p-6">
                 <h3 className="text-xl font-bold mb-6 flex items-center">
@@ -102,6 +115,20 @@ export default function Concerts() {
                       </Card>
                     );
                   })}
+                </div>
+              </CardContent>
+            </Card>
+          ) : (
+            <Card className="glassmorphism border-gray-600">
+              <CardContent className="p-6">
+                <h3 className="text-xl font-bold mb-6 flex items-center">
+                  <Calendar className="mr-2 text-green-500" size={24} />
+                  Upcoming Shows
+                </h3>
+                <div className="text-center py-8 phish-text">
+                  <Calendar className="mx-auto mb-4 text-gray-400" size={48} />
+                  <p className="text-lg mb-2">No upcoming shows scheduled</p>
+                  <p>Check back later for new tour announcements</p>
                 </div>
               </CardContent>
             </Card>
