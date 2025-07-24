@@ -14,10 +14,18 @@ import {
   InsertDraftedSong,
   InsertConcert,
   InsertSongPerformance,
-  users
+  users,
+  tours,
+  leagues,
+  songs,
+  draftedSongs,
+  concerts,
+  songPerformances,
+  activities,
+  leagueMembers
 } from "@shared/schema";
 import { db } from "./db";
-import { eq } from "drizzle-orm";
+import { eq, and, sql } from "drizzle-orm";
 
 // Interface for storage operations
 export interface IStorage {
@@ -35,11 +43,14 @@ export interface IStorage {
 
   // League operations
   getLeague(id: number): Promise<League | undefined>;
+  getAllLeagues(): Promise<League[]>;
+  getPublicLeagues(tourId?: number): Promise<(League & { memberCount: number })[]>;
   createLeague(league: InsertLeague & { ownerId: number }): Promise<League>;
   getUserLeagues(userId: number): Promise<League[]>;
   getTourLeagues(tourId: number): Promise<League[]>;
   joinLeague(userId: number, leagueId: number): Promise<void>;
   getLeagueMembers(leagueId: number): Promise<(LeagueMember & { user: User })[]>;
+  getLeagueMemberCount(leagueId: number): Promise<number>;
 
   // Song operations
   getAllSongs(): Promise<Song[]>;
@@ -125,27 +136,78 @@ export class DatabaseStorage implements IStorage {
     return { id: 1, ...tour, createdAt: new Date() } as Tour;
   }
 
-  // League operations - stub implementations
+  // League operations - database implementations
   async getLeague(id: number): Promise<League | undefined> {
-    return {
-      id: 1,
-      name: "Winter Tour Fantasy League",
-      description: "Draft songs for the NYE run and winter shows",
-      tourId: 1,
-      ownerId: 1,
-      maxPlayers: 24,
-      draftStatus: "active",
-      createdAt: new Date(),
-    };
+    const [league] = await db
+      .select()
+      .from(leagues)
+      .where(eq(leagues.id, id));
+    
+    return league || undefined;
+  }
+
+  async getAllLeagues(): Promise<League[]> {
+    return await db.select().from(leagues);
+  }
+
+  async getPublicLeagues(tourId?: number): Promise<(League & { memberCount: number })[]> {
+    const query = db
+      .select({
+        id: leagues.id,
+        name: leagues.name,
+        description: leagues.description,
+        tourId: leagues.tourId,
+        ownerId: leagues.ownerId,
+        maxPlayers: leagues.maxPlayers,
+        draftStatus: leagues.draftStatus,
+        createdAt: leagues.createdAt,
+        memberCount: sql<number>`count(${leagueMembers.id})`,
+      })
+      .from(leagues)
+      .leftJoin(leagueMembers, eq(leagues.id, leagueMembers.leagueId))
+      .groupBy(leagues.id);
+    
+    if (tourId) {
+      query.where(eq(leagues.tourId, tourId));
+    }
+    
+    return await query;
   }
 
   async createLeague(league: InsertLeague & { ownerId: number }): Promise<League> {
-    return { id: 1, ...league, createdAt: new Date() } as League;
+    const [newLeague] = await db
+      .insert(leagues)
+      .values(league)
+      .returning();
+    
+    // Automatically add the creator as a league member
+    await db
+      .insert(leagueMembers)
+      .values({
+        leagueId: newLeague.id,
+        userId: league.ownerId,
+      });
+    
+    return newLeague;
   }
 
   async getUserLeagues(userId: number): Promise<League[]> {
-    const league = await this.getLeague(1);
-    return league ? [league] : [];
+    const userLeagues = await db
+      .select({
+        id: leagues.id,
+        name: leagues.name,
+        description: leagues.description,
+        tourId: leagues.tourId,
+        ownerId: leagues.ownerId,
+        maxPlayers: leagues.maxPlayers,
+        draftStatus: leagues.draftStatus,
+        createdAt: leagues.createdAt,
+      })
+      .from(leagues)
+      .innerJoin(leagueMembers, eq(leagues.id, leagueMembers.leagueId))
+      .where(eq(leagueMembers.userId, userId));
+    
+    return userLeagues;
   }
 
   async getTourLeagues(tourId: number): Promise<League[]> {
@@ -154,11 +216,66 @@ export class DatabaseStorage implements IStorage {
   }
 
   async joinLeague(userId: number, leagueId: number): Promise<void> {
-    // Stub implementation
+    // Check if user is already a member
+    const existingMember = await db
+      .select()
+      .from(leagueMembers)
+      .where(and(eq(leagueMembers.userId, userId), eq(leagueMembers.leagueId, leagueId)))
+      .limit(1);
+    
+    if (existingMember.length > 0) {
+      throw new Error("User is already a member of this league");
+    }
+    
+    // Check if league is at capacity
+    const league = await this.getLeague(leagueId);
+    if (!league) {
+      throw new Error("League not found");
+    }
+    
+    const memberCount = await this.getLeagueMemberCount(leagueId);
+    if (memberCount >= league.maxPlayers) {
+      throw new Error("League is at maximum capacity");
+    }
+    
+    // Add user to league
+    await db
+      .insert(leagueMembers)
+      .values({
+        leagueId,
+        userId,
+      });
   }
 
   async getLeagueMembers(leagueId: number): Promise<(LeagueMember & { user: User })[]> {
-    return [];
+    const members = await db
+      .select({
+        id: leagueMembers.id,
+        leagueId: leagueMembers.leagueId,
+        userId: leagueMembers.userId,
+        joinedAt: leagueMembers.joinedAt,
+        user: {
+          id: users.id,
+          username: users.username,
+          password: users.password,
+          totalPoints: users.totalPoints,
+          createdAt: users.createdAt,
+        },
+      })
+      .from(leagueMembers)
+      .innerJoin(users, eq(leagueMembers.userId, users.id))
+      .where(eq(leagueMembers.leagueId, leagueId));
+    
+    return members;
+  }
+
+  async getLeagueMemberCount(leagueId: number): Promise<number> {
+    const result = await db
+      .select({ count: sql<number>`count(*)` })
+      .from(leagueMembers)
+      .where(eq(leagueMembers.leagueId, leagueId));
+    
+    return result[0]?.count || 0;
   }
 
   private songsCache: Song[] | null = null;

@@ -8,7 +8,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
-import { Users, Plus, Trophy, Calendar, Settings } from "lucide-react";
+import { Users, Plus, Trophy, Calendar, Settings, Eye } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest } from "@/lib/queryClient";
 
@@ -16,6 +16,7 @@ const DEMO_USER_ID = 1;
 
 export default function Leagues() {
   const [isCreateOpen, setIsCreateOpen] = useState(false);
+  const [activeTab, setActiveTab] = useState<"my-leagues" | "browse">("my-leagues");
   const [newLeague, setNewLeague] = useState({
     name: "",
     description: "",
@@ -26,8 +27,13 @@ export default function Leagues() {
   const { toast } = useToast();
   const queryClient = useQueryClient();
 
-  const { data: leagues, isLoading } = useQuery({
+  const { data: myLeagues, isLoading: isLoadingMyLeagues } = useQuery({
     queryKey: ["/api/leagues", { userId: DEMO_USER_ID }],
+  });
+
+  const { data: publicLeagues, isLoading: isLoadingPublic } = useQuery({
+    queryKey: ["/api/leagues", { public: true }],
+    enabled: activeTab === "browse",
   });
 
   const { data: tours } = useQuery({
@@ -63,6 +69,28 @@ export default function Leagues() {
     },
   });
 
+  const joinLeagueMutation = useMutation({
+    mutationFn: async (leagueId: number) => {
+      return apiRequest("POST", `/api/leagues/${leagueId}/join`, {
+        userId: DEMO_USER_ID,
+      });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/leagues"] });
+      toast({
+        title: "Successfully joined league!",
+        description: "You can now draft songs and compete.",
+      });
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Failed to join league",
+        description: error.message || "Please try again later.",
+        variant: "destructive",
+      });
+    },
+  });
+
   const handleCreateLeague = () => {
     if (!newLeague.name.trim()) {
       toast({
@@ -89,6 +117,24 @@ export default function Leagues() {
               </p>
             </div>
             <div className="flex items-center space-x-4">
+              <div className="flex bg-black/50 rounded-lg p-1 border border-gray-600">
+                <Button
+                  variant={activeTab === "my-leagues" ? "default" : "ghost"}
+                  size="sm"
+                  onClick={() => setActiveTab("my-leagues")}
+                  className={activeTab === "my-leagues" ? "gradient-button" : "text-white hover:bg-gray-700"}
+                >
+                  My Leagues
+                </Button>
+                <Button
+                  variant={activeTab === "browse" ? "default" : "ghost"}
+                  size="sm"
+                  onClick={() => setActiveTab("browse")}
+                  className={activeTab === "browse" ? "gradient-button" : "text-white hover:bg-gray-700"}
+                >
+                  Browse
+                </Button>
+              </div>
               <Dialog open={isCreateOpen} onOpenChange={setIsCreateOpen}>
                 <DialogTrigger asChild>
                   <Button className="gradient-button px-6 py-2 rounded-full font-medium hover:opacity-90 transition-opacity">
@@ -165,9 +211,9 @@ export default function Leagues() {
                 </div>
               ))}
             </div>
-          ) : leagues?.length > 0 ? (
+          ) : activeTab === "my-leagues" && myLeagues?.length > 0 ? (
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-              {leagues.map((league: any) => (
+              {myLeagues.map((league: any) => (
                 <Card key={league.id} className="glassmorphism border-gray-600 hover:border-green-500 transition-colors">
                   <CardContent className="p-6">
                     <div className="flex items-start justify-between mb-4">
@@ -216,6 +262,92 @@ export default function Leagues() {
                 </Card>
               ))}
             </div>
+          ) : activeTab === "browse" ? (
+            // Browse Public Leagues Tab
+            isLoadingPublic ? (
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                {[1, 2, 3].map((i) => (
+                  <div key={i} className="animate-pulse">
+                    <div className="h-48 bg-gray-700 rounded-xl"></div>
+                  </div>
+                ))}
+              </div>
+            ) : publicLeagues && publicLeagues.length > 0 ? (
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                {publicLeagues.map((league: any) => (
+                  <Card key={league.id} className="glassmorphism border-gray-600 hover:border-blue-500 transition-colors">
+                    <CardContent className="p-6">
+                      <div className="flex items-start justify-between mb-4">
+                        <div className="w-12 h-12 bg-gradient-to-r from-blue-500 to-purple-500 rounded-lg flex items-center justify-center">
+                          <Trophy className="text-white" size={24} />
+                        </div>
+                        <Badge className="bg-blue-500 text-white">
+                          PUBLIC
+                        </Badge>
+                      </div>
+
+                      <h3 className="text-xl font-bold text-white mb-2">{league.name}</h3>
+                      {league.description && (
+                        <p className="phish-text text-sm mb-4">{league.description}</p>
+                      )}
+
+                      <div className="space-y-3">
+                        <div className="flex items-center justify-between text-sm">
+                          <div className="flex items-center phish-text">
+                            <Users className="mr-2" size={16} />
+                            Players
+                          </div>
+                          <span className="text-white font-medium">{league.memberCount || 0}/{league.maxPlayers}</span>
+                        </div>
+
+                        <div className="flex items-center justify-between text-sm">
+                          <div className="flex items-center phish-text">
+                            <Calendar className="mr-2" size={16} />
+                            Created
+                          </div>
+                          <span className="text-white font-medium">
+                            {league.createdAt ? new Date(league.createdAt).toLocaleDateString() : "Unknown"}
+                          </span>
+                        </div>
+                      </div>
+
+                      <div className="flex space-x-2 mt-6">
+                        <Button 
+                          className="flex-1 bg-blue-600 hover:bg-blue-700 text-white"
+                          onClick={() => joinLeagueMutation.mutate(league.id)}
+                          disabled={joinLeagueMutation.isPending || (league.memberCount >= league.maxPlayers)}
+                        >
+                          {joinLeagueMutation.isPending ? "Joining..." : 
+                           league.memberCount >= league.maxPlayers ? "Full" : "Join League"}
+                        </Button>
+                        <Button variant="outline" className="border-gray-600 p-2">
+                          <Eye size={16} />
+                        </Button>
+                      </div>
+                    </CardContent>
+                  </Card>
+                ))}
+              </div>
+            ) : (
+              <div className="text-center py-12">
+                <Card className="glassmorphism border-gray-600 max-w-md mx-auto">
+                  <CardContent className="p-8">
+                    <Trophy className="mx-auto mb-4 phish-text" size={64} />
+                    <h3 className="text-xl font-bold text-white mb-2">No Public Leagues</h3>
+                    <p className="phish-text mb-6">
+                      No public leagues are available right now. Create one to get started!
+                    </p>
+                    <Button
+                      className="gradient-button w-full"
+                      onClick={() => setIsCreateOpen(true)}
+                    >
+                      <Plus className="mr-2" size={16} />
+                      Create First League
+                    </Button>
+                  </CardContent>
+                </Card>
+              </div>
+            )
           ) : (
             <div className="text-center py-12">
               <Card className="glassmorphism border-gray-600 max-w-md mx-auto">

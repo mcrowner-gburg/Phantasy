@@ -77,13 +77,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // League routes
   app.get("/api/leagues", async (req, res) => {
     try {
-      const userId = parseInt(req.query.userId as string);
-      if (!userId) {
-        return res.status(400).json({ message: "User ID required" });
-      }
+      const { userId, tourId, public: isPublic } = req.query;
       
-      const leagues = await storage.getUserLeagues(userId);
-      res.json(leagues);
+      if (isPublic === "true") {
+        const leagues = await storage.getPublicLeagues(tourId ? parseInt(tourId as string) : undefined);
+        res.json(leagues);
+      } else if (userId) {
+        const leagues = await storage.getUserLeagues(parseInt(userId as string));
+        res.json(leagues);
+      } else {
+        return res.status(400).json({ message: "User ID required or use public=true" });
+      }
     } catch (error) {
       res.status(500).json({ message: "Failed to fetch leagues" });
     }
@@ -116,8 +120,33 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       await storage.joinLeague(userId, leagueId);
       res.json({ message: "Successfully joined league" });
+    } catch (error: any) {
+      res.status(400).json({ message: error.message || "Failed to join league" });
+    }
+  });
+
+  app.get("/api/leagues/:id", async (req, res) => {
+    try {
+      const leagueId = parseInt(req.params.id);
+      const league = await storage.getLeague(leagueId);
+      
+      if (!league) {
+        return res.status(404).json({ message: "League not found" });
+      }
+      
+      res.json(league);
     } catch (error) {
-      res.status(500).json({ message: "Failed to join league" });
+      res.status(500).json({ message: "Failed to fetch league" });
+    }
+  });
+
+  app.get("/api/leagues/:id/members", async (req, res) => {
+    try {
+      const leagueId = parseInt(req.params.id);
+      const members = await storage.getLeagueMembers(leagueId);
+      res.json(members);
+    } catch (error) {
+      res.status(500).json({ message: "Failed to fetch league members" });
     }
   });
 
