@@ -50,6 +50,7 @@ PhishDraft is a fantasy sports application specifically designed for Phish conce
 - Updated activity descriptions to reflect new point breakdown: "played (+1 pt) and opened first set (+1 pt)"
 - Streamlined song catalog with realistic 24-month performance data for informed drafting decisions
 - Enhanced performance tracking with clear point attribution for each scoring category
+- **Points Correction**: Fixed user's drafted song points to match correct 4-point system: Wilson (5), Fluffhead (2), Tweezer (5)
 
 ### July 24, 2025 - Draft Limit Reduction & Comprehensive Song Catalog
 - Reduced maximum drafted songs per user from 20 to 10 for more strategic gameplay
