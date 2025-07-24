@@ -106,34 +106,24 @@ export class DatabaseStorage implements IStorage {
 
 
 
-  // Tour operations - stub implementations
+  // Tour operations - database implementations
   async getTours(): Promise<Tour[]> {
-    return [{
-      id: 1,
-      name: "Winter Tour 2024",
-      year: 2024,
-      season: "winter",
-      description: "NYE run and winter shows",
-      startDate: new Date("2024-12-28"),
-      endDate: new Date("2024-01-15"),
-      isActive: true,
-      createdAt: new Date(),
-    }];
+    return await db.select().from(tours).orderBy(tours.id);
   }
 
   async getActiveTour(): Promise<Tour | undefined> {
-    const tours = await this.getTours();
-    return tours.find(t => t.isActive);
+    const [tour] = await db.select().from(tours).where(eq(tours.isActive, true));
+    return tour || undefined;
   }
 
   async getTour(id: number): Promise<Tour | undefined> {
-    const tours = await this.getTours();
-    return tours.find(t => t.id === id);
+    const [tour] = await db.select().from(tours).where(eq(tours.id, id));
+    return tour || undefined;
   }
 
   async createTour(tour: InsertTour): Promise<Tour> {
-    // Stub implementation
-    return { id: 1, ...tour, createdAt: new Date() } as Tour;
+    const [newTour] = await db.insert(tours).values(tour).returning();
+    return newTour;
   }
 
   // League operations - database implementations
