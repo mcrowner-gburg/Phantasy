@@ -30,7 +30,7 @@ export class PhishNetService {
     try {
       const today = new Date().toISOString().split("T")[0];
       const response = await fetch(
-        `${this.baseUrl}/shows/upcoming.json?apikey=${this.apiKey}&date=${today}`,
+        `${this.baseUrl}/shows/query.json?apikey=${this.apiKey}&showdate_gte=${today}&order=showdate_asc`,
       );
 
       if (!response.ok) {
@@ -38,17 +38,18 @@ export class PhishNetService {
       }
 
       const data = await response.json();
-      return data.response?.data || [];
+      return data.data || [];
     } catch (error) {
       console.error("Error fetching upcoming shows:", error);
       return [];
     }
   }
 
-  async getRecentShows(limit = 10): Promise<PhishNetShow[]> {
+  async getRecentShows(limit = 20): Promise<PhishNetShow[]> {
     try {
+      // Get shows from 2025 since that's the current year
       const response = await fetch(
-        `${this.baseUrl}/shows/recent.json?apikey=${this.apiKey}&limit=${limit}`,
+        `${this.baseUrl}/shows/query.json?apikey=${this.apiKey}&year=2025&order=showdate_desc&limit=${limit}`,
       );
 
       if (!response.ok) {
@@ -56,7 +57,7 @@ export class PhishNetService {
       }
 
       const data = await response.json();
-      return data.response?.data || [];
+      return data.data || [];
     } catch (error) {
       console.error("Error fetching recent shows:", error);
       return [];
