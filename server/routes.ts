@@ -448,17 +448,20 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       // Get upcoming concerts from Phish.net API
       const upcomingShows = await phishApi.getUpcomingShows();
-      const upcomingConcerts = upcomingShows.slice(0, 3).map((show: any) => ({
-        id: parseInt(show.showid),
-        tourId: 1,
-        date: new Date(show.showdate),
-        venue: show.venue,
-        city: show.city,
-        state: show.state,
-        country: show.country,
-        setlist: [],
-        isCompleted: false,
-      }));
+      const upcomingConcerts = upcomingShows
+        .map((show: any) => ({
+          id: parseInt(show.showid),
+          tourId: 1,
+          date: new Date(show.showdate),
+          venue: show.venue,
+          city: show.city,
+          state: show.state,
+          country: show.country,
+          setlist: [],
+          isCompleted: false,
+        }))
+        .sort((a: any, b: any) => new Date(a.date).getTime() - new Date(b.date).getTime())
+        .slice(0, 3);
       
       // Get league standings
       const leagueStandings = await storage.getLeagueStandings(currentLeague.id);
