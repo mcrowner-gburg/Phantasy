@@ -1,0 +1,111 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --background: hsl(0, 0%, 100%);
+  --foreground: hsl(20, 14.3%, 4.1%);
+  --muted: hsl(60, 4.8%, 95.9%);
+  --muted-foreground: hsl(25, 5.3%, 44.7%);
+  --popover: hsl(0, 0%, 100%);
+  --popover-foreground: hsl(20, 14.3%, 4.1%);
+  --card: hsl(0, 0%, 100%);
+  --card-foreground: hsl(20, 14.3%, 4.1%);
+  --border: hsl(20, 5.9%, 90%);
+  --input: hsl(20, 5.9%, 90%);
+  --primary: hsl(29, 84%, 54%);
+  --primary-foreground: hsl(60, 9.1%, 97.8%);
+  --secondary: hsl(60, 4.8%, 95.9%);
+  --secondary-foreground: hsl(24, 9.8%, 10%);
+  --accent: hsl(60, 4.8%, 95.9%);
+  --accent-foreground: hsl(24, 9.8%, 10%);
+  --destructive: hsl(0, 84.2%, 60.2%);
+  --destructive-foreground: hsl(60, 9.1%, 97.8%);
+  --ring: hsl(20, 14.3%, 4.1%);
+  --radius: 0.5rem;
+  
+  /* Phish-specific colors */
+  --phish-green: hsl(141, 84%, 44%);
+  --phish-dark: hsl(0, 0%, 9.8%);
+  --phish-card: hsl(0, 0%, 15.7%);
+  --phish-border: hsl(0, 0%, 32.5%);
+  --phish-orange: hsl(14, 100%, 60%);
+  --phish-gold: hsl(50, 100%, 62%);
+  --phish-text: hsl(0, 0%, 70%);
+}
+
+.dark {
+  --background: hsl(0, 0%, 9.8%);
+  --foreground: hsl(0, 0%, 98%);
+  --muted: hsl(0, 0%, 15.7%);
+  --muted-foreground: hsl(0, 0%, 70%);
+  --popover: hsl(0, 0%, 9.8%);
+  --popover-foreground: hsl(0, 0%, 98%);
+  --card: hsl(0, 0%, 15.7%);
+  --card-foreground: hsl(0, 0%, 98%);
+  --border: hsl(0, 0%, 32.5%);
+  --input: hsl(0, 0%, 32.5%);
+  --primary: hsl(141, 84%, 44%);
+  --primary-foreground: hsl(0, 0%, 9.8%);
+  --secondary: hsl(0, 0%, 15.7%);
+  --secondary-foreground: hsl(0, 0%, 98%);
+  --accent: hsl(0, 0%, 15.7%);
+  --accent-foreground: hsl(0, 0%, 98%);
+  --destructive: hsl(0, 62.8%, 30.6%);
+  --destructive-foreground: hsl(0, 0%, 98%);
+  --ring: hsl(0, 0%, 83.9%);
+  --radius: 0.5rem;
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+
+  body {
+    @apply font-sans antialiased;
+    background-color: var(--phish-dark);
+    color: white;
+    font-family: 'Inter', sans-serif;
+  }
+}
+
+@layer components {
+  .glassmorphism {
+    background: rgba(40, 40, 40, 0.8);
+    backdrop-filter: blur(10px);
+    border: 1px solid rgba(83, 83, 83, 0.3);
+  }
+  
+  .gradient-button {
+    background: linear-gradient(135deg, var(--phish-green) 0%, hsl(142, 85%, 55%) 100%);
+  }
+  
+  .score-gradient {
+    background: linear-gradient(135deg, var(--phish-gold) 0%, var(--phish-orange) 100%);
+  }
+  
+  .phish-card {
+    background-color: var(--phish-card);
+  }
+  
+  .phish-border {
+    border-color: var(--phish-border);
+  }
+  
+  .phish-text {
+    color: var(--phish-text);
+  }
+  
+  .phish-green {
+    color: var(--phish-green);
+  }
+  
+  .phish-orange {
+    color: var(--phish-orange);
+  }
+  
+  .phish-gold {
+    color: var(--phish-gold);
+  }
+}

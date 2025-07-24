@@ -1,0 +1,283 @@
+import type { Express } from "express";
+import { createServer, type Server } from "http";
+import { storage } from "./storage";
+import { insertUserSchema, insertLeagueSchema, insertDraftedSongSchema } from "@shared/schema";
+import { z } from "zod";
+
+export async function registerRoutes(app: Express): Promise<Server> {
+  // Authentication routes
+  app.post("/api/auth/register", async (req, res) => {
+    try {
+      const userData = insertUserSchema.parse(req.body);
+      
+      // Check if username already exists
+      const existingUser = await storage.getUserByUsername(userData.username);
+      if (existingUser) {
+        return res.status(400).json({ message: "Username already exists" });
+      }
+      
+      const user = await storage.createUser(userData);
+      res.json({ user: { id: user.id, username: user.username, totalPoints: user.totalPoints } });
+    } catch (error) {
+      res.status(400).json({ message: "Invalid user data" });
+    }
+  });
+
+  app.post("/api/auth/login", async (req, res) => {
+    try {
+      const { username, password } = req.body;
+      const user = await storage.getUserByUsername(username);
+      
+      if (!user || user.password !== password) {
+        return res.status(401).json({ message: "Invalid credentials" });
+      }
+      
+      res.json({ user: { id: user.id, username: user.username, totalPoints: user.totalPoints } });
+    } catch (error) {
+      res.status(500).json({ message: "Login failed" });
+    }
+  });
+
+  // User routes
+  app.get("/api/users/:id", async (req, res) => {
+    try {
+      const userId = parseInt(req.params.id);
+      const user = await storage.getUser(userId);
+      
+      if (!user) {
+        return res.status(404).json({ message: "User not found" });
+      }
+      
+      res.json({ id: user.id, username: user.username, totalPoints: user.totalPoints });
+    } catch (error) {
+      res.status(500).json({ message: "Failed to fetch user" });
+    }
+  });
+
+  // League routes
+  app.get("/api/leagues", async (req, res) => {
+    try {
+      const userId = parseInt(req.query.userId as string);
+      if (!userId) {
+        return res.status(400).json({ message: "User ID required" });
+      }
+      
+      const leagues = await storage.getUserLeagues(userId);
+      res.json(leagues);
+    } catch (error) {
+      res.status(500).json({ message: "Failed to fetch leagues" });
+    }
+  });
+
+  app.post("/api/leagues", async (req, res) => {
+    try {
+      const leagueData = insertLeagueSchema.parse(req.body);
+      const { ownerId } = req.body;
+      
+      if (!ownerId) {
+        return res.status(400).json({ message: "Owner ID required" });
+      }
+      
+      const league = await storage.createLeague({ ...leagueData, ownerId });
+      res.json(league);
+    } catch (error) {
+      res.status(400).json({ message: "Invalid league data" });
+    }
+  });
+
+  app.post("/api/leagues/:id/join", async (req, res) => {
+    try {
+      const leagueId = parseInt(req.params.id);
+      const { userId } = req.body;
+      
+      if (!userId) {
+        return res.status(400).json({ message: "User ID required" });
+      }
+      
+      await storage.joinLeague(userId, leagueId);
+      res.json({ message: "Successfully joined league" });
+    } catch (error) {
+      res.status(500).json({ message: "Failed to join league" });
+    }
+  });
+
+  app.get("/api/leagues/:id/standings", async (req, res) => {
+    try {
+      const leagueId = parseInt(req.params.id);
+      const standings = await storage.getLeagueStandings(leagueId);
+      res.json(standings);
+    } catch (error) {
+      res.status(500).json({ message: "Failed to fetch standings" });
+    }
+  });
+
+  // Song routes
+  app.get("/api/songs", async (req, res) => {
+    try {
+      const songs = await storage.getAllSongs();
+      res.json(songs);
+    } catch (error) {
+      res.status(500).json({ message: "Failed to fetch songs" });
+    }
+  });
+
+  app.get("/api/songs/search", async (req, res) => {
+    try {
+      const { q } = req.query;
+      if (!q) {
+        return res.status(400).json({ message: "Search query required" });
+      }
+      
+      const songs = await storage.getAllSongs();
+      const filtered = songs.filter(song => 
+        song.title.toLowerCase().includes((q as string).toLowerCase())
+      );
+      
+      res.json(filtered);
+    } catch (error) {
+      res.status(500).json({ message: "Failed to search songs" });
+    }
+  });
+
+  // Draft routes
+  app.get("/api/drafted-songs", async (req, res) => {
+    try {
+      const userId = parseInt(req.query.userId as string);
+      const leagueId = parseInt(req.query.leagueId as string);
+      
+      if (!userId || !leagueId) {
+        return res.status(400).json({ message: "User ID and League ID required" });
+      }
+      
+      const draftedSongs = await storage.getDraftedSongs(userId, leagueId);
+      res.json(draftedSongs);
+    } catch (error) {
+      res.status(500).json({ message: "Failed to fetch drafted songs" });
+    }
+  });
+
+  app.post("/api/draft", async (req, res) => {
+    try {
+      const draftData = insertDraftedSongSchema.parse(req.body);
+      
+      // Check if song is already drafted by this user in this league
+      const existingDrafts = await storage.getDraftedSongs(draftData.userId, draftData.leagueId);
+      const alreadyDrafted = existingDrafts.some(draft => draft.songId === draftData.songId);
+      
+      if (alreadyDrafted) {
+        return res.status(400).json({ message: "Song already drafted" });
+      }
+      
+      const draftedSong = await storage.draftSong(draftData);
+      
+      // Create activity
+      const song = await storage.getSong(draftData.songId);
+      if (song) {
+        await storage.createActivity(
+          draftData.userId,
+          draftData.leagueId,
+          "draft",
+          `You drafted "${song.title}"`,
+          song.rarityScore || 0
+        );
+      }
+      
+      res.json(draftedSong);
+    } catch (error) {
+      res.status(400).json({ message: "Failed to draft song" });
+    }
+  });
+
+  // Concert routes
+  app.get("/api/concerts", async (req, res) => {
+    try {
+      const concerts = await storage.getConcerts();
+      res.json(concerts);
+    } catch (error) {
+      res.status(500).json({ message: "Failed to fetch concerts" });
+    }
+  });
+
+  app.get("/api/concerts/upcoming", async (req, res) => {
+    try {
+      const concerts = await storage.getUpcomingConcerts();
+      res.json(concerts);
+    } catch (error) {
+      res.status(500).json({ message: "Failed to fetch upcoming concerts" });
+    }
+  });
+
+  // Activity routes
+  app.get("/api/activities", async (req, res) => {
+    try {
+      const userId = parseInt(req.query.userId as string);
+      const leagueId = req.query.leagueId ? parseInt(req.query.leagueId as string) : undefined;
+      
+      if (!userId) {
+        return res.status(400).json({ message: "User ID required" });
+      }
+      
+      const activities = await storage.getUserActivities(userId, leagueId);
+      res.json(activities);
+    } catch (error) {
+      res.status(500).json({ message: "Failed to fetch activities" });
+    }
+  });
+
+  // Dashboard data endpoint
+  app.get("/api/dashboard", async (req, res) => {
+    try {
+      const userId = parseInt(req.query.userId as string);
+      if (!userId) {
+        return res.status(400).json({ message: "User ID required" });
+      }
+
+      // Get user data
+      const user = await storage.getUser(userId);
+      if (!user) {
+        return res.status(404).json({ message: "User not found" });
+      }
+
+      // Get user's leagues (assume first one for demo)
+      const leagues = await storage.getUserLeagues(userId);
+      const currentLeague = leagues[0];
+
+      if (!currentLeague) {
+        return res.json({
+          user: { id: user.id, username: user.username, totalPoints: user.totalPoints },
+          league: null,
+          draftedSongs: [],
+          recentActivities: [],
+          upcomingConcerts: [],
+          leagueStandings: []
+        });
+      }
+
+      // Get drafted songs
+      const draftedSongs = await storage.getDraftedSongs(userId, currentLeague.id);
+      
+      // Get recent activities
+      const recentActivities = await storage.getUserActivities(userId, currentLeague.id);
+      
+      // Get upcoming concerts
+      const upcomingConcerts = await storage.getUpcomingConcerts();
+      
+      // Get league standings
+      const leagueStandings = await storage.getLeagueStandings(currentLeague.id);
+
+      res.json({
+        user: { id: user.id, username: user.username, totalPoints: user.totalPoints },
+        league: currentLeague,
+        draftedSongs: draftedSongs.slice(0, 10), // Limit for display
+        recentActivities: recentActivities.slice(0, 5),
+        upcomingConcerts: upcomingConcerts.slice(0, 3),
+        leagueStandings: leagueStandings.slice(0, 10)
+      });
+    } catch (error) {
+      res.status(500).json({ message: "Failed to fetch dashboard data" });
+    }
+  });
+
+  const httpServer = createServer(app);
+  return httpServer;
+}
