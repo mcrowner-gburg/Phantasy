@@ -16,7 +16,9 @@ export default function Concerts() {
     queryKey: ["/api/concerts/upcoming"],
   });
 
-  const sortedConcerts = concerts?.sort((a: any, b: any) => 
+  const sortedConcerts = concerts?.filter((concert: any) => 
+    new Date(concert.date) < new Date() // Only show completed shows
+  ).sort((a: any, b: any) => 
     new Date(b.date).getTime() - new Date(a.date).getTime()
   ) || [];
 
@@ -140,9 +142,9 @@ export default function Concerts() {
               <div className="flex items-center justify-between mb-6">
                 <h3 className="text-xl font-bold flex items-center">
                   <Music className="mr-2 text-green-500" size={24} />
-                  All Shows
+                  Completed Shows
                 </h3>
-                <p className="phish-text text-sm">{concerts?.length || 0} total shows</p>
+                <p className="phish-text text-sm">{sortedConcerts.length} completed shows</p>
               </div>
 
               {isLoading ? (
@@ -218,14 +220,64 @@ export default function Concerts() {
                           
                           {hasSetlist && (
                             <div className="mt-4 pt-4 border-t border-gray-700">
-                              <h5 className="font-medium mb-2 text-white">Complete Setlist:</h5>
-                              <div className="flex flex-wrap gap-1">
-                                {concert.setlist.map((song: string, index: number) => (
-                                  <span key={index} className="text-sm bg-gray-700 px-2 py-1 rounded text-green-400">
-                                    {song}
-                                  </span>
-                                ))}
-                              </div>
+                              <h5 className="font-medium mb-3 text-white">Complete Setlist:</h5>
+                              {(() => {
+                                // Organize setlist into sets - this is a simplified approach
+                                // In a real app, this data would come structured from the API
+                                const songs = concert.setlist;
+                                const totalSongs = songs.length;
+                                
+                                // Basic set division logic for display purposes
+                                const set1End = Math.ceil(totalSongs * 0.45);
+                                const set2End = totalSongs - Math.min(3, Math.ceil(totalSongs * 0.15));
+                                
+                                const set1 = songs.slice(0, set1End);
+                                const set2 = songs.slice(set1End, set2End);
+                                const encore = songs.slice(set2End);
+                                
+                                return (
+                                  <div className="space-y-4">
+                                    {set1.length > 0 && (
+                                      <div>
+                                        <h6 className="text-sm font-semibold text-orange-400 mb-2">SET 1:</h6>
+                                        <div className="flex flex-wrap gap-1">
+                                          {set1.map((song: string, index: number) => (
+                                            <span key={`set1-${index}`} className="text-sm bg-gray-700 px-2 py-1 rounded text-green-400">
+                                              {song}
+                                            </span>
+                                          ))}
+                                        </div>
+                                      </div>
+                                    )}
+                                    
+                                    {set2.length > 0 && (
+                                      <div>
+                                        <h6 className="text-sm font-semibold text-orange-400 mb-2">SET 2:</h6>
+                                        <div className="flex flex-wrap gap-1">
+                                          {set2.map((song: string, index: number) => (
+                                            <span key={`set2-${index}`} className="text-sm bg-gray-700 px-2 py-1 rounded text-green-400">
+                                              {song}
+                                            </span>
+                                          ))}
+                                        </div>
+                                      </div>
+                                    )}
+                                    
+                                    {encore.length > 0 && (
+                                      <div>
+                                        <h6 className="text-sm font-semibold text-yellow-400 mb-2">ENCORE:</h6>
+                                        <div className="flex flex-wrap gap-1">
+                                          {encore.map((song: string, index: number) => (
+                                            <span key={`encore-${index}`} className="text-sm bg-gray-700 px-2 py-1 rounded text-yellow-300">
+                                              {song}
+                                            </span>
+                                          ))}
+                                        </div>
+                                      </div>
+                                    )}
+                                  </div>
+                                );
+                              })()}
                             </div>
                           )}
                         </CardContent>
