@@ -248,80 +248,41 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Get recent shows from Phish.net API
       const recentShows = await phishApi.getRecentShows(20);
       
-      // If API returns empty, provide recent summer 2025 show data
+      console.log(`Fetched ${recentShows.length} shows from Phish.net API`);
+      
+      // If API returns empty, log the issue but still try to use the data
       if (recentShows.length === 0) {
-        const recentConcerts = [
-          {
-            id: 20250723,
-            tourId: 1,
-            date: new Date("2025-07-23T18:30:00.000Z"),
-            venue: "Forest Hills Stadium",
-            city: "Forest Hills",
-            state: "NY",
-            country: "USA",
-            setlist: ["Free", "Back on the Train", "Theme From the Bottom", "Cities", "Divided Sky", "Timber (Jerry the Mule)", "Ether Edge", "The Squirming Coil", "Punch You in the Eye", "Ghost", "A Wave of Hope", "What's the Use?", "Ruby Waves", "Backwards Down the Number Line", "Character Zero", "Sneakin' Sally Through the Alley", "Wilson", "Rocky Top"],
-            isCompleted: true,
-          },
-          {
-            id: 20250722,
-            tourId: 1,
-            date: new Date("2025-07-22T18:30:00.000Z"),
-            venue: "Forest Hills Stadium",
-            city: "Forest Hills",
-            state: "NY",
-            country: "USA",
-            setlist: ["The Moma Dance", "Rift", "Sigma Oasis", "Possum", "Wolfman's Brother", "Stash", "Blaze On", "Monsters", "I Am the Walrus", "Carini", "Tweezer", "What's Going Through Your Mind", "A Life Beyond The Dream", "Harry Hood", "Slave to the Traffic Light", "More", "Tweezer Reprise"],
-            isCompleted: true,
-          },
-          {
-            id: 20250720,
-            tourId: 1,
-            date: new Date("2025-07-20T19:00:00.000Z"),
-            venue: "United Center",
-            city: "Chicago",
-            state: "IL",
-            country: "USA",
-            setlist: ["Harry Hood", "Gin and Juice", "On Your Way Down", "No Men in No Man's Land", "What's Going Through Your Mind"],
-            isCompleted: true,
-          },
-          {
-            id: 20250719,
-            tourId: 1,
-            date: new Date("2025-07-19T19:00:00.000Z"),
-            venue: "United Center",
-            city: "Chicago",
-            state: "IL",
-            country: "USA",
-            setlist: ["Wilson", "Backwards Down the Number Line", "Tweezer", "Ghost", "You Enjoy Myself"],
-            isCompleted: true,
-          },
-          {
-            id: 20250718,
-            tourId: 1,
-            date: new Date("2025-07-18T19:00:00.000Z"),
-            venue: "United Center",
-            city: "Chicago",
-            state: "IL",
-            country: "USA",
-            setlist: ["Free", "Maze", "Sample in a Jar", "Fluffhead", "Harry Hood"],
-            isCompleted: true,
-          }
-        ];
-        
-        return res.json(recentConcerts);
+        console.log("No shows returned from Phish.net API - checking API response structure");
       }
       
-      // Transform Phish.net data to our format
-      const concerts = recentShows.map(show => ({
-        id: parseInt(show.showid),
-        tourId: 1, // Associate with current tour
-        date: new Date(show.showdate),
-        venue: show.venue,
-        city: show.city,
-        state: show.state,
-        country: show.country,
-        setlist: [], // Will be populated when setlist is fetched
-        isCompleted: true, // Recent shows are completed
+      // Transform Phish.net data to our format and fetch setlists for completed shows
+      const concerts = await Promise.all(recentShows.map(async (show: any) => {
+        const isCompleted = new Date(show.showdate) < new Date();
+        let setlist: string[] = [];
+        
+        // Fetch setlist for completed shows
+        if (isCompleted) {
+          try {
+            const setlistData = await phishApi.getSetlist(show.showdate);
+            if (setlistData && setlistData.length > 0) {
+              setlist = setlistData.map((song: any) => song.song || song.title || song.songname).filter(Boolean);
+            }
+          } catch (error) {
+            console.error(`Error fetching setlist for ${show.showdate}:`, error);
+          }
+        }
+        
+        return {
+          id: parseInt(show.showid),
+          tourId: 1, // Associate with current tour
+          date: new Date(show.showdate),
+          venue: show.venue,
+          city: show.city,
+          state: show.state,
+          country: show.country,
+          setlist,
+          isCompleted,
+        };
       }));
       
       res.json(concerts);
@@ -337,7 +298,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const upcomingShows = await phishApi.getUpcomingShows();
       
       // Transform Phish.net data to our format
-      const concerts = upcomingShows.map(show => ({
+      const concerts = upcomingShows.map((show: any) => ({
         id: parseInt(show.showid),
         tourId: 1, // Associate with current tour
         date: new Date(show.showdate),

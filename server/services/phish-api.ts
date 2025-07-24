@@ -28,9 +28,10 @@ export class PhishNetService {
 
   async getUpcomingShows(): Promise<PhishNetShow[]> {
     try {
-      const today = new Date().toISOString().split("T")[0];
+      // Get shows from current and future years
+      const currentYear = new Date().getFullYear();
       const response = await fetch(
-        `${this.baseUrl}/shows/query.json?apikey=${this.apiKey}&showdate_gte=${today}&order=showdate_asc`,
+        `${this.baseUrl}/shows/showyear/${currentYear}.json?apikey=${this.apiKey}&order_by=showdate&direction=asc`,
       );
 
       if (!response.ok) {
@@ -38,7 +39,11 @@ export class PhishNetService {
       }
 
       const data = await response.json();
-      return data.data || [];
+      const shows = data.data || [];
+      
+      // Filter for future shows
+      const today = new Date();
+      return shows.filter((show: PhishNetShow) => new Date(show.showdate) > today);
     } catch (error) {
       console.error("Error fetching upcoming shows:", error);
       return [];
@@ -47,9 +52,9 @@ export class PhishNetService {
 
   async getRecentShows(limit = 20): Promise<PhishNetShow[]> {
     try {
-      // Get shows from 2025 since that's the current year
+      // Get shows from 2025 using the correct v5 API structure
       const response = await fetch(
-        `${this.baseUrl}/shows/query.json?apikey=${this.apiKey}&year=2025&order=showdate_desc&limit=${limit}`,
+        `${this.baseUrl}/shows/showyear/2025.json?apikey=${this.apiKey}&order_by=showdate&direction=desc&limit=${limit}`,
       );
 
       if (!response.ok) {
@@ -64,10 +69,10 @@ export class PhishNetService {
     }
   }
 
-  async getSetlist(showId: string): Promise<any> {
+  async getSetlist(showDate: string): Promise<any> {
     try {
       const response = await fetch(
-        `${this.baseUrl}/setlists/get.json?apikey=${this.apiKey}&showid=${showId}`,
+        `${this.baseUrl}/setlists/showdate/${showDate}.json?apikey=${this.apiKey}`,
       );
 
       if (!response.ok) {
@@ -75,7 +80,7 @@ export class PhishNetService {
       }
 
       const data = await response.json();
-      return data.response?.data || null;
+      return data.data || null;
     } catch (error) {
       console.error("Error fetching setlist:", error);
       return null;
