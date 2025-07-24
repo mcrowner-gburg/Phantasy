@@ -70,6 +70,30 @@ export default function Dashboard() {
         </header>
 
         <main className="p-8 space-y-8 pb-20 lg:pb-8">
+          {/* Scoring System Info */}
+          <Card className="glassmorphism border-gray-600 mb-6">
+            <CardContent className="p-4">
+              <div className="flex items-center justify-between">
+                <h3 className="text-lg font-bold">Scoring System</h3>
+                <Star className="text-orange-500" size={20} />
+              </div>
+              <div className="grid grid-cols-3 gap-4 mt-4 text-sm">
+                <div className="text-center">
+                  <div className="font-bold phish-gold text-lg">+1</div>
+                  <div className="phish-text">Song Played</div>
+                </div>
+                <div className="text-center">
+                  <div className="font-bold text-green-400 text-lg">+1</div>
+                  <div className="phish-text">Set Opener</div>
+                </div>
+                <div className="text-center">
+                  <div className="font-bold text-orange-400 text-lg">+1</div>
+                  <div className="phish-text">Encore</div>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+
           {/* Stats Overview */}
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
             <Card className="glassmorphism border-gray-600">
@@ -256,8 +280,8 @@ export default function Dashboard() {
                     <thead>
                       <tr className="text-left border-b phish-border">
                         <th className="pb-3 font-medium phish-text">Song</th>
-                        <th className="pb-3 font-medium phish-text">Last Played</th>
-                        <th className="pb-3 font-medium phish-text">Rarity Score</th>
+                        <th className="pb-3 font-medium phish-text">Performance Stats</th>
+                        <th className="pb-3 font-medium phish-text">Rarity</th>
                         <th className="pb-3 font-medium phish-text">Points</th>
                         <th className="pb-3 font-medium phish-text">Status</th>
                       </tr>
@@ -277,7 +301,16 @@ export default function Dashboard() {
                             </div>
                           </td>
                           <td className="py-4 phish-text">
-                            {draft.song?.lastPlayed ? format(new Date(draft.song.lastPlayed), "MMM dd, yyyy") : "Never"}
+                            <div className="space-y-1">
+                              <div className="flex items-center space-x-2 text-sm">
+                                <span className="font-medium text-white">{draft.playedCount || 0}</span>
+                                <span>played</span>
+                              </div>
+                              <div className="flex space-x-4 text-xs">
+                                <span className="text-green-400">{draft.openerCount || 0} openers</span>
+                                <span className="text-orange-400">{draft.encoreCount || 0} encores</span>
+                              </div>
+                            </div>
                           </td>
                           <td className="py-4">
                             <Badge className={`text-xs px-2 py-1 rounded-full font-medium ${

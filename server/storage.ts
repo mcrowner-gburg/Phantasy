@@ -1,8 +1,9 @@
 import { 
-  users, tours, leagues, leagueMembers, songs, draftedSongs, concerts, activities,
+  users, tours, leagues, leagueMembers, songs, draftedSongs, concerts, activities, songPerformances,
   type User, type InsertUser, type Tour, type InsertTour, type League, type InsertLeague,
   type Song, type DraftedSong, type InsertDraftedSong,
-  type Concert, type InsertConcert, type Activity, type LeagueMember
+  type Concert, type InsertConcert, type Activity, type LeagueMember,
+  type SongPerformance, type InsertSongPerformance
 } from "@shared/schema";
 
 export interface IStorage {
@@ -37,12 +38,18 @@ export interface IStorage {
   getDraftedSongs(userId: number, leagueId: number): Promise<(DraftedSong & { song: Song })[]>;
   draftSong(draft: InsertDraftedSong): Promise<DraftedSong>;
   updateDraftedSongPoints(id: number, points: number): Promise<void>;
+  updateDraftedSongStats(id: number, playedCount: number, openerCount: number, encoreCount: number): Promise<void>;
 
   // Concerts
   getConcerts(): Promise<Concert[]>;
   getUpcomingConcerts(): Promise<Concert[]>;
   createConcert(concert: InsertConcert): Promise<Concert>;
   updateConcertSetlist(concertId: number, setlist: string[]): Promise<void>;
+
+  // Song Performances
+  createSongPerformance(performance: InsertSongPerformance): Promise<SongPerformance>;
+  getConcertPerformances(concertId: number): Promise<(SongPerformance & { song: Song })[]>;
+  calculateAndUpdatePoints(concertId: number): Promise<void>;
 
   // Activities
   getUserActivities(userId: number, leagueId?: number): Promise<Activity[]>;
@@ -60,6 +67,7 @@ export class MemStorage implements IStorage {
   private songs: Map<number, Song> = new Map();
   private draftedSongs: Map<number, DraftedSong & { song: Song }> = new Map();
   private concerts: Map<number, Concert> = new Map();
+  private songPerformances: Map<number, SongPerformance & { song: Song }> = new Map();
   private activities: Map<number, Activity> = new Map();
   
   private currentUserId = 1;
@@ -68,6 +76,7 @@ export class MemStorage implements IStorage {
   private currentSongId = 1;
   private currentDraftedSongId = 1;
   private currentConcertId = 1;
+  private currentSongPerformanceId = 1;
   private currentActivityId = 1;
   private currentLeagueMemberId = 1;
 
@@ -180,6 +189,71 @@ export class MemStorage implements IStorage {
       createdAt: new Date(),
     };
     this.leagues.set(league.id, league);
+
+    // Seed sample user and drafted songs for demo
+    const user: User = {
+      id: this.currentUserId++,
+      username: "phan123",
+      password: "password123",
+      totalPoints: 15,
+      createdAt: new Date(),
+    };
+    this.users.set(user.id, user);
+
+    // Join user to league
+    const member: LeagueMember = {
+      id: this.currentLeagueMemberId++,
+      leagueId: league.id,
+      userId: user.id,
+      joinedAt: new Date(),
+    };
+    this.leagueMembers.set(member.id, member);
+
+    // Draft some songs for demo
+    const sampleDrafts = [
+      { songId: 1, points: 5, playedCount: 2, openerCount: 1, encoreCount: 0 }, // Wilson
+      { songId: 3, points: 3, playedCount: 1, openerCount: 0, encoreCount: 1 }, // Fluffhead
+      { songId: 5, points: 7, playedCount: 3, openerCount: 1, encoreCount: 1 }, // Tweezer
+    ];
+
+    sampleDrafts.forEach(draft => {
+      const song = this.songs.get(draft.songId)!;
+      const draftedSong: DraftedSong & { song: Song } = {
+        id: this.currentDraftedSongId++,
+        userId: user.id,
+        leagueId: league.id,
+        songId: draft.songId,
+        points: draft.points,
+        playedCount: draft.playedCount,
+        openerCount: draft.openerCount,
+        encoreCount: draft.encoreCount,
+        status: "active",
+        draftedAt: new Date(),
+        song,
+      };
+      this.draftedSongs.set(draftedSong.id, draftedSong);
+    });
+
+    // Create sample activities
+    const activities = [
+      { type: "draft", description: 'You drafted "Wilson"', points: 0 },
+      { type: "score", description: '"Wilson" was played as a set opener (+2 points)', points: 2 },
+      { type: "score", description: '"Fluffhead" was played as an encore (+2 points)', points: 2 },
+      { type: "score", description: '"Tweezer" was played (+1 point)', points: 1 },
+    ];
+
+    activities.forEach(activity => {
+      const newActivity: Activity = {
+        id: this.currentActivityId++,
+        userId: user.id,
+        leagueId: league.id,
+        type: activity.type,
+        description: activity.description,
+        points: activity.points,
+        createdAt: new Date(Date.now() - Math.random() * 2 * 24 * 60 * 60 * 1000),
+      };
+      this.activities.set(newActivity.id, newActivity);
+    });
   }
 
   // Users
@@ -355,6 +429,16 @@ export class MemStorage implements IStorage {
     }
   }
 
+  async updateDraftedSongStats(id: number, playedCount: number, openerCount: number, encoreCount: number): Promise<void> {
+    const draft = this.draftedSongs.get(id);
+    if (draft) {
+      draft.playedCount = playedCount;
+      draft.openerCount = openerCount;
+      draft.encoreCount = encoreCount;
+      this.draftedSongs.set(id, draft);
+    }
+  }
+
   // Concerts
   async getConcerts(): Promise<Concert[]> {
     return Array.from(this.concerts.values()).sort((a, b) => a.date.getTime() - b.date.getTime());
@@ -383,6 +467,78 @@ export class MemStorage implements IStorage {
       concert.setlist = setlist;
       concert.isCompleted = true;
       this.concerts.set(concertId, concert);
+    }
+  }
+
+  // Song Performances
+  async createSongPerformance(performance: InsertSongPerformance): Promise<SongPerformance> {
+    const song = this.songs.get(performance.songId);
+    if (!song) {
+      throw new Error("Song not found");
+    }
+
+    const newPerformance: SongPerformance & { song: Song } = {
+      ...performance,
+      id: this.currentSongPerformanceId++,
+      song,
+    };
+    this.songPerformances.set(newPerformance.id, newPerformance);
+    return newPerformance;
+  }
+
+  async getConcertPerformances(concertId: number): Promise<(SongPerformance & { song: Song })[]> {
+    return Array.from(this.songPerformances.values())
+      .filter(performance => performance.concertId === concertId);
+  }
+
+  async calculateAndUpdatePoints(concertId: number): Promise<void> {
+    const performances = await this.getConcertPerformances(concertId);
+    
+    for (const performance of performances) {
+      // Calculate points: 1 for played + 1 for opener + 1 for encore
+      let points = 1; // Base point for being played
+      
+      if (performance.isOpener) {
+        points += 1; // Additional point for set opener
+      }
+      
+      if (performance.isEncore) {
+        points += 1; // Additional point for encore
+      }
+
+      // Find all drafted songs for this song and update their stats
+      const draftedSongs = Array.from(this.draftedSongs.values())
+        .filter(draft => draft.songId === performance.songId);
+
+      for (const draftedSong of draftedSongs) {
+        // Update points
+        await this.updateDraftedSongPoints(draftedSong.id, points);
+        
+        // Update stats
+        const newPlayedCount = (draftedSong.playedCount || 0) + 1;
+        const newOpenerCount = (draftedSong.openerCount || 0) + (performance.isOpener ? 1 : 0);
+        const newEncoreCount = (draftedSong.encoreCount || 0) + (performance.isEncore ? 1 : 0);
+        
+        await this.updateDraftedSongStats(draftedSong.id, newPlayedCount, newOpenerCount, newEncoreCount);
+        
+        // Update user total points
+        await this.updateUserPoints(draftedSong.userId, points);
+        
+        // Create activity for the points scored
+        const song = this.songs.get(performance.songId);
+        let description = `"${song?.title}" was played`;
+        if (performance.isOpener) description += " as a set opener";
+        if (performance.isEncore) description += " as an encore";
+        description += ` (+${points} points)`;
+        
+        await this.createActivity(
+          draftedSong.userId,
+          draftedSong.leagueId,
+          "score",
+          description,
+          points
+        );
+      }
     }
   }
 

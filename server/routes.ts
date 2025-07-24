@@ -1,7 +1,7 @@
 import type { Express } from "express";
 import { createServer, type Server } from "http";
 import { storage } from "./storage";
-import { insertUserSchema, insertTourSchema, insertLeagueSchema, insertDraftedSongSchema } from "@shared/schema";
+import { insertUserSchema, insertTourSchema, insertLeagueSchema, insertDraftedSongSchema, insertSongPerformanceSchema } from "@shared/schema";
 import { z } from "zod";
 
 export async function registerRoutes(app: Express): Promise<Server> {
@@ -268,6 +268,31 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.json(activities);
     } catch (error) {
       res.status(500).json({ message: "Failed to fetch activities" });
+    }
+  });
+
+  // Song Performance routes
+  app.post("/api/performances", async (req, res) => {
+    try {
+      const performanceData = insertSongPerformanceSchema.parse(req.body);
+      const performance = await storage.createSongPerformance(performanceData);
+      
+      // Calculate and update points for this performance
+      await storage.calculateAndUpdatePoints(performanceData.concertId);
+      
+      res.json(performance);
+    } catch (error) {
+      res.status(400).json({ message: "Failed to create song performance" });
+    }
+  });
+
+  app.get("/api/concerts/:id/performances", async (req, res) => {
+    try {
+      const concertId = parseInt(req.params.id);
+      const performances = await storage.getConcertPerformances(concertId);
+      res.json(performances);
+    } catch (error) {
+      res.status(500).json({ message: "Failed to fetch concert performances" });
     }
   });
 

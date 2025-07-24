@@ -55,6 +55,9 @@ export const draftedSongs = pgTable("drafted_songs", {
   leagueId: integer("league_id").references(() => leagues.id),
   songId: integer("song_id").references(() => songs.id),
   points: integer("points").default(0),
+  playedCount: integer("played_count").default(0), // Number of times played
+  openerCount: integer("opener_count").default(0), // Number of times as opener
+  encoreCount: integer("encore_count").default(0), // Number of times as encore
   status: text("status").default("active"), // active, benched
   draftedAt: timestamp("drafted_at").defaultNow(),
 });
@@ -67,8 +70,20 @@ export const concerts = pgTable("concerts", {
   city: text("city").notNull(),
   state: text("state"),
   country: text("country").default("USA"),
-  setlist: jsonb("setlist"), // Array of song titles
+  setlist: jsonb("setlist"), // Structured setlist with positions
   isCompleted: boolean("is_completed").default(false),
+});
+
+// New table to track song performances with position details
+export const songPerformances = pgTable("song_performances", {
+  id: serial("id").primaryKey(),
+  concertId: integer("concert_id").references(() => concerts.id),
+  songId: integer("song_id").references(() => songs.id),
+  setNumber: integer("set_number"), // 1, 2, or null for encore
+  position: integer("position"), // Position in the set
+  isOpener: boolean("is_opener").default(false), // First song of set 1 or 2
+  isEncore: boolean("is_encore").default(false), // Encore song
+  notes: text("notes"), // Additional notes (jam length, etc.)
 });
 
 export const activities = pgTable("activities", {
@@ -119,6 +134,16 @@ export const insertConcertSchema = createInsertSchema(concerts).pick({
   setlist: true,
 });
 
+export const insertSongPerformanceSchema = createInsertSchema(songPerformances).pick({
+  concertId: true,
+  songId: true,
+  setNumber: true,
+  position: true,
+  isOpener: true,
+  isEncore: true,
+  notes: true,
+});
+
 // Types
 export type User = typeof users.$inferSelect;
 export type InsertUser = z.infer<typeof insertUserSchema>;
@@ -131,5 +156,7 @@ export type DraftedSong = typeof draftedSongs.$inferSelect;
 export type InsertDraftedSong = z.infer<typeof insertDraftedSongSchema>;
 export type Concert = typeof concerts.$inferSelect;
 export type InsertConcert = z.infer<typeof insertConcertSchema>;
+export type SongPerformance = typeof songPerformances.$inferSelect;
+export type InsertSongPerformance = z.infer<typeof insertSongPerformanceSchema>;
 export type Activity = typeof activities.$inferSelect;
 export type LeagueMember = typeof leagueMembers.$inferSelect;

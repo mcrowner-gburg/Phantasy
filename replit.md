@@ -38,7 +38,8 @@ Fantasy seasons organized as "tours" (Summer Tour, Fall Tour, NYE Run, etc.) rat
 - **Tours**: Phish tour seasons (Summer Tour, Fall Tour, NYE Run, etc.) with date ranges and active status
 - **Leagues**: Fantasy league creation and management within specific tours
 - **Songs**: Phish song database with rarity scoring and play statistics
-- **Drafted Songs**: User song selections within leagues with point accumulation
+- **Drafted Songs**: User song selections within leagues with detailed performance statistics and point accumulation
+- **Song Performances**: Individual song performances at concerts with position tracking (opener, encore, set placement)
 - **Concerts**: Tour-specific show tracking with setlist data
 - **Activities**: User action logging for feeds and notifications
 - **League Members**: Many-to-many relationship between users and leagues
@@ -54,9 +55,12 @@ Fantasy seasons organized as "tours" (Summer Tour, Fall Tour, NYE Run, etc.) rat
 - Real-time draft status tracking
 
 ### Scoring Engine
-- Point calculation based on song rarity and performance frequency
-- Daily point accumulation from concert performances
-- Leaderboard ranking system
+- **Base Points**: 1 point when a drafted song is played at a concert
+- **Bonus Points**: +1 point if the song opens Set 1 or Set 2
+- **Encore Bonus**: +1 point if the song is played as an encore
+- **Maximum per performance**: 3 points (played + opener + encore)
+- **Performance tracking**: Detailed stats on played count, opener count, encore count
+- Real-time point accumulation and leaderboard updates
 
 ### External Integrations
 - **Phish.net API**: Concert schedules, setlists, and song statistics
