@@ -22,6 +22,7 @@ export default function Leagues() {
     description: "",
     tourId: 1, // Default to active tour
     maxPlayers: 24,
+    isPublic: true, // Default to public
   });
   
   const { toast } = useToast();
@@ -56,7 +57,7 @@ export default function Leagues() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/leagues"] });
       setIsCreateOpen(false);
-      setNewLeague({ name: "", description: "", tourId: (activeTour as any)?.id || 1, maxPlayers: 24 });
+      setNewLeague({ name: "", description: "", tourId: (activeTour as any)?.id || 1, maxPlayers: 24, isPublic: true });
       toast({
         title: "League created successfully!",
         description: "Your new fantasy league is ready for players.",
@@ -181,6 +182,18 @@ export default function Leagues() {
                         onChange={(e) => setNewLeague({ ...newLeague, maxPlayers: parseInt(e.target.value) || 24 })}
                       />
                     </div>
+                    <div className="flex items-center space-x-2">
+                      <input
+                        type="checkbox"
+                        id="isPublic"
+                        checked={newLeague.isPublic}
+                        onChange={(e) => setNewLeague({ ...newLeague, isPublic: e.target.checked })}
+                        className="w-4 h-4 text-blue-600 bg-gray-100 border-gray-300 rounded focus:ring-blue-500"
+                      />
+                      <Label htmlFor="isPublic" className="text-white text-sm">
+                        Make league public (others can find and join)
+                      </Label>
+                    </div>
                     <div className="flex space-x-3">
                       <Button
                         className="flex-1 gradient-button"
@@ -238,7 +251,7 @@ export default function Leagues() {
                           <Users className="mr-2" size={16} />
                           Players
                         </div>
-                        <span className="text-white font-medium">0/{league.maxPlayers}</span>
+                        <span className="text-white font-medium">1/{league.maxPlayers}</span>
                       </div>
 
                       <div className="flex items-center justify-between text-sm">
