@@ -164,15 +164,51 @@ export class DatabaseStorage implements IStorage {
     return [];
   }
 
-  // Song operations - stub implementations
+  private songsCache: Song[] | null = null;
+  private cacheExpiry: number = 0;
+  private readonly CACHE_DURATION = 30 * 60 * 1000; // 30 minutes
+
+  // Song operations with authentic Phish.net data
   async getAllSongs(): Promise<Song[]> {
-    return [
-      { id: 1, title: "Wilson", category: "Gamehendge", rarityScore: 85, lastPlayed: new Date(), totalPlays: 245 },
-      { id: 2, title: "Harry Hood", category: "Classic", rarityScore: 65, lastPlayed: new Date(), totalPlays: 456 },
-      { id: 3, title: "Fluffhead", category: "Epic", rarityScore: 120, lastPlayed: new Date(), totalPlays: 123 },
-      { id: 4, title: "You Enjoy Myself", category: "Classic", rarityScore: 70, lastPlayed: new Date(), totalPlays: 389 },
-      { id: 5, title: "Tweezer", category: "Jam", rarityScore: 60, lastPlayed: new Date(), totalPlays: 512 },
+    // Return cached data if still valid
+    if (this.songsCache && Date.now() < this.cacheExpiry) {
+      return this.songsCache;
+    }
+
+    // Base song list - using exact Phish.net database names for authentic rarity scores
+    const baseSongs: Song[] = [
+      { id: 1, title: "Wilson", category: "Gamehendge", rarityScore: 50, lastPlayed: null, totalPlays: 0 },
+      { id: 2, title: "Harry Hood", category: "Classic", rarityScore: 50, lastPlayed: null, totalPlays: 0 },
+      { id: 3, title: "Fluffhead", category: "Epic", rarityScore: 50, lastPlayed: null, totalPlays: 0 },
+      { id: 4, title: "You Enjoy Myself", category: "Classic", rarityScore: 50, lastPlayed: null, totalPlays: 0 },
+      { id: 5, title: "Tweezer", category: "Jam", rarityScore: 50, lastPlayed: null, totalPlays: 0 },
+      { id: 6, title: "Free", category: "Rock", rarityScore: 50, lastPlayed: null, totalPlays: 0 },
+      { id: 7, title: "Bowie", category: "Epic", rarityScore: 50, lastPlayed: null, totalPlays: 0 },
+      { id: 8, title: "Possum", category: "Country", rarityScore: 50, lastPlayed: null, totalPlays: 0 },
+      { id: 9, title: "Maze", category: "Rock", rarityScore: 50, lastPlayed: null, totalPlays: 0 },
+      { id: 10, title: "Divided Sky", category: "Composed", rarityScore: 50, lastPlayed: null, totalPlays: 0 },
+      { id: 11, title: "Julius", category: "Rock", rarityScore: 50, lastPlayed: null, totalPlays: 0 },
+      { id: 12, title: "Chalk Dust Torture", category: "Rock", rarityScore: 50, lastPlayed: null, totalPlays: 0 },
+      { id: 13, title: "Antelope", category: "Classic", rarityScore: 50, lastPlayed: null, totalPlays: 0 },
+      { id: 14, title: "Ghost", category: "Jam", rarityScore: 50, lastPlayed: null, totalPlays: 0 },
+      { id: 15, title: "Bathtub Gin", category: "Jam", rarityScore: 50, lastPlayed: null, totalPlays: 0 },
     ];
+
+    try {
+      // Import the rarity service dynamically to avoid circular dependencies
+      const { updateSongRarityScores } = await import("./services/phish-rarity");
+      const updatedSongs = await updateSongRarityScores(baseSongs);
+      
+      // Cache the results
+      this.songsCache = updatedSongs;
+      this.cacheExpiry = Date.now() + this.CACHE_DURATION;
+      
+      return updatedSongs;
+    } catch (error) {
+      console.error("Error updating song rarity scores:", error);
+      // Fallback to base songs if API fails
+      return baseSongs;
+    }
   }
 
   async getSong(id: number): Promise<Song | undefined> {
@@ -189,8 +225,18 @@ export class DatabaseStorage implements IStorage {
     return { id: Date.now(), title, category, rarityScore: 50, lastPlayed: new Date(), totalPlays: 0 };
   }
 
-  async updateSongStats(songId: number, rarityScore: number, lastPlayed: Date): Promise<void> {
-    // Stub implementation
+  async updateSongStats(songId: number, rarityScore: number, lastPlayed: Date | null): Promise<void> {
+    // Update cache if it exists
+    if (this.songsCache) {
+      const songIndex = this.songsCache.findIndex(s => s.id === songId);
+      if (songIndex !== -1) {
+        this.songsCache[songIndex] = {
+          ...this.songsCache[songIndex],
+          rarityScore,
+          lastPlayed,
+        };
+      }
+    }
   }
 
   // Drafted Songs operations - stub implementations

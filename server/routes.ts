@@ -5,6 +5,7 @@ import { insertUserSchema, insertTourSchema, insertLeagueSchema, insertDraftedSo
 import { z } from "zod";
 import { phishApi } from "./services/phish-api";
 import { setupAuth, requireAuth } from "./auth";
+import adminRoutes from "./routes/admin";
 
 export async function registerRoutes(app: Express): Promise<Server> {
   // Set up authentication middleware
@@ -451,6 +452,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.status(500).json({ message: "Failed to fetch dashboard data" });
     }
   });
+
+  // Admin routes for managing rarity scores
+  app.use("/api/admin", adminRoutes);
 
   const httpServer = createServer(app);
   return httpServer;

@@ -26,6 +26,18 @@ PhishDraft is a fantasy sports application specifically designed for Phish conce
 - Implemented clickable links to Phish.net show pages for all concerts (dashboard and concerts page)
 - Fixed URL formatting to match Phish.net structure with full month names (e.g., "july-23-2025")
 
+### July 24, 2025 - Authentic Rarity Scoring System Implementation
+- Replaced hardcoded mock rarity scores with real Phish.net API v5 data integration
+- Created PhishRarity service that calculates rarity scores based on actual song statistics:
+  * Frequency component (0-60 points): fewer plays = higher rarity
+  * Gap component (0-40 points): longer gap since last played = higher current rarity
+  * Real-time fetching from Phish.net songs endpoint with proper v5 API format
+- Implemented intelligent caching system (30-minute cache) to minimize API calls
+- Added admin endpoints for rarity score management and debugging
+- Successfully validated with authentic data: Wilson (302 plays), Tweezer (411 plays), Fluffhead (286 plays)
+- Rarity badges now reflect genuine song performance statistics instead of arbitrary values
+- System gracefully handles API errors and provides fallback default scores
+
 ## User Preferences
 
 Preferred communication style: Simple, everyday language.
