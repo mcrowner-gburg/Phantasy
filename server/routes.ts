@@ -224,6 +224,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ message: "Song already drafted" });
       }
       
+      // Check if user has reached the 10-song draft limit
+      if (existingDrafts.length >= 10) {
+        return res.status(400).json({ message: "Maximum of 10 songs can be drafted" });
+      }
+      
       const draftedSong = await storage.draftSong(draftData);
       
       // Create activity

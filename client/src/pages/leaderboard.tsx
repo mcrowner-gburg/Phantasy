@@ -4,21 +4,32 @@ import { MobileNavigation } from "@/components/mobile-navigation";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Crown, Trophy, User, Medal, TrendingUp } from "lucide-react";
+import { useAuth } from "@/hooks/useAuth";
 
-const DEMO_LEAGUE_ID = 5; // Use Summer Tour Champions league
+
 
 export default function Leaderboard() {
+  const { user } = useAuth();
+  
+  // Get user's first league as default
+  const { data: leagues } = useQuery({
+    queryKey: ["/api/leagues"],
+    enabled: !!user?.id,
+  });
+  
   // Check if there's a league parameter in the URL
   const urlParams = new URLSearchParams(window.location.search);
   const leagueIdFromUrl = urlParams.get('league');
-  const leagueId = leagueIdFromUrl ? parseInt(leagueIdFromUrl) : DEMO_LEAGUE_ID;
+  const leagueId = leagueIdFromUrl ? parseInt(leagueIdFromUrl) : leagues?.[0]?.id;
 
   const { data: standings, isLoading } = useQuery({
     queryKey: ["/api/leagues", leagueId, "standings"],
+    enabled: !!leagueId,
   });
 
   const { data: leagueInfo } = useQuery({
     queryKey: ["/api/leagues", leagueId],
+    enabled: !!leagueId,
   });
 
   const getRankIcon = (rank: number) => {

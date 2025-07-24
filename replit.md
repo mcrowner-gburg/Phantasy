@@ -48,6 +48,14 @@ PhishDraft is a fantasy sports application specifically designed for Phish conce
 - Created comprehensive scoring engine with performance tracking (playedCount, openerCount, encoreCount)
 - Added smart activity descriptions that dynamically reflect point combinations based on performance type
 
+### July 24, 2025 - Draft Limit Reduction & Authentication Fix
+- Reduced maximum drafted songs per user from 20 to 10 for more strategic gameplay
+- Added backend validation to enforce 10-song draft limit with proper error messages
+- Replaced all hardcoded DEMO_USER_ID constants with real authentication using useAuth hook
+- Fixed TypeScript errors by updating all pages to use authenticated user data
+- Updated dashboard, draft, and leaderboard pages to work with user-specific leagues
+- Enhanced draft system to show accurate "slots remaining" count based on 10-song limit
+
 ## User Preferences
 
 Preferred communication style: Simple, everyday language.

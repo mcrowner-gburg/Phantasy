@@ -144,7 +144,7 @@ export default function Dashboard() {
                   </div>
                 </div>
                 <div className="mt-4 flex items-center text-sm">
-                  <span className="phish-text">{Math.max(0, 20 - (draftedSongs?.length || 0))} slots remaining</span>
+                  <span className="phish-text">{Math.max(0, 10 - (draftedSongs?.length || 0))} slots remaining</span>
                 </div>
               </CardContent>
             </Card>

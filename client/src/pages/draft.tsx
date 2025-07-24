@@ -9,28 +9,35 @@ import { Badge } from "@/components/ui/badge";
 import { Music, Search, Plus, Check } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest } from "@/lib/queryClient";
-
-const DEMO_USER_ID = 1;
-const DEMO_LEAGUE_ID = 1;
+import { useAuth } from "@/hooks/useAuth";
 
 export default function Draft() {
   const [searchQuery, setSearchQuery] = useState("");
   const { toast } = useToast();
   const queryClient = useQueryClient();
+  const { user } = useAuth();
+
+  // Use the first league as default for now
+  const { data: leagues } = useQuery({
+    queryKey: ["/api/leagues"],
+  });
+  
+  const currentLeague = leagues?.[0];
 
   const { data: songs, isLoading: songsLoading } = useQuery({
     queryKey: ["/api/songs"],
   });
 
   const { data: draftedSongs } = useQuery({
-    queryKey: ["/api/drafted-songs", { userId: DEMO_USER_ID, leagueId: DEMO_LEAGUE_ID }],
+    queryKey: ["/api/drafted-songs", { userId: user?.id, leagueId: currentLeague?.id }],
+    enabled: !!user?.id && !!currentLeague?.id,
   });
 
   const draftMutation = useMutation({
     mutationFn: async (songId: number) => {
       return apiRequest("POST", "/api/draft", {
-        userId: DEMO_USER_ID,
-        leagueId: DEMO_LEAGUE_ID,
+        userId: user?.id,
+        leagueId: currentLeague?.id,
         songId,
       });
     },
@@ -82,7 +89,7 @@ export default function Draft() {
             </div>
             <div className="flex items-center space-x-4">
               <Badge variant="outline" className="border-green-500 text-green-500">
-                {draftedSongs?.length || 0}/20 Songs Drafted
+                {draftedSongs?.length || 0}/10 Songs Drafted
               </Badge>
             </div>
           </div>
