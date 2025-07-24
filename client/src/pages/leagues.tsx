@@ -27,16 +27,18 @@ export default function Leagues() {
   const { toast } = useToast();
   const queryClient = useQueryClient();
 
-  const { data: myLeagues, isLoading: isLoadingMyLeagues } = useQuery({
-    queryKey: ["/api/leagues", { userId: DEMO_USER_ID }],
+  const { data: myLeagues = [], isLoading: isLoadingMyLeagues } = useQuery({
+    queryKey: ["/api/leagues", "my", DEMO_USER_ID],
+    queryFn: () => fetch(`/api/leagues?userId=${DEMO_USER_ID}`).then(res => res.json()),
   });
 
-  const { data: publicLeagues, isLoading: isLoadingPublic } = useQuery({
-    queryKey: ["/api/leagues", { public: true }],
+  const { data: publicLeagues = [], isLoading: isLoadingPublic } = useQuery({
+    queryKey: ["/api/leagues", "public"],
+    queryFn: () => fetch(`/api/leagues?public=true`).then(res => res.json()),
     enabled: activeTab === "browse",
   });
 
-  const { data: tours } = useQuery({
+  const { data: tours = [] } = useQuery({
     queryKey: ["/api/tours"],
   });
 
@@ -54,7 +56,7 @@ export default function Leagues() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/leagues"] });
       setIsCreateOpen(false);
-      setNewLeague({ name: "", description: "", tourId: activeTour?.id || 1, maxPlayers: 24 });
+      setNewLeague({ name: "", description: "", tourId: (activeTour as any)?.id || 1, maxPlayers: 24 });
       toast({
         title: "League created successfully!",
         description: "Your new fantasy league is ready for players.",
@@ -113,7 +115,7 @@ export default function Leagues() {
             <div>
               <h2 className="text-2xl font-bold">My Leagues</h2>
               <p className="phish-text">
-                {activeTour ? `Join or create leagues for ${activeTour.name}` : "Join or create fantasy leagues"}
+                {activeTour ? `Join or create leagues for ${(activeTour as any)?.name}` : "Join or create fantasy leagues"}
               </p>
             </div>
             <div className="flex items-center space-x-4">
@@ -203,7 +205,7 @@ export default function Leagues() {
         </header>
 
         <main className="p-8 pb-20 lg:pb-8">
-          {isLoading ? (
+          {isLoadingMyLeagues ? (
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
               {[1, 2, 3].map((i) => (
                 <div key={i} className="animate-pulse">
@@ -211,7 +213,7 @@ export default function Leagues() {
                 </div>
               ))}
             </div>
-          ) : activeTab === "my-leagues" && myLeagues?.length > 0 ? (
+          ) : activeTab === "my-leagues" && myLeagues.length > 0 ? (
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
               {myLeagues.map((league: any) => (
                 <Card key={league.id} className="glassmorphism border-gray-600 hover:border-green-500 transition-colors">
@@ -272,7 +274,7 @@ export default function Leagues() {
                   </div>
                 ))}
               </div>
-            ) : publicLeagues && publicLeagues.length > 0 ? (
+            ) : publicLeagues.length > 0 ? (
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                 {publicLeagues.map((league: any) => (
                   <Card key={league.id} className="glassmorphism border-gray-600 hover:border-blue-500 transition-colors">
