@@ -4,40 +4,11 @@ import { storage } from "./storage";
 import { insertUserSchema, insertTourSchema, insertLeagueSchema, insertDraftedSongSchema, insertSongPerformanceSchema } from "@shared/schema";
 import { z } from "zod";
 import { phishApi } from "./services/phish-api";
+import { setupAuth, requireAuth } from "./auth";
 
 export async function registerRoutes(app: Express): Promise<Server> {
-  // Authentication routes
-  app.post("/api/auth/register", async (req, res) => {
-    try {
-      const userData = insertUserSchema.parse(req.body);
-      
-      // Check if username already exists
-      const existingUser = await storage.getUserByUsername(userData.username);
-      if (existingUser) {
-        return res.status(400).json({ message: "Username already exists" });
-      }
-      
-      const user = await storage.createUser(userData);
-      res.json({ user: { id: user.id, username: user.username, totalPoints: user.totalPoints } });
-    } catch (error) {
-      res.status(400).json({ message: "Invalid user data" });
-    }
-  });
-
-  app.post("/api/auth/login", async (req, res) => {
-    try {
-      const { username, password } = req.body;
-      const user = await storage.getUserByUsername(username);
-      
-      if (!user || user.password !== password) {
-        return res.status(401).json({ message: "Invalid credentials" });
-      }
-      
-      res.json({ user: { id: user.id, username: user.username, totalPoints: user.totalPoints } });
-    } catch (error) {
-      res.status(500).json({ message: "Login failed" });
-    }
-  });
+  // Set up authentication middleware
+  setupAuth(app);
 
   // User routes
   app.get("/api/users/:id", async (req, res) => {
