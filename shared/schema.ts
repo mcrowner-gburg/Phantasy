@@ -56,7 +56,7 @@ export const songs = pgTable("songs", {
   id: serial("id").primaryKey(),
   title: text("title").notNull(),
   category: text("category"), // Gamehendge, Classic, Epic, etc.
-  rarityScore: integer("rarity_score").default(0), // 1-100 based on play frequency
+  rarityScore: integer("rarity_score").default(0), // Simple scoring: 0 base points, earned during tour
   lastPlayed: timestamp("last_played"),
   totalPlays: integer("total_plays").default(0),
 });

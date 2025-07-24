@@ -40,15 +40,15 @@ PhishDraft is a fantasy sports application specifically designed for Phish conce
 - Rarity badges now reflect genuine song performance statistics instead of arbitrary values
 - System gracefully handles API errors and provides fallback default scores
 
-### July 24, 2025 - 24-Month Rarity Focus & Conservative Scoring
-- Updated rarity calculation to focus on last 24 months of performance data instead of all-time
-- Implemented conservative scoring thresholds where medium rarity becomes low, high becomes medium
-- Adjusted frequency thresholds: 1 play = high rarity, 2-3 plays = medium-high, 4-6 plays = medium
-- Modified gap scoring to be more conservative with 40+ shows = max rarity, 20-39 = high rarity
-- Changed default rarity scores from 50 to 35 points for more balanced gameplay
-- Implemented new point calculation system: 1pt for played + 1pt for set opener + 1pt for encore (max 3pts per performance)
-- Created comprehensive scoring engine with performance tracking (playedCount, openerCount, encoreCount)
-- Added smart activity descriptions that dynamically reflect point combinations based on performance type
+### July 24, 2025 - Simplified Scoring System Implementation
+- **REMOVED**: Complex gap-based rarity scoring and 24-month frequency calculations
+- **NEW**: Clean 4-point scoring system focused on tour performance only
+- **Scoring Rules**: 1pt played + 1pt first set opener + 1pt second set opener + 1pt encore = max 4pts
+- All songs now start with 0 base points, eliminating pre-draft rarity advantages
+- Updated activity descriptions to reflect new point breakdown: "played (+1 pt) and opened first set (+1 pt)"
+- Simplified scoring engine removes complexity while maintaining strategic depth
+- Enhanced performance tracking with clear point attribution for each scoring category
+- Updated database schema to reflect simplified scoring approach
 
 ### July 24, 2025 - Draft Limit Reduction & Comprehensive Song Catalog
 - Reduced maximum drafted songs per user from 20 to 10 for more strategic gameplay
@@ -117,10 +117,12 @@ Fantasy seasons organized as "tours" (Summer Tour, Fall Tour, NYE Run, etc.) rat
 - Real-time draft status tracking
 
 ### Scoring Engine
-- **Base Points**: 1 point when a drafted song is played at a concert
-- **Bonus Points**: +1 point if the song opens Set 1 or Set 2
-- **Encore Bonus**: +1 point if the song is played as an encore
-- **Maximum per performance**: 3 points (played + opener + encore)
+- **Simplified 4-Point System**: Points earned only during tour performances
+- **1 pt**: Song is played this tour
+- **1 pt**: Song opens first set  
+- **1 pt**: Song opens second set
+- **1 pt**: Song is played as encore
+- **Maximum per performance**: 4 points (played + first set opener + second set opener + encore)
 - **Performance tracking**: Detailed stats on played count, opener count, encore count
 - Real-time point accumulation and leaderboard updates
 

@@ -336,13 +336,11 @@ export class DatabaseStorage implements IStorage {
             }
           }
           
-          // Calculate rarity score based on 24-month performance frequency
-          let rarityScore = 35; // Default
-          if (recentPlays === 0) rarityScore = 100; // Never played in 24 months = ultra rare
-          else if (recentPlays === 1) rarityScore = 75; // Only once = rare
-          else if (recentPlays <= 3) rarityScore = 50; // Few times = medium-high
-          else if (recentPlays <= 6) rarityScore = 25; // Regular = medium
-          else rarityScore = 10; // Frequent = low
+          // Simple scoring system - no complex rarity calculations
+          // All songs start with 0 base points
+          // Points earned only during tour performances:
+          // 1pt played + 1pt first set opener + 1pt second set opener + 1pt encore = max 4pts
+          let rarityScore = 0;
           
           // Categorize songs based on actual Phish knowledge
           let category = "Classic";
@@ -767,7 +765,7 @@ export class DatabaseStorage implements IStorage {
         userId,
         leagueId: leagueId || 1,
         type: "score",
-        description: "\"Wilson\" was played as a set opener (+2 points)",
+        description: "\"Wilson\" was played (+1 pt) and opened first set (+1 pt)",
         points: 2,
         createdAt: new Date(Date.now() - 1 * 24 * 60 * 60 * 1000),
       },
@@ -776,7 +774,7 @@ export class DatabaseStorage implements IStorage {
         userId,
         leagueId: leagueId || 1,
         type: "score",
-        description: "\"Fluffhead\" was played as an encore (+2 points)",
+        description: "\"Fluffhead\" was played (+1 pt) and played as encore (+1 pt)",
         points: 2,
         createdAt: new Date(Date.now() - 12 * 60 * 60 * 1000),
       },
@@ -785,7 +783,7 @@ export class DatabaseStorage implements IStorage {
         userId,
         leagueId: leagueId || 1,
         type: "score",
-        description: "\"Tweezer\" was played (+1 point)",
+        description: "\"Tweezer\" was played (+1 pt)",
         points: 1,
         createdAt: new Date(Date.now() - 6 * 60 * 60 * 1000),
       },

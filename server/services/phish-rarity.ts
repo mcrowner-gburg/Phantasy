@@ -31,68 +31,18 @@ const PHISH_NET_API_KEY = "6F27E04F96EAC8C2C21B";
 const PHISH_NET_API_BASE = "https://api.phish.net/v5";
 
 /**
- * Calculate rarity score based on Phish.net statistics from last 24 months
- * Factors considered:
- * - Times played in last 24 months (frequency)
- * - Gap since last played (recency)
- * - Recent performance patterns only
+ * Simple scoring system - no complex rarity calculations
+ * Points are earned only during tour performances:
+ * - 1 pt: Song is played this tour
+ * - 1 pt: Song opens first set  
+ * - 1 pt: Song opens second set
+ * - 1 pt: Song is played as encore
+ * Maximum 4 points per performance
  */
 function calculateRarityScore(stats: PhishNetSongStats): number {
-  const { times_played, gap, last_played } = stats;
-  
-  // Filter to only consider plays from last 24 months
-  const twentyFourMonthsAgo = new Date();
-  twentyFourMonthsAgo.setMonth(twentyFourMonthsAgo.getMonth() - 24);
-  
-  // If last played is more than 24 months ago, treat as never played recently
-  const lastPlayedDate = last_played ? new Date(last_played) : null;
-  const isRecentlyActive = lastPlayedDate && lastPlayedDate > twentyFourMonthsAgo;
-  
-  // Estimate recent plays based on gap and total plays
-  // This is an approximation since Phish.net doesn't provide date-filtered play counts
-  let recentPlays = 0;
-  if (isRecentlyActive && gap < 50) {
-    // For recently active songs, estimate based on gap
-    // Phish plays ~40-60 shows per year, so ~80-120 shows in 24 months
-    const estimatedRecentShows = 100; // Conservative estimate
-    recentPlays = Math.max(1, Math.floor(estimatedRecentShows / (gap + 1)));
-    recentPlays = Math.min(recentPlays, times_played); // Can't exceed total plays
-  }
-  
-  let rarityScore = 0;
-  
-  // Frequency component (0-60 points) - based on 24-month activity
-  // Conservative thresholds: what was "medium" is now "low", "high" is now "medium"
-  if (!isRecentlyActive || recentPlays === 0) {
-    rarityScore += 60; // Not played in last 24 months = maximum rarity
-  } else if (recentPlays <= 1) {
-    rarityScore += 55; // 1 time in 24 months = high rarity
-  } else if (recentPlays <= 3) {
-    rarityScore += 45; // 2-3 times in 24 months = medium-high rarity
-  } else if (recentPlays <= 6) {
-    rarityScore += 35; // 4-6 times in 24 months = medium rarity
-  } else if (recentPlays <= 12) {
-    rarityScore += 25; // 7-12 times in 24 months = low-medium rarity
-  } else if (recentPlays <= 20) {
-    rarityScore += 15; // 13-20 times in 24 months = low rarity
-  } else {
-    rarityScore += 5; // Very common in recent period
-  }
-  
-  // Gap component (0-40 points) - adjusted for more conservative scoring
-  if (gap >= 40) {
-    rarityScore += 40; // Not played in 40+ shows = maximum gap rarity
-  } else if (gap >= 20) {
-    rarityScore += 30; // 20-39 shows ago = high gap rarity
-  } else if (gap >= 10) {
-    rarityScore += 20; // 10-19 shows ago = medium gap rarity
-  } else if (gap >= 3) {
-    rarityScore += 10; // 3-9 shows ago = low gap rarity
-  } else {
-    rarityScore += 0; // Very recently played
-  }
-  
-  return Math.min(rarityScore, 100); // Cap at 100
+  // No complex rarity scoring - just return a simple base score
+  // Actual points are earned during tour performances only
+  return 0; // All songs start with 0 base points
 }
 
 /**
