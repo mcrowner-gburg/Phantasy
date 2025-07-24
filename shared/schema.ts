@@ -10,10 +10,23 @@ export const users = pgTable("users", {
   createdAt: timestamp("created_at").defaultNow(),
 });
 
+export const tours = pgTable("tours", {
+  id: serial("id").primaryKey(),
+  name: text("name").notNull(), // "Summer Tour 2024", "Fall Tour 2023", etc.
+  year: integer("year").notNull(),
+  season: text("season").notNull(), // "summer", "fall", "winter", "spring", "nye"
+  description: text("description"),
+  startDate: timestamp("start_date"),
+  endDate: timestamp("end_date"),
+  isActive: boolean("is_active").default(true),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
 export const leagues = pgTable("leagues", {
   id: serial("id").primaryKey(),
   name: text("name").notNull(),
   description: text("description"),
+  tourId: integer("tour_id").references(() => tours.id),
   ownerId: integer("owner_id").references(() => users.id),
   maxPlayers: integer("max_players").default(24),
   draftStatus: text("draft_status").default("active"), // active, completed, paused
@@ -48,6 +61,7 @@ export const draftedSongs = pgTable("drafted_songs", {
 
 export const concerts = pgTable("concerts", {
   id: serial("id").primaryKey(),
+  tourId: integer("tour_id").references(() => tours.id),
   date: timestamp("date").notNull(),
   venue: text("venue").notNull(),
   city: text("city").notNull(),
@@ -73,9 +87,19 @@ export const insertUserSchema = createInsertSchema(users).pick({
   password: true,
 });
 
+export const insertTourSchema = createInsertSchema(tours).pick({
+  name: true,
+  year: true,
+  season: true,
+  description: true,
+  startDate: true,
+  endDate: true,
+});
+
 export const insertLeagueSchema = createInsertSchema(leagues).pick({
   name: true,
   description: true,
+  tourId: true,
   maxPlayers: true,
 });
 
@@ -86,6 +110,7 @@ export const insertDraftedSongSchema = createInsertSchema(draftedSongs).pick({
 });
 
 export const insertConcertSchema = createInsertSchema(concerts).pick({
+  tourId: true,
   date: true,
   venue: true,
   city: true,
@@ -97,6 +122,8 @@ export const insertConcertSchema = createInsertSchema(concerts).pick({
 // Types
 export type User = typeof users.$inferSelect;
 export type InsertUser = z.infer<typeof insertUserSchema>;
+export type Tour = typeof tours.$inferSelect;
+export type InsertTour = z.infer<typeof insertTourSchema>;
 export type League = typeof leagues.$inferSelect;
 export type InsertLeague = z.infer<typeof insertLeagueSchema>;
 export type Song = typeof songs.$inferSelect;

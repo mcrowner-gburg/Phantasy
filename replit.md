@@ -7,6 +7,7 @@ PhishDraft is a fantasy sports application specifically designed for Phish conce
 ## User Preferences
 
 Preferred communication style: Simple, everyday language.
+Fantasy seasons organized as "tours" (Summer Tour, Fall Tour, NYE Run, etc.) rather than traditional sports seasons.
 
 ## System Architecture
 
@@ -34,10 +35,11 @@ Preferred communication style: Simple, everyday language.
 
 ### Data Model (shared/schema.ts)
 - **Users**: Authentication, points tracking, profile management
-- **Leagues**: Fantasy league creation and management with ownership
+- **Tours**: Phish tour seasons (Summer Tour, Fall Tour, NYE Run, etc.) with date ranges and active status
+- **Leagues**: Fantasy league creation and management within specific tours
 - **Songs**: Phish song database with rarity scoring and play statistics
 - **Drafted Songs**: User song selections within leagues with point accumulation
-- **Concerts**: Upcoming and past show tracking with setlist data
+- **Concerts**: Tour-specific show tracking with setlist data
 - **Activities**: User action logging for feeds and notifications
 - **League Members**: Many-to-many relationship between users and leagues
 

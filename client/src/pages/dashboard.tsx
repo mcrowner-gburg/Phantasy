@@ -36,7 +36,7 @@ export default function Dashboard() {
     );
   }
 
-  const { user, league, draftedSongs, recentActivities, upcomingConcerts, leagueStandings } = dashboardData || {};
+  const { user, tour, league, draftedSongs, recentActivities, upcomingConcerts, leagueStandings } = dashboardData || {};
 
   const userRank = leagueStandings?.find((standing: any) => standing.id === user?.id)?.rank || 0;
   const todayPoints = leagueStandings?.find((standing: any) => standing.id === user?.id)?.todayPoints || 0;
@@ -52,7 +52,7 @@ export default function Dashboard() {
           <div className="flex justify-between items-center">
             <div>
               <h2 className="text-2xl font-bold">Dashboard</h2>
-              <p className="phish-text">Welcome back to your fantasy Phish league</p>
+              <p className="phish-text">Welcome back to {tour?.name || "your fantasy Phish league"}</p>
             </div>
             <div className="flex items-center space-x-4">
               <div className="relative">
@@ -317,7 +317,7 @@ export default function Dashboard() {
                 <h3 className="text-xl font-bold">League Standings</h3>
                 <div className="flex items-center space-x-2 text-sm phish-text">
                   <Users className="" size={16} />
-                  <span>"{league?.name || "No League"}" League</span>
+                  <span>"{league?.name || "No League"}" - {tour?.name || "No Tour"}</span>
                 </div>
               </div>
 

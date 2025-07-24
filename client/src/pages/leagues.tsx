@@ -19,6 +19,7 @@ export default function Leagues() {
   const [newLeague, setNewLeague] = useState({
     name: "",
     description: "",
+    tourId: 1, // Default to active tour
     maxPlayers: 24,
   });
   
@@ -27,6 +28,14 @@ export default function Leagues() {
 
   const { data: leagues, isLoading } = useQuery({
     queryKey: ["/api/leagues", { userId: DEMO_USER_ID }],
+  });
+
+  const { data: tours } = useQuery({
+    queryKey: ["/api/tours"],
+  });
+
+  const { data: activeTour } = useQuery({
+    queryKey: ["/api/tours/active"],
   });
 
   const createLeagueMutation = useMutation({
@@ -39,7 +48,7 @@ export default function Leagues() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/leagues"] });
       setIsCreateOpen(false);
-      setNewLeague({ name: "", description: "", maxPlayers: 24 });
+      setNewLeague({ name: "", description: "", tourId: activeTour?.id || 1, maxPlayers: 24 });
       toast({
         title: "League created successfully!",
         description: "Your new fantasy league is ready for players.",
@@ -75,7 +84,9 @@ export default function Leagues() {
           <div className="flex justify-between items-center">
             <div>
               <h2 className="text-2xl font-bold">My Leagues</h2>
-              <p className="phish-text">Manage your fantasy Phish leagues</p>
+              <p className="phish-text">
+                {activeTour ? `Join or create leagues for ${activeTour.name}` : "Join or create fantasy leagues"}
+              </p>
             </div>
             <div className="flex items-center space-x-4">
               <Dialog open={isCreateOpen} onOpenChange={setIsCreateOpen}>

@@ -1,6 +1,6 @@
 import { 
-  users, leagues, leagueMembers, songs, draftedSongs, concerts, activities,
-  type User, type InsertUser, type League, type InsertLeague,
+  users, tours, leagues, leagueMembers, songs, draftedSongs, concerts, activities,
+  type User, type InsertUser, type Tour, type InsertTour, type League, type InsertLeague,
   type Song, type DraftedSong, type InsertDraftedSong,
   type Concert, type InsertConcert, type Activity, type LeagueMember
 } from "@shared/schema";
@@ -12,10 +12,17 @@ export interface IStorage {
   createUser(user: InsertUser): Promise<User>;
   updateUserPoints(userId: number, points: number): Promise<void>;
 
+  // Tours
+  getTours(): Promise<Tour[]>;
+  getActiveTour(): Promise<Tour | undefined>;
+  getTour(id: number): Promise<Tour | undefined>;
+  createTour(tour: InsertTour): Promise<Tour>;
+
   // Leagues
   getLeague(id: number): Promise<League | undefined>;
   createLeague(league: InsertLeague & { ownerId: number }): Promise<League>;
   getUserLeagues(userId: number): Promise<League[]>;
+  getTourLeagues(tourId: number): Promise<League[]>;
   joinLeague(userId: number, leagueId: number): Promise<void>;
   getLeagueMembers(leagueId: number): Promise<(LeagueMember & { user: User })[]>;
 
@@ -47,6 +54,7 @@ export interface IStorage {
 
 export class MemStorage implements IStorage {
   private users: Map<number, User> = new Map();
+  private tours: Map<number, Tour> = new Map();
   private leagues: Map<number, League> = new Map();
   private leagueMembers: Map<number, LeagueMember> = new Map();
   private songs: Map<number, Song> = new Map();
@@ -55,6 +63,7 @@ export class MemStorage implements IStorage {
   private activities: Map<number, Activity> = new Map();
   
   private currentUserId = 1;
+  private currentTourId = 1;
   private currentLeagueId = 1;
   private currentSongId = 1;
   private currentDraftedSongId = 1;
@@ -67,6 +76,52 @@ export class MemStorage implements IStorage {
   }
 
   private seedData() {
+    // Seed tours
+    const tourData = [
+      { 
+        name: "Winter Tour 2024", 
+        year: 2024, 
+        season: "winter", 
+        description: "NYE run and winter shows",
+        startDate: new Date("2024-12-28"),
+        endDate: new Date("2024-01-15"),
+        isActive: true
+      },
+      { 
+        name: "Summer Tour 2024", 
+        year: 2024, 
+        season: "summer", 
+        description: "Summer festival season",
+        startDate: new Date("2024-06-15"),
+        endDate: new Date("2024-08-30"),
+        isActive: false
+      },
+      { 
+        name: "Fall Tour 2023", 
+        year: 2023, 
+        season: "fall", 
+        description: "Fall shows and Halloween",
+        startDate: new Date("2023-10-15"),
+        endDate: new Date("2023-11-15"),
+        isActive: false
+      }
+    ];
+
+    tourData.forEach(tour => {
+      const newTour: Tour = {
+        id: this.currentTourId++,
+        name: tour.name,
+        year: tour.year,
+        season: tour.season,
+        description: tour.description,
+        startDate: tour.startDate,
+        endDate: tour.endDate,
+        isActive: tour.isActive,
+        createdAt: new Date(),
+      };
+      this.tours.set(newTour.id, newTour);
+    });
+
     // Seed songs
     const songData = [
       { title: "Wilson", category: "Gamehendge", rarityScore: 85, totalPlays: 245 },
@@ -101,6 +156,7 @@ export class MemStorage implements IStorage {
     concertData.forEach(concert => {
       const newConcert: Concert = {
         id: this.currentConcertId++,
+        tourId: 1, // Winter Tour 2024
         date: concert.date,
         venue: concert.venue,
         city: concert.city,
@@ -111,6 +167,19 @@ export class MemStorage implements IStorage {
       };
       this.concerts.set(newConcert.id, newConcert);
     });
+
+    // Seed a league for the active tour
+    const league: League = {
+      id: this.currentLeagueId++,
+      name: "Winter Tour Fantasy League",
+      description: "Draft songs for the NYE run and winter shows",
+      tourId: 1, // Winter Tour 2024
+      ownerId: 1,
+      maxPlayers: 24,
+      draftStatus: "active",
+      createdAt: new Date(),
+    };
+    this.leagues.set(league.id, league);
   }
 
   // Users
@@ -141,6 +210,30 @@ export class MemStorage implements IStorage {
     }
   }
 
+  // Tours
+  async getTours(): Promise<Tour[]> {
+    return Array.from(this.tours.values());
+  }
+
+  async getActiveTour(): Promise<Tour | undefined> {
+    return Array.from(this.tours.values()).find(tour => tour.isActive);
+  }
+
+  async getTour(id: number): Promise<Tour | undefined> {
+    return this.tours.get(id);
+  }
+
+  async createTour(insertTour: InsertTour): Promise<Tour> {
+    const tour: Tour = {
+      ...insertTour,
+      id: this.currentTourId++,
+      isActive: true,
+      createdAt: new Date(),
+    };
+    this.tours.set(tour.id, tour);
+    return tour;
+  }
+
   // Leagues
   async getLeague(id: number): Promise<League | undefined> {
     return this.leagues.get(id);
@@ -168,6 +261,11 @@ export class MemStorage implements IStorage {
     
     return Array.from(this.leagues.values())
       .filter(league => userLeagueIds.includes(league.id));
+  }
+
+  async getTourLeagues(tourId: number): Promise<League[]> {
+    return Array.from(this.leagues.values())
+      .filter(league => league.tourId === tourId);
   }
 
   async joinLeague(userId: number, leagueId: number): Promise<void> {

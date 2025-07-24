@@ -1,7 +1,7 @@
 import type { Express } from "express";
 import { createServer, type Server } from "http";
 import { storage } from "./storage";
-import { insertUserSchema, insertLeagueSchema, insertDraftedSongSchema } from "@shared/schema";
+import { insertUserSchema, insertTourSchema, insertLeagueSchema, insertDraftedSongSchema } from "@shared/schema";
 import { z } from "zod";
 
 export async function registerRoutes(app: Express): Promise<Server> {
@@ -51,6 +51,53 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.json({ id: user.id, username: user.username, totalPoints: user.totalPoints });
     } catch (error) {
       res.status(500).json({ message: "Failed to fetch user" });
+    }
+  });
+
+  // Tour routes
+  app.get("/api/tours", async (req, res) => {
+    try {
+      const tours = await storage.getTours();
+      res.json(tours);
+    } catch (error) {
+      res.status(500).json({ message: "Failed to fetch tours" });
+    }
+  });
+
+  app.get("/api/tours/active", async (req, res) => {
+    try {
+      const activeTour = await storage.getActiveTour();
+      if (!activeTour) {
+        return res.status(404).json({ message: "No active tour found" });
+      }
+      res.json(activeTour);
+    } catch (error) {
+      res.status(500).json({ message: "Failed to fetch active tour" });
+    }
+  });
+
+  app.get("/api/tours/:id", async (req, res) => {
+    try {
+      const tourId = parseInt(req.params.id);
+      const tour = await storage.getTour(tourId);
+      
+      if (!tour) {
+        return res.status(404).json({ message: "Tour not found" });
+      }
+      
+      res.json(tour);
+    } catch (error) {
+      res.status(500).json({ message: "Failed to fetch tour" });
+    }
+  });
+
+  app.post("/api/tours", async (req, res) => {
+    try {
+      const tourData = insertTourSchema.parse(req.body);
+      const tour = await storage.createTour(tourData);
+      res.json(tour);
+    } catch (error) {
+      res.status(400).json({ message: "Invalid tour data" });
     }
   });
 
@@ -238,6 +285,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(404).json({ message: "User not found" });
       }
 
+      // Get active tour
+      const activeTour = await storage.getActiveTour();
+      
       // Get user's leagues (assume first one for demo)
       const leagues = await storage.getUserLeagues(userId);
       const currentLeague = leagues[0];
@@ -245,6 +295,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (!currentLeague) {
         return res.json({
           user: { id: user.id, username: user.username, totalPoints: user.totalPoints },
+          tour: activeTour,
           league: null,
           draftedSongs: [],
           recentActivities: [],
@@ -267,6 +318,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       res.json({
         user: { id: user.id, username: user.username, totalPoints: user.totalPoints },
+        tour: activeTour,
         league: currentLeague,
         draftedSongs: draftedSongs.slice(0, 10), // Limit for display
         recentActivities: recentActivities.slice(0, 5),
