@@ -40,15 +40,16 @@ PhishDraft is a fantasy sports application specifically designed for Phish conce
 - Rarity badges now reflect genuine song performance statistics instead of arbitrary values
 - System gracefully handles API errors and provides fallback default scores
 
-### July 24, 2025 - Simplified Scoring System Implementation
-- **REMOVED**: Complex gap-based rarity scoring and 24-month frequency calculations
+### July 24, 2025 - Simplified Scoring System & Clean Draft Interface
+- **REMOVED**: Complex gap-based rarity scoring and 24-month frequency calculations  
+- **REMOVED**: Rarity scores and expected points from draft interface for cleaner song selection
 - **NEW**: Clean 4-point scoring system focused on tour performance only
 - **Scoring Rules**: 1pt played + 1pt first set opener + 1pt second set opener + 1pt encore = max 4pts
+- **Draft Display**: Shows only "Plays (24 months)" count instead of confusing rarity metrics
 - All songs now start with 0 base points, eliminating pre-draft rarity advantages
 - Updated activity descriptions to reflect new point breakdown: "played (+1 pt) and opened first set (+1 pt)"
-- Simplified scoring engine removes complexity while maintaining strategic depth
+- Streamlined song catalog with realistic 24-month performance data for informed drafting decisions
 - Enhanced performance tracking with clear point attribution for each scoring category
-- Updated database schema to reflect simplified scoring approach
 
 ### July 24, 2025 - Draft Limit Reduction & Comprehensive Song Catalog
 - Reduced maximum drafted songs per user from 20 to 10 for more strategic gameplay

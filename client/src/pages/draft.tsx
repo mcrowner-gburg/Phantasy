@@ -64,17 +64,7 @@ export default function Draft() {
 
   const draftedSongIds = new Set(draftedSongs?.map((draft: any) => draft.songId) || []);
 
-  const getRarityColor = (score: number) => {
-    if (score >= 100) return "bg-red-500 text-white";
-    if (score >= 75) return "bg-orange-500 text-white";
-    return "bg-yellow-500 text-black";
-  };
-
-  const getRarityLabel = (score: number) => {
-    if (score >= 100) return "RARE";
-    if (score >= 75) return "HIGH";
-    return "MED";
-  };
+  // Simplified draft interface - no rarity calculations needed
 
   return (
     <div className="flex min-h-screen">
@@ -137,7 +127,7 @@ export default function Draft() {
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                   {filteredSongs.map((song: any) => {
                     const isDrafted = draftedSongIds.has(song.id);
-                    const canDraft = !isDrafted && (draftedSongs?.length || 0) < 20;
+                    const canDraft = !isDrafted && (draftedSongs?.length || 0) < 10;
 
                     return (
                       <Card
@@ -161,18 +151,8 @@ export default function Draft() {
 
                           <div className="space-y-2 mb-4">
                             <div className="flex justify-between text-sm">
-                              <span className="phish-text">Rarity Score:</span>
-                              <Badge className={`text-xs px-2 py-1 rounded-full ${getRarityColor(song.rarityScore || 0)}`}>
-                                {getRarityLabel(song.rarityScore || 0)}
-                              </Badge>
-                            </div>
-                            <div className="flex justify-between text-sm">
-                              <span className="phish-text">Total Plays:</span>
-                              <span className="text-white">{song.totalPlays || 0}</span>
-                            </div>
-                            <div className="flex justify-between text-sm">
-                              <span className="phish-text">Expected Points:</span>
-                              <span className="phish-gold font-bold">{song.rarityScore || 0}</span>
+                              <span className="phish-text">Plays (24 months):</span>
+                              <span className="text-white font-semibold">{song.totalPlays || 0}</span>
                             </div>
                           </div>
 
