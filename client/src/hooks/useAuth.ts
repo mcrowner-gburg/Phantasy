@@ -1,7 +1,7 @@
 import { useQuery } from "@tanstack/react-query";
 
 export function useAuth() {
-  const { data: user, isLoading } = useQuery({
+  const { data: response, isLoading } = useQuery({
     queryKey: ["/api/auth/user"],
     retry: false,
     queryFn: async () => {
@@ -15,6 +15,8 @@ export function useAuth() {
       return await res.json();
     },
   });
+
+  const user = response?.user || null;
 
   return {
     user,

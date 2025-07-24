@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useLocation } from "wouter";
+import { useAuth } from "@/hooks/useAuth";
 import { NavigationSidebar } from "@/components/navigation-sidebar";
 import { MobileNavigation } from "@/components/mobile-navigation";
 import { Card, CardContent } from "@/components/ui/card";
@@ -13,9 +14,8 @@ import { Users, Plus, Trophy, Calendar, Settings, Eye } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest } from "@/lib/queryClient";
 
-const DEMO_USER_ID = 1;
-
 export default function Leagues() {
+  const { user } = useAuth();
   const [isCreateOpen, setIsCreateOpen] = useState(false);
   const [activeTab, setActiveTab] = useState<"my-leagues" | "browse">("my-leagues");
   const [newLeague, setNewLeague] = useState({
@@ -31,8 +31,9 @@ export default function Leagues() {
   const [, setLocation] = useLocation();
 
   const { data: myLeagues = [], isLoading: isLoadingMyLeagues } = useQuery({
-    queryKey: ["/api/leagues", "my", DEMO_USER_ID],
-    queryFn: () => fetch(`/api/leagues?userId=${DEMO_USER_ID}`).then(res => res.json()),
+    queryKey: ["/api/leagues", "my", user?.id],
+    queryFn: () => fetch(`/api/leagues?userId=${user?.id}`).then(res => res.json()),
+    enabled: !!user?.id,
   });
 
   const { data: publicLeagues = [], isLoading: isLoadingPublic } = useQuery({
@@ -53,7 +54,7 @@ export default function Leagues() {
     mutationFn: async () => {
       return apiRequest("POST", "/api/leagues", {
         ...newLeague,
-        ownerId: DEMO_USER_ID,
+        ownerId: user?.id,
       });
     },
     onSuccess: () => {
