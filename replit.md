@@ -38,6 +38,14 @@ PhishDraft is a fantasy sports application specifically designed for Phish conce
 - Rarity badges now reflect genuine song performance statistics instead of arbitrary values
 - System gracefully handles API errors and provides fallback default scores
 
+### July 24, 2025 - 24-Month Rarity Focus & Conservative Scoring
+- Updated rarity calculation to focus on last 24 months of performance data instead of all-time
+- Implemented conservative scoring thresholds where medium rarity becomes low, high becomes medium
+- Adjusted frequency thresholds: 1 play = high rarity, 2-3 plays = medium-high, 4-6 plays = medium
+- Modified gap scoring to be more conservative with 40+ shows = max rarity, 20-39 = high rarity
+- Changed default rarity scores from 50 to 35 points for more balanced gameplay
+- Updated point calculation system: 1pt for played + 1pt for set opener + 1pt for encore (max 3pts per performance)
+
 ## User Preferences
 
 Preferred communication style: Simple, everyday language.

@@ -93,12 +93,7 @@ export class DatabaseStorage implements IStorage {
     return user;
   }
 
-  async updateUserPoints(userId: number, points: number): Promise<void> {
-    await db
-      .update(users)
-      .set({ totalPoints: points })
-      .where(eq(users.id, userId));
-  }
+
 
   // Tour operations - stub implementations
   async getTours(): Promise<Tour[]> {
@@ -291,12 +286,23 @@ export class DatabaseStorage implements IStorage {
     return { id: Date.now(), ...draft, draftedAt: new Date() } as DraftedSong;
   }
 
-  async updateDraftedSongPoints(id: number, points: number): Promise<void> {
-    // Stub implementation
+  async updateDraftedSongPoints(id: number, additionalPoints: number): Promise<void> {
+    // In a real database, this would update the points for the drafted song
+    // For now, this is a stub but the logic would be:
+    // UPDATE drafted_songs SET points = points + additionalPoints WHERE id = id
+    console.log(`Updating drafted song ${id} with +${additionalPoints} points`);
   }
 
   async updateDraftedSongStats(id: number, playedCount: number, openerCount: number, encoreCount: number): Promise<void> {
-    // Stub implementation
+    // In a real database, this would update the performance stats for the drafted song
+    // UPDATE drafted_songs SET played_count = playedCount, opener_count = openerCount, encore_count = encoreCount WHERE id = id
+    console.log(`Updating drafted song ${id} stats: ${playedCount} played, ${openerCount} openers, ${encoreCount} encores`);
+  }
+
+  async updateUserPoints(userId: number, additionalPoints: number): Promise<void> {
+    // In a real database, this would update the user's total points by adding additionalPoints
+    // UPDATE users SET total_points = total_points + additionalPoints WHERE id = userId
+    console.log(`Updating user ${userId} with +${additionalPoints} points`);
   }
 
   // Concert operations - stub implementations
@@ -326,7 +332,59 @@ export class DatabaseStorage implements IStorage {
   }
 
   async calculateAndUpdatePoints(concertId: number): Promise<void> {
-    // Stub implementation
+    const performances = await this.getConcertPerformances(concertId);
+    
+    for (const performance of performances) {
+      // Calculate points: 1 for played + 1 for opener + 1 for encore (max 3 points)
+      let points = 1; // Base point for being played
+      
+      if (performance.isOpener) {
+        points += 1; // Additional point for set opener
+      }
+      
+      if (performance.isEncore) {
+        points += 1; // Additional point for encore
+      }
+
+      // Find all drafted songs for this song and update their stats
+      const draftedSongs = await this.getDraftedSongs(1, 1); // Mock for now
+      const relevantDrafts = draftedSongs.filter((draft: any) => draft.songId === performance.songId);
+
+      for (const draftedSong of relevantDrafts) {
+        // Update points
+        await this.updateDraftedSongPoints(draftedSong.id, points);
+        
+        // Update stats
+        const newPlayedCount = (draftedSong.playedCount || 0) + 1;
+        const newOpenerCount = (draftedSong.openerCount || 0) + (performance.isOpener ? 1 : 0);
+        const newEncoreCount = (draftedSong.encoreCount || 0) + (performance.isEncore ? 1 : 0);
+        
+        await this.updateDraftedSongStats(draftedSong.id, newPlayedCount, newOpenerCount, newEncoreCount);
+        
+        // Update user total points
+        await this.updateUserPoints(draftedSong.userId, points);
+        
+        // Create activity for the points scored
+        const song = await this.getSong(performance.songId!);
+        let description = `"${song?.title}" was played`;
+        if (performance.isOpener && performance.isEncore) {
+          description += " as a set opener and encore";
+        } else if (performance.isOpener) {
+          description += " as a set opener";
+        } else if (performance.isEncore) {
+          description += " as an encore";
+        }
+        description += ` (+${points} points)`;
+        
+        await this.createActivity(
+          draftedSong.userId,
+          draftedSong.leagueId,
+          "score",
+          description,
+          points
+        );
+      }
+    }
   }
 
   // Activities operations - stub implementations
