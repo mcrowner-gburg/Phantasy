@@ -6,13 +6,13 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Bell, Plus, ArrowUp, Star, Trophy, Music, Calendar, Crown, Users, User } from "lucide-react";
 import { format } from "date-fns";
-
-// Mock user ID for demo - in real app this would come from auth
-const DEMO_USER_ID = 1;
+import { useAuth } from "@/hooks/useAuth";
 
 export default function Dashboard() {
+  const { user: authUser } = useAuth();
   const { data: dashboardData, isLoading } = useQuery({
-    queryKey: [`/api/dashboard?userId=${DEMO_USER_ID}`],
+    queryKey: [`/api/dashboard?userId=${authUser?.user?.id}`],
+    enabled: !!authUser?.user?.id,
   });
 
   if (isLoading) {
@@ -43,7 +43,7 @@ export default function Dashboard() {
 
   return (
     <div className="flex min-h-screen">
-      <NavigationSidebar user={user} />
+      <NavigationSidebar user={user || authUser?.user} />
       
       {/* Main Content */}
       <div className="flex-1 ml-64 lg:ml-64">

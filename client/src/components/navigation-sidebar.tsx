@@ -2,6 +2,7 @@ import { Link, useLocation } from "wouter";
 import { Music, Home, Trophy, Calendar, Users, User, Bell, Plus } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import UserMenu from "@/components/user-menu";
 
 interface NavigationSidebarProps {
   user?: {
@@ -49,14 +50,17 @@ export function NavigationSidebar({ user }: NavigationSidebarProps) {
       
       {user && (
         <div className="absolute bottom-0 left-0 right-0 p-6 border-t border-gray-700">
-          <div className="flex items-center">
-            <div className="w-10 h-10 bg-green-500 rounded-full flex items-center justify-center mr-3">
-              <User className="text-black" size={20} />
+          <div className="flex items-center justify-between">
+            <div className="flex items-center">
+              <div className="w-10 h-10 bg-green-500 rounded-full flex items-center justify-center mr-3">
+                <User className="text-black" size={20} />
+              </div>
+              <div>
+                <p className="font-medium">{user.username}</p>
+                <p className="text-sm text-gray-400">{user.totalPoints?.toLocaleString() || 0} points</p>
+              </div>
             </div>
-            <div>
-              <p className="font-medium">{user.username}</p>
-              <p className="text-sm text-gray-400">{user.totalPoints?.toLocaleString() || 0} points</p>
-            </div>
+            <UserMenu />
           </div>
         </div>
       )}
