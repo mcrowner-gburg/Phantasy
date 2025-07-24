@@ -1,5 +1,8 @@
 // Phish.net API integration
-const PHISH_NET_API_KEY = import.meta.env.VITE_PHISH_NET_API_KEY || process.env.PHISH_NET_API_KEY || "your_api_key_here";
+const PHISH_NET_API_KEY =
+  import.meta.env.VITE_PHISH_NET_API_KEY ||
+  process.env.PHISH_NET_API_KEY ||
+  "	6F27E04F96EAC8C2C21B";
 const PHISH_NET_BASE_URL = "https://api.phish.net/v5";
 
 export interface PhishNetShow {
@@ -27,10 +30,13 @@ class PhishNetAPI {
     this.apiKey = apiKey;
   }
 
-  private async makeRequest(endpoint: string, params: Record<string, string> = {}) {
+  private async makeRequest(
+    endpoint: string,
+    params: Record<string, string> = {},
+  ) {
     const url = new URL(`${PHISH_NET_BASE_URL}/${endpoint}`);
     url.searchParams.append("apikey", this.apiKey);
-    
+
     Object.entries(params).forEach(([key, value]) => {
       url.searchParams.append(key, value);
     });
@@ -49,7 +55,9 @@ class PhishNetAPI {
 
   async getRecentShows(limit: number = 10): Promise<PhishNetShow[]> {
     try {
-      const response = await this.makeRequest("shows", { limit: limit.toString() });
+      const response = await this.makeRequest("shows", {
+        limit: limit.toString(),
+      });
       return response.data || [];
     } catch (error) {
       console.error("Failed to fetch recent shows:", error);
@@ -75,7 +83,9 @@ class PhishNetAPI {
         const setlistData = response.data[0].setlistdata;
         // Parse setlist data to extract song names
         // This would need proper parsing based on Phish.net format
-        return setlistData ? setlistData.split(",").map((song: string) => song.trim()) : [];
+        return setlistData
+          ? setlistData.split(",").map((song: string) => song.trim())
+          : [];
       }
       return [];
     } catch (error) {
@@ -87,7 +97,9 @@ class PhishNetAPI {
   async getSongStats(songName: string): Promise<PhishNetSong | null> {
     try {
       const response = await this.makeRequest("songs", { song: songName });
-      return response.data && response.data.length > 0 ? response.data[0] : null;
+      return response.data && response.data.length > 0
+        ? response.data[0]
+        : null;
     } catch (error) {
       console.error("Failed to fetch song stats:", error);
       return null;
