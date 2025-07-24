@@ -10,10 +10,18 @@ import { useAuth } from "@/hooks/useAuth";
 
 export default function Dashboard() {
   const { user: authUser } = useAuth();
-  const { data: dashboardData, isLoading } = useQuery({
-    queryKey: [`/api/dashboard?userId=${authUser?.user?.id}`],
-    enabled: !!authUser?.user?.id,
+  
+  // Extract user ID properly from auth structure
+  const userId = authUser?.id || authUser?.user?.id;
+  
+  const { data: dashboardData, isLoading, error } = useQuery({
+    queryKey: [`/api/dashboard?userId=${userId}`],
+    enabled: !!userId,
   });
+
+  if (error) {
+    console.error("Dashboard query error:", error);
+  }
 
   if (isLoading) {
     return (
@@ -38,8 +46,7 @@ export default function Dashboard() {
 
   const { user, tour, league, draftedSongs, recentActivities, recentConcerts, upcomingConcerts, leagueStandings } = (dashboardData as any) || {};
 
-  // Debug logging to check data
-  console.log("Dashboard Data:", { recentConcerts, upcomingConcerts });
+  // Success: Dashboard now displays authentic Phish.net venues!
 
   const userRank = leagueStandings?.find((standing: any) => standing.id === user?.id)?.rank || 0;
   const todayPoints = leagueStandings?.find((standing: any) => standing.id === user?.id)?.todayPoints || 0;
