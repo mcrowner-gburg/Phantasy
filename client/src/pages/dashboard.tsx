@@ -36,7 +36,10 @@ export default function Dashboard() {
     );
   }
 
-  const { user, tour, league, draftedSongs, recentActivities, recentConcerts, upcomingConcerts, leagueStandings } = dashboardData || {};
+  const { user, tour, league, draftedSongs, recentActivities, recentConcerts, upcomingConcerts, leagueStandings } = (dashboardData as any) || {};
+
+  // Debug logging to check data
+  console.log("Dashboard Data:", { recentConcerts, upcomingConcerts });
 
   const userRank = leagueStandings?.find((standing: any) => standing.id === user?.id)?.rank || 0;
   const todayPoints = leagueStandings?.find((standing: any) => standing.id === user?.id)?.todayPoints || 0;
