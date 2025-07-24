@@ -13,6 +13,8 @@ PhishDraft is a fantasy sports application specifically designed for Phish conce
 - Fixed dashboard routing and API query implementation for proper data fetching
 - Dashboard now shows real Phish concert venues: Forest Hills Stadium, United Center, Hampton Coliseum
 - Added date sorting for upcoming shows (closest to farthest chronological order)
+- Implemented clickable links to Phish.net show pages for all concerts (dashboard and concerts page)
+- Fixed URL formatting to match Phish.net structure with full month names (e.g., "july-23-2025")
 
 ## User Preferences
 
