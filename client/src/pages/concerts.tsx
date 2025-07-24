@@ -48,11 +48,7 @@ export default function Concerts() {
               <h2 className="text-2xl font-bold">Concerts</h2>
               <p className="phish-text">Track Phish shows and setlists for scoring</p>
             </div>
-            <div className="flex items-center space-x-4">
-              <Badge variant="outline" className="border-green-500 text-green-500">
-                {upcomingConcerts?.length || 0} Upcoming
-              </Badge>
-            </div>
+
           </div>
         </header>
 
