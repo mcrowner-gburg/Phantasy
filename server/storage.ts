@@ -286,23 +286,91 @@ export class DatabaseStorage implements IStorage {
       return this.songsCache;
     }
 
-    // Base song list - using exact Phish.net database names for authentic rarity scores
+    // Comprehensive Phish song catalog - authentic titles from actual performances
     const baseSongs: Song[] = [
+      // Classic Phish staples
       { id: 1, title: "Wilson", category: "Gamehendge", rarityScore: 35, lastPlayed: null, totalPlays: 0 },
       { id: 2, title: "Harry Hood", category: "Classic", rarityScore: 35, lastPlayed: null, totalPlays: 0 },
       { id: 3, title: "Fluffhead", category: "Epic", rarityScore: 35, lastPlayed: null, totalPlays: 0 },
       { id: 4, title: "You Enjoy Myself", category: "Classic", rarityScore: 35, lastPlayed: null, totalPlays: 0 },
       { id: 5, title: "Tweezer", category: "Jam", rarityScore: 35, lastPlayed: null, totalPlays: 0 },
       { id: 6, title: "Free", category: "Rock", rarityScore: 35, lastPlayed: null, totalPlays: 0 },
-      { id: 7, title: "Bowie", category: "Epic", rarityScore: 35, lastPlayed: null, totalPlays: 0 },
+      { id: 7, title: "David Bowie", category: "Epic", rarityScore: 35, lastPlayed: null, totalPlays: 0 },
       { id: 8, title: "Possum", category: "Country", rarityScore: 35, lastPlayed: null, totalPlays: 0 },
       { id: 9, title: "Maze", category: "Rock", rarityScore: 35, lastPlayed: null, totalPlays: 0 },
       { id: 10, title: "Divided Sky", category: "Composed", rarityScore: 35, lastPlayed: null, totalPlays: 0 },
       { id: 11, title: "Julius", category: "Rock", rarityScore: 35, lastPlayed: null, totalPlays: 0 },
       { id: 12, title: "Chalk Dust Torture", category: "Rock", rarityScore: 35, lastPlayed: null, totalPlays: 0 },
-      { id: 13, title: "Antelope", category: "Classic", rarityScore: 35, lastPlayed: null, totalPlays: 0 },
+      { id: 13, title: "Run Like an Antelope", category: "Classic", rarityScore: 35, lastPlayed: null, totalPlays: 0 },
       { id: 14, title: "Ghost", category: "Jam", rarityScore: 35, lastPlayed: null, totalPlays: 0 },
       { id: 15, title: "Bathtub Gin", category: "Jam", rarityScore: 35, lastPlayed: null, totalPlays: 0 },
+      
+      // Additional jam vehicles and favorites
+      { id: 16, title: "Simple", category: "Jam", rarityScore: 35, lastPlayed: null, totalPlays: 0 },
+      { id: 17, title: "Light", category: "Jam", rarityScore: 35, lastPlayed: null, totalPlays: 0 },
+      { id: 18, title: "Piper", category: "Jam", rarityScore: 35, lastPlayed: null, totalPlays: 0 },
+      { id: 19, title: "Sand", category: "Jam", rarityScore: 35, lastPlayed: null, totalPlays: 0 },
+      { id: 20, title: "Wolfman's Brother", category: "Jam", rarityScore: 35, lastPlayed: null, totalPlays: 0 },
+      { id: 21, title: "Theme From the Bottom", category: "Rock", rarityScore: 35, lastPlayed: null, totalPlays: 0 },
+      { id: 22, title: "Sample in a Jar", category: "Rock", rarityScore: 35, lastPlayed: null, totalPlays: 0 },
+      { id: 23, title: "Slave to the Traffic Light", category: "Classic", rarityScore: 35, lastPlayed: null, totalPlays: 0 },
+      { id: 24, title: "Stash", category: "Rock", rarityScore: 35, lastPlayed: null, totalPlays: 0 },
+      { id: 25, title: "Reba", category: "Composed", rarityScore: 35, lastPlayed: null, totalPlays: 0 },
+      
+      // Epic compositions and rarities
+      { id: 26, title: "The Lizards", category: "Gamehendge", rarityScore: 35, lastPlayed: null, totalPlays: 0 },
+      { id: 27, title: "Tela", category: "Gamehendge", rarityScore: 35, lastPlayed: null, totalPlays: 0 },
+      { id: 28, title: "The Sloth", category: "Gamehendge", rarityScore: 35, lastPlayed: null, totalPlays: 0 },
+      { id: 29, title: "McGrupp and the Watchful Hosemasters", category: "Gamehendge", rarityScore: 35, lastPlayed: null, totalPlays: 0 },
+      { id: 30, title: "Colonel Forbin's Ascent", category: "Gamehendge", rarityScore: 35, lastPlayed: null, totalPlays: 0 },
+      { id: 31, title: "The Famous Mockingbird", category: "Gamehendge", rarityScore: 35, lastPlayed: null, totalPlays: 0 },
+      { id: 32, title: "Esther", category: "Rare", rarityScore: 35, lastPlayed: null, totalPlays: 0 },
+      { id: 33, title: "Icculus", category: "Rare", rarityScore: 35, lastPlayed: null, totalPlays: 0 },
+      { id: 34, title: "Harpua", category: "Rare", rarityScore: 35, lastPlayed: null, totalPlays: 0 },
+      { id: 35, title: "Forbin's > Mockingbird", category: "Epic", rarityScore: 35, lastPlayed: null, totalPlays: 0 },
+      
+      // Modern era favorites
+      { id: 36, title: "Carini", category: "Rock", rarityScore: 35, lastPlayed: null, totalPlays: 0 },
+      { id: 37, title: "Kill Devil Falls", category: "Rock", rarityScore: 35, lastPlayed: null, totalPlays: 0 },
+      { id: 38, title: "Backwards Down the Number Line", category: "Jam", rarityScore: 35, lastPlayed: null, totalPlays: 0 },
+      { id: 39, title: "Stealing Time From the Faulty Plan", category: "Rock", rarityScore: 35, lastPlayed: null, totalPlays: 0 },
+      { id: 40, title: "The Moma Dance", category: "Funk", rarityScore: 35, lastPlayed: null, totalPlays: 0 },
+      { id: 41, title: "Birds of a Feather", category: "Funk", rarityScore: 35, lastPlayed: null, totalPlays: 0 },
+      { id: 42, title: "Limb By Limb", category: "Rock", rarityScore: 35, lastPlayed: null, totalPlays: 0 },
+      { id: 43, title: "Guyute", category: "Composed", rarityScore: 35, lastPlayed: null, totalPlays: 0 },
+      { id: 44, title: "Roggae", category: "Funk", rarityScore: 35, lastPlayed: null, totalPlays: 0 },
+      { id: 45, title: "Heavy Things", category: "Rock", rarityScore: 35, lastPlayed: null, totalPlays: 0 },
+      
+      // Covers and special songs
+      { id: 46, title: "Rocky Top", category: "Cover", rarityScore: 35, lastPlayed: null, totalPlays: 0 },
+      { id: 47, title: "Good Times Bad Times", category: "Cover", rarityScore: 35, lastPlayed: null, totalPlays: 0 },
+      { id: 48, title: "Bold As Love", category: "Cover", rarityScore: 35, lastPlayed: null, totalPlays: 0 },
+      { id: 49, title: "While My Guitar Gently Weeps", category: "Cover", rarityScore: 35, lastPlayed: null, totalPlays: 0 },
+      { id: 50, title: "Also Sprach Zarathustra", category: "Cover", rarityScore: 35, lastPlayed: null, totalPlays: 0 },
+      
+      // Deep cuts and rarities
+      { id: 51, title: "Destiny Unbound", category: "Rare", rarityScore: 35, lastPlayed: null, totalPlays: 0 },
+      { id: 52, title: "Dinner and a Movie", category: "Rare", rarityScore: 35, lastPlayed: null, totalPlays: 0 },
+      { id: 53, title: "Dog Faced Boy", category: "Rare", rarityScore: 35, lastPlayed: null, totalPlays: 0 },
+      { id: 54, title: "Lengthwise", category: "Rare", rarityScore: 35, lastPlayed: null, totalPlays: 0 },
+      { id: 55, title: "Weigh", category: "Rare", rarityScore: 35, lastPlayed: null, totalPlays: 0 },
+      { id: 56, title: "If I Could", category: "Rare", rarityScore: 35, lastPlayed: null, totalPlays: 0 },
+      { id: 57, title: "Taste", category: "Rare", rarityScore: 35, lastPlayed: null, totalPlays: 0 },
+      { id: 58, title: "Fast Enough for You", category: "Rare", rarityScore: 35, lastPlayed: null, totalPlays: 0 },
+      { id: 59, title: "Sparkle", category: "Rock", rarityScore: 35, lastPlayed: null, totalPlays: 0 },
+      { id: 60, title: "Character Zero", category: "Rock", rarityScore: 35, lastPlayed: null, totalPlays: 0 },
+      
+      // Recent additions and modern favorites
+      { id: 61, title: "Blaze On", category: "Modern", rarityScore: 35, lastPlayed: null, totalPlays: 0 },
+      { id: 62, title: "No Men In No Man's Land", category: "Modern", rarityScore: 35, lastPlayed: null, totalPlays: 0 },
+      { id: 63, title: "Petrichor", category: "Modern", rarityScore: 35, lastPlayed: null, totalPlays: 0 },
+      { id: 64, title: "Things People Do", category: "Modern", rarityScore: 35, lastPlayed: null, totalPlays: 0 },
+      { id: 65, title: "More", category: "Modern", rarityScore: 35, lastPlayed: null, totalPlays: 0 },
+      { id: 66, title: "Everything's Right", category: "Modern", rarityScore: 35, lastPlayed: null, totalPlays: 0 },
+      { id: 67, title: "Soul Planet", category: "Modern", rarityScore: 35, lastPlayed: null, totalPlays: 0 },
+      { id: 68, title: "Sigma Oasis", category: "Modern", rarityScore: 35, lastPlayed: null, totalPlays: 0 },
+      { id: 69, title: "Ruby Waves", category: "Modern", rarityScore: 35, lastPlayed: null, totalPlays: 0 },
+      { id: 70, title: "Turtle in the Clouds", category: "Modern", rarityScore: 35, lastPlayed: null, totalPlays: 0 },
     ];
 
     try {
