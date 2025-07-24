@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { useLocation } from "wouter";
 import { NavigationSidebar } from "@/components/navigation-sidebar";
 import { MobileNavigation } from "@/components/mobile-navigation";
 import { Card, CardContent } from "@/components/ui/card";
@@ -27,6 +28,7 @@ export default function Leagues() {
   
   const { toast } = useToast();
   const queryClient = useQueryClient();
+  const [, setLocation] = useLocation();
 
   const { data: myLeagues = [], isLoading: isLoadingMyLeagues } = useQuery({
     queryKey: ["/api/leagues", "my", DEMO_USER_ID],
@@ -266,10 +268,21 @@ export default function Leagues() {
                     </div>
 
                     <div className="flex space-x-2 mt-6">
-                      <Button className="flex-1 gradient-button text-sm">
+                      <Button 
+                        className="flex-1 gradient-button text-sm"
+                        onClick={() => setLocation(`/leaderboard?league=${league.id}`)}
+                      >
                         View League
                       </Button>
-                      <Button variant="outline" className="border-gray-600 p-2">
+                      <Button 
+                        variant="outline" 
+                        className="border-gray-600 p-2"
+                        onClick={() => {
+                          // For now, show a message that settings are coming soon
+                          // In the future, this would open a league settings dialog
+                          alert("League settings coming soon!");
+                        }}
+                      >
                         <Settings size={16} />
                       </Button>
                     </div>

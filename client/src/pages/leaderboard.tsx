@@ -8,8 +8,17 @@ import { Crown, Trophy, User, Medal, TrendingUp } from "lucide-react";
 const DEMO_LEAGUE_ID = 5; // Use Summer Tour Champions league
 
 export default function Leaderboard() {
+  // Check if there's a league parameter in the URL
+  const urlParams = new URLSearchParams(window.location.search);
+  const leagueIdFromUrl = urlParams.get('league');
+  const leagueId = leagueIdFromUrl ? parseInt(leagueIdFromUrl) : DEMO_LEAGUE_ID;
+
   const { data: standings, isLoading } = useQuery({
-    queryKey: ["/api/leagues", DEMO_LEAGUE_ID, "standings"],
+    queryKey: ["/api/leagues", leagueId, "standings"],
+  });
+
+  const { data: leagueInfo } = useQuery({
+    queryKey: ["/api/leagues", leagueId],
   });
 
   const getRankIcon = (rank: number) => {
@@ -51,7 +60,7 @@ export default function Leaderboard() {
             </div>
             <div className="flex items-center space-x-4">
               <Badge variant="outline" className="border-green-500 text-green-500">
-                Summer Tour Champions
+                {leagueInfo?.name || "Summer Tour Champions"}
               </Badge>
             </div>
           </div>
