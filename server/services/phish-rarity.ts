@@ -195,7 +195,7 @@ export async function refreshAllSongRarities(getAllSongs: () => Promise<Song[]>,
   const updatedSongs = await updateSongRarityScores(songs);
   
   for (const song of updatedSongs) {
-    await updateSongStats(song.id, song.rarityScore, song.lastPlayed || null);
+    await updateSongStats(song.id, song.rarityScore, song.lastPlayed);
   }
   
   console.log("Successfully updated all song rarity scores from Phish.net API");

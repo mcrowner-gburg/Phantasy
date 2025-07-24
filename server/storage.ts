@@ -46,7 +46,7 @@ export interface IStorage {
   getSong(id: number): Promise<Song | undefined>;
   getSongByTitle(title: string): Promise<Song | undefined>;
   createSong(title: string, category?: string): Promise<Song>;
-  updateSongStats(songId: number, rarityScore: number, lastPlayed: Date): Promise<void>;
+  updateSongStats(songId: number, rarityScore: number, lastPlayed: Date | null): Promise<void>;
 
   // Drafted Songs operations
   getDraftedSongs(userId: number, leagueId: number): Promise<(DraftedSong & { song: Song })[]>;
@@ -149,11 +149,13 @@ export class DatabaseStorage implements IStorage {
   }
 
   async getUserLeagues(userId: number): Promise<League[]> {
-    return [await this.getLeague(1)!];
+    const league = await this.getLeague(1);
+    return league ? [league] : [];
   }
 
   async getTourLeagues(tourId: number): Promise<League[]> {
-    return [await this.getLeague(1)!];
+    const league = await this.getLeague(1);
+    return league ? [league] : [];
   }
 
   async joinLeague(userId: number, leagueId: number): Promise<void> {
@@ -222,7 +224,7 @@ export class DatabaseStorage implements IStorage {
   }
 
   async createSong(title: string, category?: string): Promise<Song> {
-    return { id: Date.now(), title, category, rarityScore: 50, lastPlayed: new Date(), totalPlays: 0 };
+    return { id: Date.now(), title, category: category ?? null, rarityScore: 50, lastPlayed: new Date(), totalPlays: 0 };
   }
 
   async updateSongStats(songId: number, rarityScore: number, lastPlayed: Date | null): Promise<void> {
