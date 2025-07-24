@@ -16,20 +16,23 @@ interface PhishNetSong {
 }
 
 export class PhishNetService {
-  private baseUrl = 'https://api.phish.net/v5';
+  private baseUrl = "https://api.phish.net/v5";
   private apiKey: string;
 
   constructor() {
-    this.apiKey = process.env.PHISH_NET_API_KEY || process.env.PHISH_API_KEY || 'demo_key';
+    this.apiKey =
+      process.env.PHISH_NET_API_KEY ||
+      process.env.PHISH_API_KEY ||
+      "	6F27E04F96EAC8C2C21B";
   }
 
   async getUpcomingShows(): Promise<PhishNetShow[]> {
     try {
-      const today = new Date().toISOString().split('T')[0];
+      const today = new Date().toISOString().split("T")[0];
       const response = await fetch(
-        `${this.baseUrl}/shows/upcoming.json?apikey=${this.apiKey}&date=${today}`
+        `${this.baseUrl}/shows/upcoming.json?apikey=${this.apiKey}&date=${today}`,
       );
-      
+
       if (!response.ok) {
         throw new Error(`Phish.net API error: ${response.statusText}`);
       }
@@ -37,7 +40,7 @@ export class PhishNetService {
       const data = await response.json();
       return data.response?.data || [];
     } catch (error) {
-      console.error('Error fetching upcoming shows:', error);
+      console.error("Error fetching upcoming shows:", error);
       return [];
     }
   }
@@ -45,9 +48,9 @@ export class PhishNetService {
   async getRecentShows(limit = 10): Promise<PhishNetShow[]> {
     try {
       const response = await fetch(
-        `${this.baseUrl}/shows/recent.json?apikey=${this.apiKey}&limit=${limit}`
+        `${this.baseUrl}/shows/recent.json?apikey=${this.apiKey}&limit=${limit}`,
       );
-      
+
       if (!response.ok) {
         throw new Error(`Phish.net API error: ${response.statusText}`);
       }
@@ -55,7 +58,7 @@ export class PhishNetService {
       const data = await response.json();
       return data.response?.data || [];
     } catch (error) {
-      console.error('Error fetching recent shows:', error);
+      console.error("Error fetching recent shows:", error);
       return [];
     }
   }
@@ -63,9 +66,9 @@ export class PhishNetService {
   async getSetlist(showId: string): Promise<any> {
     try {
       const response = await fetch(
-        `${this.baseUrl}/setlists/get.json?apikey=${this.apiKey}&showid=${showId}`
+        `${this.baseUrl}/setlists/get.json?apikey=${this.apiKey}&showid=${showId}`,
       );
-      
+
       if (!response.ok) {
         throw new Error(`Phish.net API error: ${response.statusText}`);
       }
@@ -73,7 +76,7 @@ export class PhishNetService {
       const data = await response.json();
       return data.response?.data || null;
     } catch (error) {
-      console.error('Error fetching setlist:', error);
+      console.error("Error fetching setlist:", error);
       return null;
     }
   }
@@ -81,9 +84,9 @@ export class PhishNetService {
   async getSongStats(songName: string): Promise<PhishNetSong | null> {
     try {
       const response = await fetch(
-        `${this.baseUrl}/songs/stats.json?apikey=${this.apiKey}&song=${encodeURIComponent(songName)}`
+        `${this.baseUrl}/songs/stats.json?apikey=${this.apiKey}&song=${encodeURIComponent(songName)}`,
       );
-      
+
       if (!response.ok) {
         throw new Error(`Phish.net API error: ${response.statusText}`);
       }
@@ -91,7 +94,7 @@ export class PhishNetService {
       const data = await response.json();
       return data.response?.data || null;
     } catch (error) {
-      console.error('Error fetching song stats:', error);
+      console.error("Error fetching song stats:", error);
       return null;
     }
   }
@@ -99,9 +102,9 @@ export class PhishNetService {
   async getAllSongs(): Promise<PhishNetSong[]> {
     try {
       const response = await fetch(
-        `${this.baseUrl}/songs/all.json?apikey=${this.apiKey}`
+        `${this.baseUrl}/songs/all.json?apikey=${this.apiKey}`,
       );
-      
+
       if (!response.ok) {
         throw new Error(`Phish.net API error: ${response.statusText}`);
       }
@@ -109,7 +112,7 @@ export class PhishNetService {
       const data = await response.json();
       return data.response?.data || [];
     } catch (error) {
-      console.error('Error fetching all songs:', error);
+      console.error("Error fetching all songs:", error);
       return [];
     }
   }
@@ -118,7 +121,7 @@ export class PhishNetService {
     // Calculate rarity score based on times played and average gap
     // Lower times played = higher rarity
     // Higher average gap = higher rarity
-    const playScore = Math.max(0, 100 - (timesPlayed / 10));
+    const playScore = Math.max(0, 100 - timesPlayed / 10);
     const gapScore = Math.min(100, avgGap * 2);
     return Math.round((playScore + gapScore) / 2);
   }
