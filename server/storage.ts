@@ -8,12 +8,14 @@ import {
   Concert, 
   SongPerformance, 
   Activity,
+  PasswordResetToken,
   InsertUser,
   InsertTour,
   InsertLeague,
   InsertDraftedSong,
   InsertConcert,
   InsertSongPerformance,
+  InsertPasswordResetToken,
   users,
   tours,
   leagues,
@@ -22,7 +24,8 @@ import {
   concerts,
   songPerformances,
   activities,
-  leagueMembers
+  leagueMembers,
+  passwordResetTokens
 } from "@shared/schema";
 import { db } from "./db";
 import { eq, and, sql } from "drizzle-orm";
@@ -35,6 +38,13 @@ export interface IStorage {
   getUserByEmail(email: string): Promise<User | undefined>;
   createUser(user: InsertUser): Promise<User>;
   updateUserPoints(userId: number, points: number): Promise<void>;
+  updateUserPassword(userId: number, hashedPassword: string): Promise<void>;
+
+  // Password reset operations
+  createPasswordResetToken(token: InsertPasswordResetToken): Promise<PasswordResetToken>;
+  getPasswordResetToken(token: string): Promise<PasswordResetToken | undefined>;
+  markTokenAsUsed(tokenId: number): Promise<void>;
+  deleteExpiredTokens(): Promise<void>;
 
   // Tour operations
   getTours(): Promise<Tour[]>;
@@ -660,6 +670,51 @@ export class DatabaseStorage implements IStorage {
     // In a real database, this would update the user's total points by adding additionalPoints
     // UPDATE users SET total_points = total_points + additionalPoints WHERE id = userId
     console.log(`Updating user ${userId} with +${additionalPoints} points`);
+  }
+
+  async updateUserPassword(userId: number, hashedPassword: string): Promise<void> {
+    // In a real database implementation:
+    // await db.update(users).set({ password: hashedPassword }).where(eq(users.id, userId));
+    console.log(`Updating password for user ${userId}`);
+  }
+
+  // Password reset operations
+  async createPasswordResetToken(token: InsertPasswordResetToken): Promise<PasswordResetToken> {
+    // In a real database implementation:
+    // const [resetToken] = await db.insert(passwordResetTokens).values(token).returning();
+    // return resetToken;
+    
+    // For now, return a mock token
+    return {
+      id: Date.now(),
+      userId: token.userId,
+      token: token.token,
+      expiresAt: token.expiresAt,
+      used: false,
+      createdAt: new Date(),
+    };
+  }
+
+  async getPasswordResetToken(token: string): Promise<PasswordResetToken | undefined> {
+    // In a real database implementation:
+    // const [resetToken] = await db.select().from(passwordResetTokens)
+    //   .where(and(eq(passwordResetTokens.token, token), eq(passwordResetTokens.used, false)));
+    // return resetToken;
+    
+    // For now, return undefined (no token found)
+    return undefined;
+  }
+
+  async markTokenAsUsed(tokenId: number): Promise<void> {
+    // In a real database implementation:
+    // await db.update(passwordResetTokens).set({ used: true }).where(eq(passwordResetTokens.id, tokenId));
+    console.log(`Marking token ${tokenId} as used`);
+  }
+
+  async deleteExpiredTokens(): Promise<void> {
+    // In a real database implementation:
+    // await db.delete(passwordResetTokens).where(sql`expires_at < NOW()`);
+    console.log('Deleting expired tokens');
   }
 
   // Concert operations - stub implementations

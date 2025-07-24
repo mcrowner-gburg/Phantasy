@@ -5,6 +5,9 @@ import { insertUserSchema, insertTourSchema, insertLeagueSchema, insertDraftedSo
 import { z } from "zod";
 import { phishApi } from "./services/phish-api";
 import { setupAuth, requireAuth } from "./auth";
+import { sendPasswordResetEmail } from "./services/email";
+import { nanoid } from "nanoid";
+import bcrypt from "bcrypt";
 import adminRoutes from "./routes/admin";
 
 export async function registerRoutes(app: Express): Promise<Server> {
@@ -484,6 +487,80 @@ export async function registerRoutes(app: Express): Promise<Server> {
       });
     } catch (error) {
       res.status(500).json({ message: "Failed to fetch dashboard data" });
+    }
+  });
+
+  // Password Recovery Routes
+  app.post("/api/auth/forgot-password", async (req, res) => {
+    try {
+      const { email } = req.body;
+      
+      if (!email) {
+        return res.status(400).json({ message: "Email is required" });
+      }
+      
+      // Find user by email
+      const user = await storage.getUserByEmail(email);
+      if (!user) {
+        // For security, don't reveal if email exists
+        return res.json({ message: "If this email is registered, you will receive a password reset link." });
+      }
+      
+      // Generate reset token
+      const resetToken = nanoid(32);
+      const expiresAt = new Date(Date.now() + 60 * 60 * 1000); // 1 hour from now
+      
+      // Save token to database
+      await storage.createPasswordResetToken({
+        userId: user.id,
+        token: resetToken,
+        expiresAt,
+      });
+      
+      // Send email
+      const baseUrl = req.protocol + "://" + req.get("host");
+      const emailSent = await sendPasswordResetEmail(email, resetToken, baseUrl);
+      
+      if (!emailSent) {
+        return res.status(500).json({ message: "Failed to send reset email" });
+      }
+      
+      res.json({ message: "If this email is registered, you will receive a password reset link." });
+    } catch (error) {
+      console.error("Forgot password error:", error);
+      res.status(500).json({ message: "Failed to process password reset request" });
+    }
+  });
+
+  app.post("/api/auth/reset-password", async (req, res) => {
+    try {
+      const { token, newPassword } = req.body;
+      
+      if (!token || !newPassword) {
+        return res.status(400).json({ message: "Token and new password are required" });
+      }
+      
+      if (newPassword.length < 6) {
+        return res.status(400).json({ message: "Password must be at least 6 characters long" });
+      }
+      
+      // Find and validate token
+      const resetToken = await storage.getPasswordResetToken(token);
+      if (!resetToken || resetToken.used || new Date() > resetToken.expiresAt) {
+        return res.status(400).json({ message: "Invalid or expired reset token" });
+      }
+      
+      // Hash new password and update user
+      const hashedPassword = await bcrypt.hash(newPassword, 10);
+      await storage.updateUserPassword(resetToken.userId, hashedPassword);
+      
+      // Mark token as used
+      await storage.markTokenAsUsed(resetToken.id);
+      
+      res.json({ message: "Password reset successful" });
+    } catch (error) {
+      console.error("Reset password error:", error);
+      res.status(500).json({ message: "Failed to reset password" });
     }
   });
 

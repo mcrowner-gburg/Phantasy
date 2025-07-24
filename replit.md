@@ -67,6 +67,17 @@ PhishDraft is a fantasy sports application specifically designed for Phish conce
 - Songs span all Phish eras: 1.0 classics (1983-2000), 2.0 experimentation (2003-2004), 3.0 jams (2009-2013), 4.0 modern (2014-present)
 - Catalog now supports 10+ players each drafting 10 songs (125 available > 100 needed)
 
+### July 24, 2025 - Password Recovery System Implementation
+- **NEW**: Complete password recovery functionality with SendGrid email integration
+- **Forgot Password Page**: Clean form for users to request password reset via email
+- **Reset Password Page**: Secure token-based password reset with validation
+- **Email Service**: Professional password reset emails with HTML formatting and security best practices
+- **Database Schema**: Added password_reset_tokens table with expiration and usage tracking
+- **API Endpoints**: /api/auth/forgot-password and /api/auth/reset-password with proper error handling
+- **Security Features**: Token expiration (1 hour), single-use tokens, secure password hashing
+- **User Experience**: Clear success messages, redirect flows, and error handling
+- **Login Integration**: Added "Forgot your password?" link to login page for easy access
+
 ## User Preferences
 
 Preferred communication style: Simple, everyday language.

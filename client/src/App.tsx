@@ -11,6 +11,8 @@ import Concerts from "@/pages/concerts";
 import Leagues from "@/pages/leagues";
 import Login from "@/pages/login";
 import Register from "@/pages/register";
+import ForgotPassword from "@/pages/forgot-password";
+import ResetPassword from "@/pages/reset-password";
 import NotFound from "@/pages/not-found";
 
 function Router() {
@@ -28,6 +30,8 @@ function Router() {
     return (
       <Switch>
         <Route path="/register" component={Register} />
+        <Route path="/forgot-password" component={ForgotPassword} />
+        <Route path="/reset-password" component={ResetPassword} />
         <Route path="/" component={Login} />
         <Route component={Login} />
       </Switch>

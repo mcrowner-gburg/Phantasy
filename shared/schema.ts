@@ -22,6 +22,15 @@ export const users = pgTable("users", {
   createdAt: timestamp("created_at").defaultNow(),
 });
 
+export const passwordResetTokens = pgTable("password_reset_tokens", {
+  id: serial("id").primaryKey(),
+  userId: integer("user_id").references(() => users.id).notNull(),
+  token: text("token").notNull().unique(),
+  expiresAt: timestamp("expires_at").notNull(),
+  used: boolean("used").default(false),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
 export const tours = pgTable("tours", {
   id: serial("id").primaryKey(),
   name: text("name").notNull(), // "Summer Tour 2024", "Fall Tour 2023", etc.
@@ -158,6 +167,12 @@ export const insertSongPerformanceSchema = createInsertSchema(songPerformances).
   notes: true,
 });
 
+export const insertPasswordResetTokenSchema = createInsertSchema(passwordResetTokens).pick({
+  userId: true,
+  token: true,
+  expiresAt: true,
+});
+
 // Types
 export type User = typeof users.$inferSelect;
 export type InsertUser = z.infer<typeof insertUserSchema>;
@@ -174,3 +189,5 @@ export type SongPerformance = typeof songPerformances.$inferSelect;
 export type InsertSongPerformance = z.infer<typeof insertSongPerformanceSchema>;
 export type Activity = typeof activities.$inferSelect;
 export type LeagueMember = typeof leagueMembers.$inferSelect;
+export type PasswordResetToken = typeof passwordResetTokens.$inferSelect;
+export type InsertPasswordResetToken = z.infer<typeof insertPasswordResetTokenSchema>;
