@@ -69,6 +69,43 @@ export class PhishNetService {
     }
   }
 
+  async getAllSongs(): Promise<PhishNetSong[]> {
+    try {
+      const response = await fetch(
+        `${this.baseUrl}/songs.json?apikey=${this.apiKey}`,
+      );
+
+      if (!response.ok) {
+        throw new Error(`Phish.net API error: ${response.statusText}`);
+      }
+
+      const data = await response.json();
+      return data.data || [];
+    } catch (error) {
+      console.error("Error fetching all songs:", error);
+      return [];
+    }
+  }
+
+  async getSongStats(songName: string): Promise<any> {
+    try {
+      // Use the setlists/song endpoint to get performance statistics
+      const response = await fetch(
+        `${this.baseUrl}/setlists/song/${encodeURIComponent(songName)}.json?apikey=${this.apiKey}`,
+      );
+
+      if (!response.ok) {
+        throw new Error(`Phish.net API error: ${response.statusText}`);
+      }
+
+      const data = await response.json();
+      return data.data || [];
+    } catch (error) {
+      console.error(`Error fetching stats for song "${songName}":`, error);
+      return [];
+    }
+  }
+
   async getSetlist(showDate: string): Promise<any> {
     try {
       const response = await fetch(

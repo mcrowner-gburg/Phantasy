@@ -56,4 +56,46 @@ router.get("/rarity-debug", async (req, res) => {
   }
 });
 
+/**
+ * Test Phish.net API songs endpoint
+ */
+router.get("/test-songs", async (req, res) => {
+  try {
+    const { PhishNetService } = await import("../services/phish-api");
+    const phishApi = new PhishNetService();
+    
+    console.log("Testing Phish.net songs API...");
+    const apiSongs = await phishApi.getAllSongs();
+    
+    res.json({ 
+      success: true,
+      songCount: apiSongs.length,
+      sample: apiSongs.slice(0, 10), // First 10 songs
+      message: `Found ${apiSongs.length} songs from Phish.net API`
+    });
+  } catch (error) {
+    console.error("Error testing songs API:", error);
+    res.status(500).json({ 
+      success: false,
+      error: error.message,
+      message: "Failed to fetch songs from Phish.net API"
+    });
+  }
+});
+
+/**
+ * Clear cache to force refresh from API
+ */
+router.delete("/cache", async (req, res) => {
+  try {
+    // Clear the songs cache to force refresh from API
+    (storage as any).songsCache = null;
+    (storage as any).cacheExpiry = 0;
+    res.json({ message: "Cache cleared successfully" });
+  } catch (error) {
+    console.error("Error clearing cache:", error);
+    res.status(500).json({ message: "Failed to clear cache" });
+  }
+});
+
 export default router;

@@ -286,7 +286,102 @@ export class DatabaseStorage implements IStorage {
       return this.songsCache;
     }
 
-    // Comprehensive Phish song catalog - authentic titles from actual performances
+    try {
+      // Import the Phish API service
+      const { PhishNetService } = await import("./services/phish-api");
+      const phishApi = new PhishNetService();
+      
+      console.log("Fetching complete song catalog from Phish.net API...");
+      const apiSongs = await phishApi.getAllSongs();
+      
+      if (apiSongs && apiSongs.length > 0) {
+        console.log(`Found ${apiSongs.length} songs from Phish.net API`);
+        
+        // Transform API songs to our format and calculate 24-month stats
+        const transformedSongs: Song[] = [];
+        const cutoffDate = new Date();
+        cutoffDate.setMonth(cutoffDate.getMonth() - 24); // 24 months ago
+        
+        // Process songs in smaller batches to avoid overwhelming the API
+        const batchSize = 50; // Limit to first 50 songs for better performance
+        const songsToProcess = apiSongs.slice(0, batchSize);
+        
+        for (let i = 0; i < songsToProcess.length; i++) {
+          const apiSong = songsToProcess[i];
+          
+          // Use the song's basic stats if available, otherwise estimate
+          let recentPlays = 0;
+          let lastPlayed: Date | null = null;
+          
+          // If the song object has performance data, use it directly
+          if (apiSong.times_played && apiSong.last_played) {
+            // Estimate recent plays based on total plays and recency
+            const totalPlays = apiSong.times_played;
+            const lastPlayedDate = new Date(apiSong.last_played);
+            
+            // Simple heuristic: if played recently, assume some recent activity
+            const daysSinceLastPlayed = (Date.now() - lastPlayedDate.getTime()) / (1000 * 60 * 60 * 24);
+            
+            if (daysSinceLastPlayed <= 730) { // Within 24 months
+              // Estimate based on frequency and recency - more active songs get higher estimates
+              if (daysSinceLastPlayed <= 30) {
+                recentPlays = Math.max(3, Math.floor(totalPlays * 0.4)); // Very recent
+              } else if (daysSinceLastPlayed <= 180) {
+                recentPlays = Math.max(2, Math.floor(totalPlays * 0.3)); // Recent
+              } else {
+                recentPlays = Math.max(1, Math.floor(totalPlays * 0.2)); // Less recent
+              }
+              lastPlayed = lastPlayedDate;
+            }
+          }
+          
+          // Calculate rarity score based on 24-month performance frequency
+          let rarityScore = 35; // Default
+          if (recentPlays === 0) rarityScore = 100; // Never played in 24 months = ultra rare
+          else if (recentPlays === 1) rarityScore = 75; // Only once = rare
+          else if (recentPlays <= 3) rarityScore = 50; // Few times = medium-high
+          else if (recentPlays <= 6) rarityScore = 25; // Regular = medium
+          else rarityScore = 10; // Frequent = low
+          
+          // Categorize songs based on common knowledge
+          let category = "Classic";
+          const songTitle = apiSong.song;
+          if (songTitle.includes("Gamehendge") || ["Wilson", "The Lizards", "Tela", "Colonel Forbin", "Mockingbird"].some(g => songTitle.includes(g))) {
+            category = "Gamehendge";
+          } else if (["Tweezer", "Ghost", "Simple", "Light", "Sand", "Piper"].some(j => songTitle.includes(j))) {
+            category = "Jam";
+          } else if (recentPlays === 0 || ["Harpua", "Icculus", "Esther"].some(r => songTitle.includes(r))) {
+            category = "Rare";
+          } else if (["Sigma", "Ruby", "Everything's Right", "Blaze On", "More"].some(m => songTitle.includes(m))) {
+            category = "Modern";
+          }
+          
+          transformedSongs.push({
+            id: i + 1,
+            title: apiSong.song,
+            category,
+            rarityScore,
+            lastPlayed,
+            totalPlays: recentPlays,
+          });
+        }
+        
+        // Sort by 24-month performance count (descending - most played first)
+        transformedSongs.sort((a, b) => (b.totalPlays || 0) - (a.totalPlays || 0));
+        
+        // Cache the results
+        this.songsCache = transformedSongs;
+        this.cacheExpiry = Date.now() + this.CACHE_DURATION;
+        
+        console.log(`Successfully processed ${transformedSongs.length} songs, sorted by 24-month performance frequency`);
+        return transformedSongs;
+      }
+    } catch (error) {
+      console.error("Error fetching songs from Phish.net API:", error);
+    }
+    
+    // Fallback to curated song list if API fails
+    console.log("Using fallback curated song list");
     const baseSongs: Song[] = [
       // Classic Phish staples
       { id: 1, title: "Wilson", category: "Gamehendge", rarityScore: 35, lastPlayed: null, totalPlays: 0 },
@@ -373,21 +468,11 @@ export class DatabaseStorage implements IStorage {
       { id: 70, title: "Turtle in the Clouds", category: "Modern", rarityScore: 35, lastPlayed: null, totalPlays: 0 },
     ];
 
-    try {
-      // Import the rarity service dynamically to avoid circular dependencies
-      const { updateSongRarityScores } = await import("./services/phish-rarity");
-      const updatedSongs = await updateSongRarityScores(baseSongs);
-      
-      // Cache the results
-      this.songsCache = updatedSongs;
-      this.cacheExpiry = Date.now() + this.CACHE_DURATION;
-      
-      return updatedSongs;
-    } catch (error) {
-      console.error("Error updating song rarity scores:", error);
-      // Fallback to base songs if API fails
-      return baseSongs;
-    }
+    // Cache the fallback results
+    this.songsCache = baseSongs;
+    this.cacheExpiry = Date.now() + this.CACHE_DURATION;
+    
+    return baseSongs;
   }
 
   async getSong(id: number): Promise<Song | undefined> {

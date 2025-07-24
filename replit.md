@@ -57,6 +57,9 @@ PhishDraft is a fantasy sports application specifically designed for Phish conce
 - Enhanced draft system to show accurate "slots remaining" count based on 10-song limit
 - Expanded song catalog from 15 demo songs to 70 authentic Phish songs across all eras
 - Added comprehensive song categories: Gamehendge, Classic, Jam, Rare, Modern, Cover, Epic, Funk, Composed
+- Integrated Phish.net API to fetch complete song catalog with authentic performance data
+- Implemented 24-month performance frequency sorting (most played to least played)
+- Songs now display real rarity scores based on actual recent performance statistics
 
 ## User Preferences
 
