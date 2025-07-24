@@ -36,7 +36,7 @@ export default function Dashboard() {
     );
   }
 
-  const { user, tour, league, draftedSongs, recentActivities, upcomingConcerts, leagueStandings } = dashboardData || {};
+  const { user, tour, league, draftedSongs, recentActivities, recentConcerts, upcomingConcerts, leagueStandings } = dashboardData || {};
 
   const userRank = leagueStandings?.find((standing: any) => standing.id === user?.id)?.rank || 0;
   const todayPoints = leagueStandings?.find((standing: any) => standing.id === user?.id)?.todayPoints || 0;
@@ -175,30 +175,33 @@ export default function Dashboard() {
               <Card className="glassmorphism border-gray-600">
                 <CardContent className="p-6">
                   <div className="flex items-center justify-between mb-6">
-                    <h3 className="text-xl font-bold">Recent Activity</h3>
+                    <h3 className="text-xl font-bold">Recent Shows</h3>
                     <Button variant="link" className="text-green-500 hover:text-green-400 text-sm p-0">
                       View All
                     </Button>
                   </div>
                   
                   <div className="space-y-4">
-                    {recentActivities?.length > 0 ? (
-                      recentActivities.map((activity: any, index: number) => (
-                        <div key={activity.id || index} className="flex items-center space-x-4 p-4 bg-black bg-opacity-30 rounded-lg">
-                          <div className="w-10 h-10 bg-green-500 rounded-full flex items-center justify-center">
-                            <Music className="text-black" size={16} />
+                    {recentConcerts?.length > 0 ? (
+                      recentConcerts.map((concert: any, index: number) => (
+                        <div key={concert.id || index} className="border phish-border rounded-lg p-4 hover:border-green-500 transition-colors cursor-pointer">
+                          <div className="flex justify-between items-start mb-2">
+                            <div>
+                              <p className="font-bold text-green-500">{format(new Date(concert.date), "MMM dd, yyyy")}</p>
+                              <p className="text-sm phish-text">{format(new Date(concert.date), "h:mm a zzz")}</p>
+                            </div>
+                            <Badge className="bg-gray-500 text-white text-xs px-2 py-1 rounded-full font-medium">
+                              COMPLETED
+                            </Badge>
                           </div>
-                          <div className="flex-1">
-                            <p className="font-medium">{activity.description}</p>
-                            <p className="text-sm phish-text">{format(new Date(activity.createdAt), "h:mm a")} • +{activity.points} points expected</p>
-                          </div>
-                          <div className="phish-gold font-bold">+{activity.points}</div>
+                          <p className="font-medium">{concert.venue}</p>
+                          <p className="text-sm phish-text">{concert.city}, {concert.state}</p>
                         </div>
                       ))
                     ) : (
                       <div className="text-center py-8 phish-text">
-                        <Music className="mx-auto mb-4" size={48} />
-                        <p>No recent activity. Start drafting songs to see your activity here!</p>
+                        <Calendar className="mx-auto mb-4" size={48} />
+                        <p>No recent shows available</p>
                       </div>
                     )}
                   </div>

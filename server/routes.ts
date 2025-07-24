@@ -431,9 +431,24 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Get recent activities
       const recentActivities = await storage.getUserActivities(userId, currentLeague.id);
       
+      // Get recent shows (last 3 completed shows) from Phish.net API
+      const recentShows = await phishApi.getRecentShows(20);
+      const completedShows = recentShows.filter((show: any) => new Date(show.showdate) < new Date());
+      const recentConcerts = completedShows.slice(0, 3).map((show: any) => ({
+        id: parseInt(show.showid),
+        tourId: 1,
+        date: new Date(show.showdate),
+        venue: show.venue,
+        city: show.city,
+        state: show.state,
+        country: show.country,
+        setlist: [],
+        isCompleted: true,
+      }));
+      
       // Get upcoming concerts from Phish.net API
       const upcomingShows = await phishApi.getUpcomingShows();
-      const upcomingConcerts = upcomingShows.map(show => ({
+      const upcomingConcerts = upcomingShows.slice(0, 3).map((show: any) => ({
         id: parseInt(show.showid),
         tourId: 1,
         date: new Date(show.showdate),
@@ -454,7 +469,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
         league: currentLeague,
         draftedSongs: draftedSongs.slice(0, 10), // Limit for display
         recentActivities: recentActivities.slice(0, 5),
-        upcomingConcerts: upcomingConcerts.slice(0, 3),
+        recentConcerts: recentConcerts, // Last 3 completed shows
+        upcomingConcerts: upcomingConcerts, // Next 3 upcoming shows
         leagueStandings: leagueStandings.slice(0, 10)
       });
     } catch (error) {
