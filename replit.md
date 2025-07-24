@@ -44,7 +44,9 @@ PhishDraft is a fantasy sports application specifically designed for Phish conce
 - Adjusted frequency thresholds: 1 play = high rarity, 2-3 plays = medium-high, 4-6 plays = medium
 - Modified gap scoring to be more conservative with 40+ shows = max rarity, 20-39 = high rarity
 - Changed default rarity scores from 50 to 35 points for more balanced gameplay
-- Updated point calculation system: 1pt for played + 1pt for set opener + 1pt for encore (max 3pts per performance)
+- Implemented new point calculation system: 1pt for played + 1pt for set opener + 1pt for encore (max 3pts per performance)
+- Created comprehensive scoring engine with performance tracking (playedCount, openerCount, encoreCount)
+- Added smart activity descriptions that dynamically reflect point combinations based on performance type
 
 ## User Preferences
 
