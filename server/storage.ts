@@ -230,7 +230,7 @@ export class DatabaseStorage implements IStorage {
     }
     
     const memberCount = await this.getLeagueMemberCount(leagueId);
-    if (memberCount >= league.maxPlayers) {
+    if (memberCount >= (league.maxPlayers || 24)) {
       throw new Error("League is at maximum capacity");
     }
     
@@ -253,6 +253,7 @@ export class DatabaseStorage implements IStorage {
         user: {
           id: users.id,
           username: users.username,
+          email: users.email,
           password: users.password,
           totalPoints: users.totalPoints,
           createdAt: users.createdAt,
@@ -475,7 +476,9 @@ export class DatabaseStorage implements IStorage {
         await this.updateDraftedSongStats(draftedSong.id, newPlayedCount, newOpenerCount, newEncoreCount);
         
         // Update user total points
-        await this.updateUserPoints(draftedSong.userId, points);
+        if (draftedSong.userId) {
+          await this.updateUserPoints(draftedSong.userId, points);
+        }
         
         // Create activity for the points scored
         const song = await this.getSong(performance.songId!);
@@ -489,13 +492,15 @@ export class DatabaseStorage implements IStorage {
         }
         description += ` (+${points} points)`;
         
-        await this.createActivity(
-          draftedSong.userId,
-          draftedSong.leagueId,
-          "score",
-          description,
-          points
-        );
+        if (draftedSong.userId && draftedSong.leagueId) {
+          await this.createActivity(
+            draftedSong.userId,
+            draftedSong.leagueId,
+            "score",
+            description,
+            points
+          );
+        }
       }
     }
   }
@@ -561,6 +566,7 @@ export class DatabaseStorage implements IStorage {
       .select({
         id: users.id,
         username: users.username,
+        email: users.email,
         password: users.password,
         totalPoints: users.totalPoints,
         createdAt: users.createdAt,
