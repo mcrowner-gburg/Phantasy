@@ -30,16 +30,27 @@ export function setupAuth(app: express.Application) {
   // Authentication routes
   app.post('/api/auth/register', async (req, res) => {
     try {
-      const { username, password } = req.body;
+      const { username, email, password } = req.body;
       
-      if (!username || !password) {
-        return res.status(400).json({ message: 'Username and password are required' });
+      if (!username || !email || !password) {
+        return res.status(400).json({ message: 'Username, email, and password are required' });
       }
 
-      // Check if user already exists
+      // Basic email validation
+      const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+      if (!emailRegex.test(email)) {
+        return res.status(400).json({ message: 'Invalid email format' });
+      }
+
+      // Check if user already exists (by username or email)
       const existingUser = await storage.getUserByUsername(username);
       if (existingUser) {
         return res.status(409).json({ message: 'Username already exists' });
+      }
+
+      const existingEmail = await storage.getUserByEmail(email);
+      if (existingEmail) {
+        return res.status(409).json({ message: 'Email already exists' });
       }
 
       // Hash password
@@ -48,6 +59,7 @@ export function setupAuth(app: express.Application) {
       // Create user
       const user = await storage.createUser({
         username,
+        email,
         password: hashedPassword,
         totalPoints: 0,
       });
@@ -55,7 +67,7 @@ export function setupAuth(app: express.Application) {
       // Set session
       (req.session as any).userId = user.id;
 
-      res.json({ user: { id: user.id, username: user.username, totalPoints: user.totalPoints } });
+      res.json({ user: { id: user.id, username: user.username, email: user.email, totalPoints: user.totalPoints } });
     } catch (error) {
       console.error('Registration error:', error);
       res.status(500).json({ message: 'Internal server error' });
@@ -64,14 +76,18 @@ export function setupAuth(app: express.Application) {
 
   app.post('/api/auth/login', async (req, res) => {
     try {
-      const { username, password } = req.body;
+      const { usernameOrEmail, password } = req.body;
       
-      if (!username || !password) {
-        return res.status(400).json({ message: 'Username and password are required' });
+      if (!usernameOrEmail || !password) {
+        return res.status(400).json({ message: 'Username/email and password are required' });
       }
 
-      // Find user
-      const user = await storage.getUserByUsername(username);
+      // Find user by username or email
+      let user = await storage.getUserByUsername(usernameOrEmail);
+      if (!user) {
+        user = await storage.getUserByEmail(usernameOrEmail);
+      }
+      
       if (!user) {
         return res.status(401).json({ message: 'Invalid credentials' });
       }
@@ -85,7 +101,7 @@ export function setupAuth(app: express.Application) {
       // Set session
       (req.session as any).userId = user.id;
 
-      res.json({ user: { id: user.id, username: user.username, totalPoints: user.totalPoints } });
+      res.json({ user: { id: user.id, username: user.username, email: user.email, totalPoints: user.totalPoints } });
     } catch (error) {
       console.error('Login error:', error);
       res.status(500).json({ message: 'Internal server error' });
@@ -113,7 +129,7 @@ export function setupAuth(app: express.Application) {
         return res.status(404).json({ message: 'User not found' });
       }
 
-      res.json({ user: { id: user.id, username: user.username, totalPoints: user.totalPoints } });
+      res.json({ user: { id: user.id, username: user.username, email: user.email, totalPoints: user.totalPoints } });
     } catch (error) {
       console.error('User fetch error:', error);
       res.status(500).json({ message: 'Internal server error' });

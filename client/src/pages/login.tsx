@@ -10,13 +10,13 @@ import { apiRequest } from "@/lib/queryClient";
 
 export default function Login() {
   const [, navigate] = useLocation();
-  const [username, setUsername] = useState("");
+  const [usernameOrEmail, setUsernameOrEmail] = useState("");
   const [password, setPassword] = useState("");
   const { toast } = useToast();
   const queryClient = useQueryClient();
 
   const loginMutation = useMutation({
-    mutationFn: async (credentials: { username: string; password: string }) => {
+    mutationFn: async (credentials: { usernameOrEmail: string; password: string }) => {
       const res = await apiRequest("POST", "/api/auth/login", credentials);
       return await res.json();
     },
@@ -39,15 +39,15 @@ export default function Login() {
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!username || !password) {
+    if (!usernameOrEmail || !password) {
       toast({
         title: "Missing information",
-        description: "Please enter both username and password",
+        description: "Please enter both username/email and password",
         variant: "destructive",
       });
       return;
     }
-    loginMutation.mutate({ username, password });
+    loginMutation.mutate({ usernameOrEmail, password });
   };
 
   return (
@@ -62,13 +62,13 @@ export default function Login() {
         <CardContent>
           <form onSubmit={handleSubmit} className="space-y-4">
             <div className="space-y-2">
-              <Label htmlFor="username">Username</Label>
+              <Label htmlFor="usernameOrEmail">Username or Email</Label>
               <Input
-                id="username"
+                id="usernameOrEmail"
                 type="text"
-                value={username}
-                onChange={(e) => setUsername(e.target.value)}
-                placeholder="Enter your username"
+                value={usernameOrEmail}
+                onChange={(e) => setUsernameOrEmail(e.target.value)}
+                placeholder="Enter your username or email"
                 required
               />
             </div>

@@ -11,13 +11,14 @@ import { apiRequest } from "@/lib/queryClient";
 export default function Register() {
   const [, navigate] = useLocation();
   const [username, setUsername] = useState("");
+  const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
   const { toast } = useToast();
   const queryClient = useQueryClient();
 
   const registerMutation = useMutation({
-    mutationFn: async (userData: { username: string; password: string }) => {
+    mutationFn: async (userData: { username: string; email: string; password: string }) => {
       const res = await apiRequest("POST", "/api/auth/register", userData);
       return await res.json();
     },
@@ -41,10 +42,21 @@ export default function Register() {
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     
-    if (!username || !password || !confirmPassword) {
+    if (!username || !email || !password || !confirmPassword) {
       toast({
         title: "Missing information",
         description: "Please fill in all fields",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    // Basic email validation
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(email)) {
+      toast({
+        title: "Invalid email",
+        description: "Please enter a valid email address",
         variant: "destructive",
       });
       return;
@@ -68,7 +80,7 @@ export default function Register() {
       return;
     }
 
-    registerMutation.mutate({ username, password });
+    registerMutation.mutate({ username, email, password });
   };
 
   return (
@@ -90,6 +102,17 @@ export default function Register() {
                 value={username}
                 onChange={(e) => setUsername(e.target.value)}
                 placeholder="Choose a username"
+                required
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="email">Email</Label>
+              <Input
+                id="email"
+                type="email"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                placeholder="Enter your email address"
                 required
               />
             </div>
