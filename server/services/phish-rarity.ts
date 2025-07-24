@@ -62,32 +62,32 @@ function calculateRarityScore(stats: PhishNetSongStats): number {
   let rarityScore = 0;
   
   // Frequency component (0-60 points) - based on 24-month activity
-  // Adjusted thresholds for 24-month window (~100 shows max)
+  // Conservative thresholds: what was "medium" is now "low", "high" is now "medium"
   if (!isRecentlyActive || recentPlays === 0) {
     rarityScore += 60; // Not played in last 24 months = maximum rarity
-  } else if (recentPlays <= 2) {
-    rarityScore += 55; // 1-2 times in 24 months
-  } else if (recentPlays <= 5) {
-    rarityScore += 45; // 3-5 times in 24 months
-  } else if (recentPlays <= 10) {
-    rarityScore += 35; // 6-10 times in 24 months
+  } else if (recentPlays <= 1) {
+    rarityScore += 55; // 1 time in 24 months = high rarity
+  } else if (recentPlays <= 3) {
+    rarityScore += 45; // 2-3 times in 24 months = medium-high rarity
+  } else if (recentPlays <= 6) {
+    rarityScore += 35; // 4-6 times in 24 months = medium rarity
+  } else if (recentPlays <= 12) {
+    rarityScore += 25; // 7-12 times in 24 months = low-medium rarity
   } else if (recentPlays <= 20) {
-    rarityScore += 25; // 11-20 times in 24 months
-  } else if (recentPlays <= 30) {
-    rarityScore += 15; // 21-30 times in 24 months
+    rarityScore += 15; // 13-20 times in 24 months = low rarity
   } else {
     rarityScore += 5; // Very common in recent period
   }
   
-  // Gap component (0-40 points) - unchanged as it's already recent-focused
-  if (gap >= 50) {
-    rarityScore += 40; // Not played in 50+ shows
-  } else if (gap >= 25) {
-    rarityScore += 30; // 25-49 shows ago
-  } else if (gap >= 15) {
-    rarityScore += 20; // 15-24 shows ago
-  } else if (gap >= 5) {
-    rarityScore += 10; // 5-14 shows ago
+  // Gap component (0-40 points) - adjusted for more conservative scoring
+  if (gap >= 40) {
+    rarityScore += 40; // Not played in 40+ shows = maximum gap rarity
+  } else if (gap >= 20) {
+    rarityScore += 30; // 20-39 shows ago = high gap rarity
+  } else if (gap >= 10) {
+    rarityScore += 20; // 10-19 shows ago = medium gap rarity
+  } else if (gap >= 3) {
+    rarityScore += 10; // 3-9 shows ago = low gap rarity
   } else {
     rarityScore += 0; // Very recently played
   }
@@ -177,11 +177,11 @@ export async function updateSongRarityScores(songs: Song[]): Promise<Song[]> {
         totalPlays: stats.times_played || 0,
       };
     } else {
-      // If no stats found, assign medium rarity
+      // If no stats found, assign low-medium rarity (conservative approach)
       console.warn(`No stats found for "${song.title}", using default rarity`);
       return {
         ...song,
-        rarityScore: 50,
+        rarityScore: 35,
       };
     }
   });
@@ -201,7 +201,7 @@ export async function getSongRarityScore(songTitle: string): Promise<{ raritySco
     return { rarityScore, stats };
   }
   
-  return { rarityScore: 50, stats: null }; // Default medium rarity
+  return { rarityScore: 35, stats: null }; // Default low-medium rarity
 }
 
 /**

@@ -179,21 +179,21 @@ export class DatabaseStorage implements IStorage {
 
     // Base song list - using exact Phish.net database names for authentic rarity scores
     const baseSongs: Song[] = [
-      { id: 1, title: "Wilson", category: "Gamehendge", rarityScore: 50, lastPlayed: null, totalPlays: 0 },
-      { id: 2, title: "Harry Hood", category: "Classic", rarityScore: 50, lastPlayed: null, totalPlays: 0 },
-      { id: 3, title: "Fluffhead", category: "Epic", rarityScore: 50, lastPlayed: null, totalPlays: 0 },
-      { id: 4, title: "You Enjoy Myself", category: "Classic", rarityScore: 50, lastPlayed: null, totalPlays: 0 },
-      { id: 5, title: "Tweezer", category: "Jam", rarityScore: 50, lastPlayed: null, totalPlays: 0 },
-      { id: 6, title: "Free", category: "Rock", rarityScore: 50, lastPlayed: null, totalPlays: 0 },
-      { id: 7, title: "Bowie", category: "Epic", rarityScore: 50, lastPlayed: null, totalPlays: 0 },
-      { id: 8, title: "Possum", category: "Country", rarityScore: 50, lastPlayed: null, totalPlays: 0 },
-      { id: 9, title: "Maze", category: "Rock", rarityScore: 50, lastPlayed: null, totalPlays: 0 },
-      { id: 10, title: "Divided Sky", category: "Composed", rarityScore: 50, lastPlayed: null, totalPlays: 0 },
-      { id: 11, title: "Julius", category: "Rock", rarityScore: 50, lastPlayed: null, totalPlays: 0 },
-      { id: 12, title: "Chalk Dust Torture", category: "Rock", rarityScore: 50, lastPlayed: null, totalPlays: 0 },
-      { id: 13, title: "Antelope", category: "Classic", rarityScore: 50, lastPlayed: null, totalPlays: 0 },
-      { id: 14, title: "Ghost", category: "Jam", rarityScore: 50, lastPlayed: null, totalPlays: 0 },
-      { id: 15, title: "Bathtub Gin", category: "Jam", rarityScore: 50, lastPlayed: null, totalPlays: 0 },
+      { id: 1, title: "Wilson", category: "Gamehendge", rarityScore: 35, lastPlayed: null, totalPlays: 0 },
+      { id: 2, title: "Harry Hood", category: "Classic", rarityScore: 35, lastPlayed: null, totalPlays: 0 },
+      { id: 3, title: "Fluffhead", category: "Epic", rarityScore: 35, lastPlayed: null, totalPlays: 0 },
+      { id: 4, title: "You Enjoy Myself", category: "Classic", rarityScore: 35, lastPlayed: null, totalPlays: 0 },
+      { id: 5, title: "Tweezer", category: "Jam", rarityScore: 35, lastPlayed: null, totalPlays: 0 },
+      { id: 6, title: "Free", category: "Rock", rarityScore: 35, lastPlayed: null, totalPlays: 0 },
+      { id: 7, title: "Bowie", category: "Epic", rarityScore: 35, lastPlayed: null, totalPlays: 0 },
+      { id: 8, title: "Possum", category: "Country", rarityScore: 35, lastPlayed: null, totalPlays: 0 },
+      { id: 9, title: "Maze", category: "Rock", rarityScore: 35, lastPlayed: null, totalPlays: 0 },
+      { id: 10, title: "Divided Sky", category: "Composed", rarityScore: 35, lastPlayed: null, totalPlays: 0 },
+      { id: 11, title: "Julius", category: "Rock", rarityScore: 35, lastPlayed: null, totalPlays: 0 },
+      { id: 12, title: "Chalk Dust Torture", category: "Rock", rarityScore: 35, lastPlayed: null, totalPlays: 0 },
+      { id: 13, title: "Antelope", category: "Classic", rarityScore: 35, lastPlayed: null, totalPlays: 0 },
+      { id: 14, title: "Ghost", category: "Jam", rarityScore: 35, lastPlayed: null, totalPlays: 0 },
+      { id: 15, title: "Bathtub Gin", category: "Jam", rarityScore: 35, lastPlayed: null, totalPlays: 0 },
     ];
 
     try {
