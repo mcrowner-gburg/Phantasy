@@ -294,6 +294,7 @@ export class DatabaseStorage implements IStorage {
       console.log("Fetching complete song catalog from Phish.net API...");
       const apiSongs = await phishApi.getAllSongs();
       
+      console.log(`API returned ${apiSongs?.length || 0} songs`);
       if (apiSongs && apiSongs.length > 0) {
         console.log(`Found ${apiSongs.length} songs from Phish.net API`);
         
@@ -302,8 +303,8 @@ export class DatabaseStorage implements IStorage {
         const cutoffDate = new Date();
         cutoffDate.setMonth(cutoffDate.getMonth() - 24); // 24 months ago
         
-        // Process songs in smaller batches to avoid overwhelming the API
-        const batchSize = 50; // Limit to first 50 songs for better performance
+        // Process more songs to ensure we have at least 125 for multiplayer drafting
+        const batchSize = 150; // Expand to 150 songs to accommodate multiple players
         const songsToProcess = apiSongs.slice(0, batchSize);
         
         for (let i = 0; i < songsToProcess.length; i++) {
@@ -343,17 +344,45 @@ export class DatabaseStorage implements IStorage {
           else if (recentPlays <= 6) rarityScore = 25; // Regular = medium
           else rarityScore = 10; // Frequent = low
           
-          // Categorize songs based on common knowledge
+          // Categorize songs based on actual Phish knowledge
           let category = "Classic";
           const songTitle = apiSong.song;
-          if (songTitle.includes("Gamehendge") || ["Wilson", "The Lizards", "Tela", "Colonel Forbin", "Mockingbird"].some(g => songTitle.includes(g))) {
+          
+          // Gamehendge saga songs
+          if (["Wilson", "AC/DC Bag", "Colonel Forbin's Ascent", "The Famous Mockingbird", "The Lizards", "Tela", "The Sloth", "McGrupp", "Possum", "Llama"].some(g => songTitle.includes(g))) {
             category = "Gamehendge";
-          } else if (["Tweezer", "Ghost", "Simple", "Light", "Sand", "Piper"].some(j => songTitle.includes(j))) {
+          }
+          // Major jam vehicles
+          else if (["Tweezer", "Ghost", "Simple", "Light", "Sand", "Piper", "Bathtub Gin", "David Bowie", "Harry Hood", "You Enjoy Myself", "Run Like an Antelope", "Wolfman's Brother"].some(j => songTitle.includes(j))) {
             category = "Jam";
-          } else if (recentPlays === 0 || ["Harpua", "Icculus", "Esther"].some(r => songTitle.includes(r))) {
+          }
+          // Rare or special songs (never or rarely played in 24 months)
+          else if (recentPlays === 0 || ["Harpua", "Icculus", "Esther", "Destiny Unbound", "Dog Faced Boy", "Weigh", "If I Could", "Lengthwise"].some(r => songTitle.includes(r))) {
             category = "Rare";
-          } else if (["Sigma", "Ruby", "Everything's Right", "Blaze On", "More"].some(m => songTitle.includes(m))) {
+          }
+          // Modern era (3.0 and 4.0)
+          else if (["Sigma Oasis", "Ruby Waves", "Everything's Right", "Blaze On", "More", "Petrichor", "No Men In No Man's Land", "Things People Do", "Soul Planet", "Turtle in the Clouds", "Thread", "Mercury", "Evolve", "Waves"].some(m => songTitle.includes(m))) {
             category = "Modern";
+          }
+          // Funk songs
+          else if (["The Moma Dance", "Birds of a Feather", "Roggae", "Funky Bitch", "46 Days", "Suzy Greenberg", "Cities"].some(f => songTitle.includes(f))) {
+            category = "Funk";
+          }
+          // Cover songs (obvious indicators)
+          else if (["Rocky Top", "Good Times Bad Times", "Bold As Love", "While My Guitar Gently Weeps", "Also Sprach Zarathustra", "Loving Cup", "Satisfaction", "Day in the Life", "After Midnight"].some(c => songTitle.includes(c))) {
+            category = "Cover";
+          }
+          // Composed/intricate pieces
+          else if (["Divided Sky", "Reba", "Fluffhead", "Guyute", "The Curtain", "Foam", "Maze", "Stash"].some(comp => songTitle.includes(comp))) {
+            category = "Composed";
+          }
+          // Country/bluegrass
+          else if (["Possum", "Old Home Place", "Beauty of My Dreams", "Uncle Pen"].some(country => songTitle.includes(country))) {
+            category = "Country";
+          }
+          // Everything else defaults to Rock
+          else {
+            category = "Rock";
           }
           
           transformedSongs.push({
@@ -378,6 +407,7 @@ export class DatabaseStorage implements IStorage {
       }
     } catch (error) {
       console.error("Error fetching songs from Phish.net API:", error);
+      console.error("Error details:", error.message);
     }
     
     // Fallback to curated song list if API fails
@@ -466,6 +496,68 @@ export class DatabaseStorage implements IStorage {
       { id: 68, title: "Sigma Oasis", category: "Modern", rarityScore: 35, lastPlayed: null, totalPlays: 0 },
       { id: 69, title: "Ruby Waves", category: "Modern", rarityScore: 35, lastPlayed: null, totalPlays: 0 },
       { id: 70, title: "Turtle in the Clouds", category: "Modern", rarityScore: 35, lastPlayed: null, totalPlays: 0 },
+      
+      // Additional songs to reach 125+ for multiplayer drafting (10 players x 10 songs = 100+ needed)
+      { id: 71, title: "Thread", category: "Modern", rarityScore: 35, lastPlayed: null, totalPlays: 0 },
+      { id: 72, title: "Mercury", category: "Modern", rarityScore: 35, lastPlayed: null, totalPlays: 0 },
+      { id: 73, title: "Evolve", category: "Modern", rarityScore: 35, lastPlayed: null, totalPlays: 0 },
+      { id: 74, title: "NICU", category: "Rock", rarityScore: 35, lastPlayed: null, totalPlays: 0 },
+      { id: 75, title: "46 Days", category: "Funk", rarityScore: 35, lastPlayed: null, totalPlays: 0 },
+      { id: 76, title: "Cities", category: "Cover", rarityScore: 35, lastPlayed: null, totalPlays: 0 },
+      { id: 77, title: "Suzy Greenberg", category: "Funk", rarityScore: 35, lastPlayed: null, totalPlays: 0 },
+      { id: 78, title: "Funky Bitch", category: "Funk", rarityScore: 35, lastPlayed: null, totalPlays: 0 },
+      { id: 79, title: "Contact", category: "Composed", rarityScore: 35, lastPlayed: null, totalPlays: 0 },
+      { id: 80, title: "The Curtain", category: "Composed", rarityScore: 35, lastPlayed: null, totalPlays: 0 },
+      
+      { id: 81, title: "Foam", category: "Composed", rarityScore: 35, lastPlayed: null, totalPlays: 0 },
+      { id: 82, title: "Alumni Blues", category: "Classic", rarityScore: 35, lastPlayed: null, totalPlays: 0 },
+      { id: 83, title: "Letter to Jimmy Page", category: "Classic", rarityScore: 35, lastPlayed: null, totalPlays: 0 },
+      { id: 84, title: "Poor Heart", category: "Country", rarityScore: 35, lastPlayed: null, totalPlays: 0 },
+      { id: 85, title: "Bouncing Around the Room", category: "Rock", rarityScore: 35, lastPlayed: null, totalPlays: 0 },
+      { id: 86, title: "Rift", category: "Rock", rarityScore: 35, lastPlayed: null, totalPlays: 0 },
+      { id: 87, title: "Llama", category: "Gamehendge", rarityScore: 35, lastPlayed: null, totalPlays: 0 },
+      { id: 88, title: "Horn", category: "Rock", rarityScore: 35, lastPlayed: null, totalPlays: 0 },
+      { id: 89, title: "Cavern", category: "Rock", rarityScore: 35, lastPlayed: null, totalPlays: 0 },
+      { id: 90, title: "Fee", category: "Classic", rarityScore: 35, lastPlayed: null, totalPlays: 0 },
+      
+      { id: 91, title: "Golgi Apparatus", category: "Classic", rarityScore: 35, lastPlayed: null, totalPlays: 0 },
+      { id: 92, title: "Uncle Pen", category: "Country", rarityScore: 35, lastPlayed: null, totalPlays: 0 },
+      { id: 93, title: "Fishman's Vacuum Solo", category: "Rare", rarityScore: 35, lastPlayed: null, totalPlays: 0 },
+      { id: 94, title: "Mike's Song", category: "Classic", rarityScore: 35, lastPlayed: null, totalPlays: 0 },
+      { id: 95, title: "I Am Hydrogen", category: "Classic", rarityScore: 35, lastPlayed: null, totalPlays: 0 },
+      { id: 96, title: "Weekapaug Groove", category: "Classic", rarityScore: 35, lastPlayed: null, totalPlays: 0 },
+      { id: 97, title: "AC/DC Bag", category: "Gamehendge", rarityScore: 35, lastPlayed: null, totalPlays: 0 },
+      { id: 98, title: "My Friend My Friend", category: "Rock", rarityScore: 35, lastPlayed: null, totalPlays: 0 },
+      { id: 99, title: "Split Open and Melt", category: "Epic", rarityScore: 35, lastPlayed: null, totalPlays: 0 },
+      { id: 100, title: "The Oh Kee Pa Ceremony", category: "Rare", rarityScore: 35, lastPlayed: null, totalPlays: 0 },
+      
+      { id: 101, title: "Susskind Hotel", category: "Rare", rarityScore: 35, lastPlayed: null, totalPlays: 0 },
+      { id: 102, title: "Coil", category: "Classic", rarityScore: 35, lastPlayed: null, totalPlays: 0 },
+      { id: 103, title: "Loving Cup", category: "Cover", rarityScore: 35, lastPlayed: null, totalPlays: 0 },
+      { id: 104, title: "Tube", category: "Funk", rarityScore: 35, lastPlayed: null, totalPlays: 0 },
+      { id: 105, title: "Punch You in the Eye", category: "Rock", rarityScore: 35, lastPlayed: null, totalPlays: 0 },
+      { id: 106, title: "Prince Caspian", category: "Rock", rarityScore: 35, lastPlayed: null, totalPlays: 0 },
+      { id: 107, title: "Cars Trucks Buses", category: "Rock", rarityScore: 35, lastPlayed: null, totalPlays: 0 },
+      { id: 108, title: "Talk", category: "Rock", rarityScore: 35, lastPlayed: null, totalPlays: 0 },
+      { id: 109, title: "Limb By Limb", category: "Rock", rarityScore: 35, lastPlayed: null, totalPlays: 0 },
+      { id: 110, title: "Water in the Sky", category: "Rock", rarityScore: 35, lastPlayed: null, totalPlays: 0 },
+      
+      { id: 111, title: "Farmhouse", category: "Rock", rarityScore: 35, lastPlayed: null, totalPlays: 0 },
+      { id: 112, title: "Bug", category: "Rock", rarityScore: 35, lastPlayed: null, totalPlays: 0 },
+      { id: 113, title: "Dirt", category: "Rock", rarityScore: 35, lastPlayed: null, totalPlays: 0 },
+      { id: 114, title: "First Tube", category: "Funk", rarityScore: 35, lastPlayed: null, totalPlays: 0 },
+      { id: 115, title: "Pebbles and Marbles", category: "Jam", rarityScore: 35, lastPlayed: null, totalPlays: 0 },
+      { id: 116, title: "Waves", category: "Modern", rarityScore: 35, lastPlayed: null, totalPlays: 0 },
+      { id: 117, title: "Scents and Subtle Sounds", category: "Jam", rarityScore: 35, lastPlayed: null, totalPlays: 0 },
+      { id: 118, title: "Undermind", category: "Rock", rarityScore: 35, lastPlayed: null, totalPlays: 0 },
+      { id: 119, title: "Wading in the Velvet Sea", category: "Rock", rarityScore: 35, lastPlayed: null, totalPlays: 0 },
+      { id: 120, title: "Joy", category: "Rock", rarityScore: 35, lastPlayed: null, totalPlays: 0 },
+      
+      { id: 121, title: "Time Turns Elastic", category: "Epic", rarityScore: 35, lastPlayed: null, totalPlays: 0 },
+      { id: 122, title: "Ocelot", category: "Rock", rarityScore: 35, lastPlayed: null, totalPlays: 0 },
+      { id: 123, title: "Sugar Shack", category: "Rare", rarityScore: 35, lastPlayed: null, totalPlays: 0 },
+      { id: 124, title: "Windy City", category: "Rock", rarityScore: 35, lastPlayed: null, totalPlays: 0 },
+      { id: 125, title: "Twenty Years Later", category: "Rock", rarityScore: 35, lastPlayed: null, totalPlays: 0 },
     ];
 
     // Cache the fallback results
