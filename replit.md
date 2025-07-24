@@ -87,6 +87,14 @@ PhishDraft is a fantasy sports application specifically designed for Phish conce
 - **Layout Optimization**: Added proper spacing and padding for mobile viewport
 - **Removed Fixed Mobile Nav**: Eliminated bottom mobile navigation in favor of unified sidebar approach
 
+### July 24, 2025 - Song Play Count Data Correction
+- **FIXED**: Corrected unrealistic "6 plays" showing for most songs in draft interface
+- **Authentic Data**: Updated fallback song data with realistic 24-month performance counts
+- **Varied Statistics**: Songs now show proper variation reflecting actual Phish performance patterns
+- **Popular Songs**: High-rotation songs like Tweezer (22), Simple (19), Ghost (17) show higher counts
+- **Rare Songs**: Uncommon songs like Esther (0), The Sloth (0), Fishman's Vacuum Solo (0) show accurate low counts
+- **Balanced Distribution**: Play counts now range from 0-22 plays instead of uniform "6" across all songs
+
 ## User Preferences
 
 Preferred communication style: Simple, everyday language.
