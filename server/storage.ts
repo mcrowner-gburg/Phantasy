@@ -550,15 +550,32 @@ export class DatabaseStorage implements IStorage {
 
   // Leaderboard operations - stub implementations
   async getLeagueStandings(leagueId: number): Promise<(User & { rank: number; todayPoints: number; songCount: number })[]> {
-    const user = await this.getUser(1);
-    if (!user) return [];
-    
-    return [{
+    // Get all league members with their user data and drafted song stats
+    const result = await db
+      .select({
+        id: users.id,
+        username: users.username,
+        password: users.password,
+        totalPoints: users.totalPoints,
+        createdAt: users.createdAt,
+        songCount: sql<number>`count(${draftedSongs.id})::int`,
+        todayPoints: sql<number>`coalesce(sum(${draftedSongs.points}), 0)::int`
+      })
+      .from(leagueMembers)
+      .innerJoin(users, eq(leagueMembers.userId, users.id))
+      .leftJoin(draftedSongs, and(
+        eq(draftedSongs.userId, users.id),
+        eq(draftedSongs.leagueId, leagueId)
+      ))
+      .where(eq(leagueMembers.leagueId, leagueId))
+      .groupBy(users.id, leagueMembers.userId)
+      .orderBy(sql`coalesce(sum(${draftedSongs.points}), 0) desc`);
+
+    // Add rank based on points
+    return result.map((user, index) => ({
       ...user,
-      rank: 1,
-      todayPoints: 3,
-      songCount: 3,
-    }];
+      rank: index + 1,
+    }));
   }
 }
 

@@ -5,7 +5,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Crown, Trophy, User, Medal, TrendingUp } from "lucide-react";
 
-const DEMO_LEAGUE_ID = 1;
+const DEMO_LEAGUE_ID = 5; // Use Summer Tour Champions league
 
 export default function Leaderboard() {
   const { data: standings, isLoading } = useQuery({
@@ -51,7 +51,7 @@ export default function Leaderboard() {
             </div>
             <div className="flex items-center space-x-4">
               <Badge variant="outline" className="border-green-500 text-green-500">
-                "Donut Dynasty" League
+                Summer Tour Champions
               </Badge>
             </div>
           </div>
