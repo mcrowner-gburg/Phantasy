@@ -3,7 +3,6 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useLocation } from "wouter";
 import { useAuth } from "@/hooks/useAuth";
 import { NavigationSidebar } from "@/components/navigation-sidebar";
-import { MobileNavigation } from "@/components/mobile-navigation";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -113,7 +112,7 @@ export default function Leagues() {
     <div className="flex min-h-screen">
       <NavigationSidebar />
       
-      <div className="flex-1 ml-64 lg:ml-64">
+      <div className="flex-1 lg:ml-64">
         <header className="phish-card border-b phish-border px-8 py-4">
           <div className="flex justify-between items-center">
             <div>
@@ -399,8 +398,6 @@ export default function Leagues() {
           )}
         </main>
       </div>
-      
-      <MobileNavigation />
     </div>
   );
 }

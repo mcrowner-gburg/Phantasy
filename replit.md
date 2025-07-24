@@ -95,6 +95,14 @@ PhishDraft is a fantasy sports application specifically designed for Phish conce
 - **Rare Songs**: Uncommon songs like Esther (0), The Sloth (0), Fishman's Vacuum Solo (0) show accurate low counts
 - **Balanced Distribution**: Play counts now range from 0-22 plays instead of uniform "6" across all songs
 
+### July 24, 2025 - Unified Mobile Navigation Across All Pages
+- **UPDATED**: Applied mobile-responsive collapsible sidebar to all pages (Draft, Leagues, Concerts, Leaderboard)
+- **Consistent Experience**: All pages now use the same navigation pattern as the dashboard
+- **Removed Legacy Mobile Nav**: Eliminated bottom mobile navigation component from all pages
+- **Responsive Layout**: All pages now properly adapt between desktop sidebar and mobile hamburger menu
+- **Clean Code**: Removed MobileNavigation imports and references throughout the application
+- **Mobile Optimization**: All pages now use `lg:ml-64` responsive margin for proper mobile display
+
 ## User Preferences
 
 Preferred communication style: Simple, everyday language.

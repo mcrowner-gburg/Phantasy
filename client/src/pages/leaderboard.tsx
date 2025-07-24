@@ -1,6 +1,5 @@
 import { useQuery } from "@tanstack/react-query";
 import { NavigationSidebar } from "@/components/navigation-sidebar";
-import { MobileNavigation } from "@/components/mobile-navigation";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Crown, Trophy, User, Medal, TrendingUp } from "lucide-react";
@@ -62,7 +61,7 @@ export default function Leaderboard() {
     <div className="flex min-h-screen">
       <NavigationSidebar />
       
-      <div className="flex-1 ml-64 lg:ml-64">
+      <div className="flex-1 lg:ml-64">
         <header className="phish-card border-b phish-border px-8 py-4">
           <div className="flex justify-between items-center">
             <div>
@@ -206,8 +205,6 @@ export default function Leaderboard() {
           </Card>
         </main>
       </div>
-      
-      <MobileNavigation />
     </div>
   );
 }
