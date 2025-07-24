@@ -25,17 +25,7 @@ interface DraftedSongsProps {
 }
 
 export default function DraftedSongs({ draftedSongs, onDraftClick }: DraftedSongsProps) {
-  const getRarityColor = (score: number) => {
-    if (score >= 100) return "bg-red-500 text-white";
-    if (score >= 75) return "bg-orange-500 text-white";
-    return "bg-yellow-500 text-black";
-  };
-
-  const getRarityLabel = (score: number) => {
-    if (score >= 100) return "RARE";
-    if (score >= 75) return "HIGH";
-    return "MED";
-  };
+  // Simplified display - no rarity calculations needed
 
   return (
     <div className="glassmorphism rounded-xl p-6">
@@ -62,8 +52,7 @@ export default function DraftedSongs({ draftedSongs, onDraftClick }: DraftedSong
             <thead>
               <tr className="text-left border-b phish-border">
                 <th className="pb-3 font-medium phish-text">Song</th>
-                <th className="pb-3 font-medium phish-text">Last Played</th>
-                <th className="pb-3 font-medium phish-text">Rarity Score</th>
+                <th className="pb-3 font-medium phish-text">Plays (24 months)</th>
                 <th className="pb-3 font-medium phish-text">Points</th>
                 <th className="pb-3 font-medium phish-text">Status</th>
               </tr>
@@ -83,12 +72,7 @@ export default function DraftedSongs({ draftedSongs, onDraftClick }: DraftedSong
                     </div>
                   </td>
                   <td className="py-4 phish-text">
-                    {draft.song?.lastPlayed ? format(new Date(draft.song.lastPlayed), "MMM dd, yyyy") : "Never"}
-                  </td>
-                  <td className="py-4">
-                    <Badge className={`text-xs px-2 py-1 rounded-full font-medium ${getRarityColor(draft.song?.rarityScore || 0)}`}>
-                      {getRarityLabel(draft.song?.rarityScore || 0)}
-                    </Badge>
+                    {draft.song?.totalPlays || 0}
                   </td>
                   <td className="py-4 font-bold phish-gold">{draft.points || 0}</td>
                   <td className="py-4">
