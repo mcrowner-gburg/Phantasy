@@ -78,7 +78,7 @@ export default function Leagues() {
   const joinLeagueMutation = useMutation({
     mutationFn: async (leagueId: number) => {
       return apiRequest("POST", `/api/leagues/${leagueId}/join`, {
-        userId: DEMO_USER_ID,
+        userId: user?.id,
       });
     },
     onSuccess: () => {

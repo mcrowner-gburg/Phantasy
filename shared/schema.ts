@@ -111,7 +111,9 @@ export const activities = pgTable("activities", {
 // Insert schemas
 export const insertUserSchema = createInsertSchema(users).pick({
   username: true,
+  email: true,
   password: true,
+  totalPoints: true,
 });
 
 export const insertTourSchema = createInsertSchema(tours).pick({
