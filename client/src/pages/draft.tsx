@@ -25,8 +25,16 @@ export default function Draft() {
   
   const currentLeague = leagues?.[0];
 
+  // Get songs available for the current league (excluding already drafted songs)
   const { data: songs, isLoading: songsLoading } = useQuery({
-    queryKey: ["/api/songs"],
+    queryKey: ["/api/songs", currentLeague?.id],
+    queryFn: () => {
+      const url = currentLeague?.id 
+        ? `/api/songs?leagueId=${currentLeague.id}`
+        : '/api/songs';
+      return fetch(url).then(res => res.json());
+    },
+    enabled: !!currentLeague || !user, // Load songs when league is available or user is not logged in
   });
 
   const { data: draftedSongs } = useQuery({
@@ -45,6 +53,7 @@ export default function Draft() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/drafted-songs"] });
       queryClient.invalidateQueries({ queryKey: ["/api/dashboard"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/songs"] }); // Refresh available songs for all leagues
       toast({
         title: "Song drafted successfully!",
         description: "The song has been added to your lineup.",

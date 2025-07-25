@@ -192,8 +192,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Song routes
   app.get("/api/songs", async (req, res) => {
     try {
-      const songs = await storage.getAllSongs();
-      res.json(songs);
+      const leagueId = req.query.leagueId ? parseInt(req.query.leagueId as string) : null;
+      
+      if (leagueId) {
+        // Return only available songs for this league (excluding already drafted)
+        const availableSongs = await storage.getAvailableSongsForLeague(leagueId);
+        res.json(availableSongs);
+      } else {
+        // Return all songs if no league specified
+        const songs = await storage.getAllSongs();
+        res.json(songs);
+      }
     } catch (error) {
       res.status(500).json({ message: "Failed to fetch songs" });
     }
@@ -245,12 +254,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const draftData = insertDraftedSongSchema.parse(req.body);
       
-      // Check if song is already drafted by this user in this league
-      const existingDrafts = await storage.getDraftedSongs(draftData.userId, draftData.leagueId);
-      const alreadyDrafted = existingDrafts.some(draft => draft.songId === draftData.songId);
+      // CRITICAL: Check if song is already drafted by ANYONE in this league
+      const isSongTaken = await storage.isSongDraftedInLeague(draftData.songId, draftData.leagueId);
+      if (isSongTaken) {
+        return res.status(400).json({ message: "Song already drafted by another player in this league" });
+      }
       
-      if (alreadyDrafted) {
-        return res.status(400).json({ message: "Song already drafted" });
+      // Check if song is already drafted by this user in this league (redundant safety check)
+      const existingDrafts = await storage.getDraftedSongs(draftData.userId, draftData.leagueId);
+      const alreadyDraftedByUser = existingDrafts.some(draft => draft.songId === draftData.songId);
+      
+      if (alreadyDraftedByUser) {
+        return res.status(400).json({ message: "You have already drafted this song" });
       }
       
       // Check if user has reached the 10-song draft limit
@@ -273,6 +288,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       res.json(draftedSong);
     } catch (error) {
+      console.error("Draft error:", error);
       res.status(400).json({ message: "Failed to draft song" });
     }
   });

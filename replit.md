@@ -155,6 +155,17 @@ PhishDraft is a fantasy sports application specifically designed for Phish conce
 - **Mobile Responsive**: Profile page uses consistent mobile navigation with collapsible sidebar
 - **Security**: Profile updates require authentication and validate against existing user data
 
+### July 25, 2025 - Critical Fantasy League Song Exclusivity Implementation
+- **FIXED**: Implemented core fantasy league mechanic - each song can only be drafted by one person per league
+- **Database Operations**: Added isSongDraftedInLeague() method and getAvailableSongsForLeague() endpoint
+- **Draft Validation**: Enhanced draft route to check league-wide song availability before allowing drafts
+- **API Enhancement**: /api/songs endpoint now accepts leagueId parameter to return only available songs
+- **Frontend Integration**: Draft page now fetches league-specific available songs, hiding already drafted songs
+- **Error Handling**: Clear error messages when attempting to draft songs already taken by other players
+- **Data Integrity**: Proper database validation prevents duplicate song drafts within same league
+- **Fantasy Strategy**: Creates scarcity and strategic value - players must choose songs before others do
+- **Cache Management**: Song availability refreshes automatically after successful drafts
+
 ## User Preferences
 
 Preferred communication style: Simple, everyday language.

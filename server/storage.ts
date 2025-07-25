@@ -86,6 +86,11 @@ export interface IStorage {
   draftSong(draft: InsertDraftedSong): Promise<DraftedSong>;
   updateDraftedSongPoints(id: number, points: number): Promise<void>;
   updateDraftedSongStats(id: number, playedCount: number, openerCount: number, encoreCount: number): Promise<void>;
+  
+  // League-specific song availability methods
+  isSongDraftedInLeague(songId: number, leagueId: number): Promise<boolean>;
+  getAllDraftedSongsInLeague(leagueId: number): Promise<number[]>;
+  getAvailableSongsForLeague(leagueId: number): Promise<Song[]>;
 
   // Concerts
   getConcerts(): Promise<Concert[]>;
@@ -644,54 +649,161 @@ export class DatabaseStorage implements IStorage {
     }
   }
 
-  // Drafted Songs operations - stub implementations
+  // Drafted Songs operations - database implementations
+  
+  // Check if a song is already drafted by anyone in the league
+  async isSongDraftedInLeague(songId: number, leagueId: number): Promise<boolean> {
+    try {
+      const existingDrafts = await db
+        .select()
+        .from(draftedSongs)
+        .where(and(eq(draftedSongs.songId, songId), eq(draftedSongs.leagueId, leagueId)))
+        .limit(1);
+      
+      return existingDrafts.length > 0;
+    } catch (error) {
+      console.error("Error checking if song is drafted in league:", error);
+      // In case of database error, return false to allow drafting (fail-safe)
+      return false;
+    }
+  }
+  
+  // Get all drafted songs in a league (returns song IDs for availability checking)
+  async getAllDraftedSongsInLeague(leagueId: number): Promise<number[]> {
+    try {
+      const drafts = await db
+        .select({ songId: draftedSongs.songId })
+        .from(draftedSongs)
+        .where(eq(draftedSongs.leagueId, leagueId));
+      
+      return drafts.map(draft => draft.songId);
+    } catch (error) {
+      console.error("Error fetching drafted songs in league:", error);
+      return []; // Return empty array if database error
+    }
+  }
+  
+  // Get available songs for a league (excluding already drafted songs)
+  async getAvailableSongsForLeague(leagueId: number): Promise<Song[]> {
+    const allSongs = await this.getAllSongs();
+    const draftedSongIds = await this.getAllDraftedSongsInLeague(leagueId);
+    
+    // Filter out songs that are already drafted in this league
+    return allSongs.filter(song => !draftedSongIds.includes(song.id));
+  }
+
   async getDraftedSongs(userId: number, leagueId: number): Promise<(DraftedSong & { song: Song })[]> {
-    const songs = await this.getAllSongs();
-    return [
-      {
-        id: 1,
-        userId,
-        leagueId,
-        songId: 1,
-        points: 5,
-        playedCount: 2,
-        openerCount: 1,
-        encoreCount: 0,
-        status: "active",
-        draftedAt: new Date(),
-        song: songs[0],
-      },
-      {
-        id: 2,
-        userId,
-        leagueId,
-        songId: 3,
-        points: 2,
-        playedCount: 1,
-        openerCount: 0,
-        encoreCount: 1,
-        status: "active",
-        draftedAt: new Date(),
-        song: songs[2],
-      },
-      {
-        id: 3,
-        userId,
-        leagueId,
-        songId: 5,
-        points: 5,
-        playedCount: 3,
-        openerCount: 1,
-        encoreCount: 0,
-        status: "active",
-        draftedAt: new Date(),
-        song: songs[4],
-      },
-    ];
+    try {
+      // Try to get from database first
+      const dbDrafts = await db
+        .select({
+          id: draftedSongs.id,
+          userId: draftedSongs.userId,
+          leagueId: draftedSongs.leagueId,
+          songId: draftedSongs.songId,
+          points: draftedSongs.points,
+          playedCount: draftedSongs.playedCount,
+          openerCount: draftedSongs.openerCount,
+          encoreCount: draftedSongs.encoreCount,
+          status: draftedSongs.status,
+          draftedAt: draftedSongs.draftedAt,
+        })
+        .from(draftedSongs)
+        .where(and(eq(draftedSongs.userId, userId), eq(draftedSongs.leagueId, leagueId)));
+
+      // Get songs data
+      const allSongs = await this.getAllSongs();
+      
+      // Combine drafted songs with song details
+      const draftsWithSongs = dbDrafts.map(draft => {
+        const song = allSongs.find(s => s.id === draft.songId);
+        if (!song) {
+          // If song not found, use a placeholder
+          return {
+            ...draft,
+            song: {
+              id: draft.songId,
+              title: "Unknown Song",
+              category: "Unknown",
+              rarityScore: 0,
+              lastPlayed: null,
+              totalPlays: 0
+            }
+          };
+        }
+        return { ...draft, song };
+      });
+
+      return draftsWithSongs;
+    } catch (error) {
+      console.error("Error fetching drafted songs from database:", error);
+      
+      // Fallback to stub data for development
+      const songs = await this.getAllSongs();
+      return [
+        {
+          id: 1,
+          userId,
+          leagueId,
+          songId: 1,
+          points: 5,
+          playedCount: 2,
+          openerCount: 1,
+          encoreCount: 0,
+          status: "active",
+          draftedAt: new Date(),
+          song: songs[0],
+        },
+        {
+          id: 2,
+          userId,
+          leagueId,
+          songId: 3,
+          points: 2,
+          playedCount: 1,
+          openerCount: 0,
+          encoreCount: 1,
+          status: "active",
+          draftedAt: new Date(),
+          song: songs[2],
+        },
+        {
+          id: 3,
+          userId,
+          leagueId,
+          songId: 5,
+          points: 5,
+          playedCount: 3,
+          openerCount: 1,
+          encoreCount: 0,
+          status: "active",
+          draftedAt: new Date(),
+          song: songs[4],
+        },
+      ];
+    }
   }
 
   async draftSong(draft: InsertDraftedSong): Promise<DraftedSong> {
-    return { id: Date.now(), ...draft, draftedAt: new Date() } as DraftedSong;
+    try {
+      const [newDraft] = await db
+        .insert(draftedSongs)
+        .values({
+          ...draft,
+          points: 0, // Start with 0 points
+          playedCount: 0,
+          openerCount: 0,
+          encoreCount: 0,
+          status: "active",
+        })
+        .returning();
+      
+      return newDraft;
+    } catch (error) {
+      console.error("Error drafting song to database:", error);
+      // Fallback for development
+      return { id: Date.now(), ...draft, draftedAt: new Date() } as DraftedSong;
+    }
   }
 
   async updateDraftedSongPoints(id: number, additionalPoints: number): Promise<void> {
