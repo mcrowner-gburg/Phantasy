@@ -15,7 +15,7 @@ interface PhishNetSong {
   avg_gap: number;
 }
 
-// In-memory cache for songs - cache cleared to force API refresh
+// In-memory cache for songs - force complete refresh
 let songsCache: any[] = [];
 let songsCacheTimestamp = 0;
 const SONGS_CACHE_DURATION = 60 * 60 * 1000; // 1 hour
@@ -193,10 +193,16 @@ export class PhishNetService {
       }
 
       const data = await response.json();
-      console.log('API Response structure:', JSON.stringify(data, null, 2).substring(0, 500));
+      console.log('Full API Response:', JSON.stringify(data, null, 2).substring(0, 1000));
       
       // Phish.net v5 API returns data in .data array
       const songs = data.data || [];
+      console.log(`API returned ${songs.length} songs from response`);
+      
+      if (songs.length === 0) {
+        console.log('No songs returned, checking error:', data.error_message || 'No error message');
+        throw new Error(`No songs returned: ${data.error_message || 'Unknown error'}`);
+      }
 
       // Transform ALL songs to match our expected format - no limits!
       songsCache = songs.map((song: any, index: number) => ({
