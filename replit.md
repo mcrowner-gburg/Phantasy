@@ -126,6 +126,8 @@ PhishDraft is a fantasy sports application specifically designed for Phish conce
 - **Admin Hierarchy**: Global admins > League owners > League admins > Regular members
 - **Security**: League-specific point adjustments require appropriate admin privileges for that league
 - **API Endpoints**: /api/admin/leagues/:leagueId/promote/:userId for promoting users to league admin
+- **Member Management UI**: "Show League Members" button in admin panel displays member table with roles, join dates, and promotion controls
+- **WORKING**: Full league admin system tested and functional with member promotion capabilities
 
 ## User Preferences
 
