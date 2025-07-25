@@ -27,8 +27,9 @@ export default function DraftRoom() {
   });
 
   // Get draft order
-  const { data: draftOrder } = useQuery({
+  const { data: draftOrder, isLoading: draftOrderLoading } = useQuery({
     queryKey: [`/api/leagues/${leagueId}/draft-order`],
+    enabled: !!leagueId,
   });
 
   // Get draft picks
