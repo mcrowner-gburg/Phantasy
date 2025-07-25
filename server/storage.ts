@@ -49,6 +49,7 @@ export interface IStorage {
   createUser(user: InsertUser): Promise<User>;
   updateUserPoints(userId: number, points: number): Promise<void>;
   updateUserPassword(userId: number, hashedPassword: string): Promise<void>;
+  updateUserProfile(userId: number, updates: { email?: string; phoneNumber?: string }): Promise<User>;
 
   // Password reset operations
   createPasswordResetToken(token: InsertPasswordResetToken): Promise<PasswordResetToken>;
@@ -1178,6 +1179,50 @@ export class DatabaseStorage implements IStorage {
         totalPoints: sql`${users.totalPoints} + ${pointsDifference}`
       })
       .where(eq(users.id, userId));
+  }
+
+  async updateUserProfile(userId: number, updates: { email?: string; phoneNumber?: string }): Promise<User> {
+    // Validate that email is not already taken by another user
+    if (updates.email) {
+      const existingUser = await db
+        .select()
+        .from(users)
+        .where(and(eq(users.email, updates.email), not(eq(users.id, userId))))
+        .limit(1);
+      
+      if (existingUser.length > 0) {
+        throw new Error("Email address is already in use by another user");
+      }
+    }
+    
+    // Validate that phone number is not already taken by another user
+    if (updates.phoneNumber) {
+      const existingUser = await db
+        .select()
+        .from(users)
+        .where(and(eq(users.phoneNumber, updates.phoneNumber), not(eq(users.id, userId))))
+        .limit(1);
+      
+      if (existingUser.length > 0) {
+        throw new Error("Phone number is already in use by another user");
+      }
+    }
+
+    const [updatedUser] = await db
+      .update(users)
+      .set({
+        email: updates.email,
+        phoneNumber: updates.phoneNumber,
+        updatedAt: new Date()
+      })
+      .where(eq(users.id, userId))
+      .returning();
+    
+    if (!updatedUser) {
+      throw new Error("User not found");
+    }
+    
+    return updatedUser;
   }
 
   // Phone verification operations

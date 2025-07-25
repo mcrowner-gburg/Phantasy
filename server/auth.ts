@@ -141,6 +141,42 @@ export function setupAuth(app: express.Application) {
     });
   });
 
+  app.patch('/api/auth/profile', requireAuth, async (req, res) => {
+    try {
+      const userId = (req.session as any).userId;
+      const { email, phoneNumber } = req.body;
+
+      // Basic validation
+      if (email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+        return res.status(400).json({ message: 'Please enter a valid email address' });
+      }
+
+      if (phoneNumber && phoneNumber.trim() !== '' && !/^\+?[\d\s\-\(\)]+$/.test(phoneNumber)) {
+        return res.status(400).json({ message: 'Please enter a valid phone number' });
+      }
+
+      // Update the user profile
+      const updatedUser = await storage.updateUserProfile(userId, {
+        email: email || undefined,
+        phoneNumber: phoneNumber && phoneNumber.trim() !== '' ? phoneNumber : null
+      });
+
+      res.json({
+        user: {
+          id: updatedUser.id,
+          username: updatedUser.username,
+          email: updatedUser.email,
+          phoneNumber: updatedUser.phoneNumber,
+          totalPoints: updatedUser.totalPoints,
+          role: updatedUser.role || 'user'
+        }
+      });
+    } catch (error: any) {
+      console.error('Profile update error:', error);
+      res.status(400).json({ message: error.message || 'Failed to update profile' });
+    }
+  });
+
   app.get('/api/auth/user', async (req, res) => {
     try {
       const userId = (req.session as any)?.userId;
