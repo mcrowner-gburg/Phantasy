@@ -132,6 +132,23 @@ router.post('/leagues/:leagueId/promote/:userId', async (req: AuthenticatedReque
   }
 });
 
+// Get league members (requires league admin or global admin)
+router.get('/leagues/:leagueId/members', requireLeagueAdmin, async (req: AuthenticatedRequest, res) => {
+  try {
+    const leagueId = parseInt(req.params.leagueId);
+    
+    if (isNaN(leagueId)) {
+      return res.status(400).json({ message: 'Invalid league ID' });
+    }
+
+    const members = await storage.getLeagueMembers(leagueId);
+    res.json(members);
+  } catch (error) {
+    console.error('Error fetching league members:', error);
+    res.status(500).json({ message: 'Failed to fetch league members' });
+  }
+});
+
 // Get leagues user can admin (for league admin interface)
 router.get('/user-admin-leagues', async (req: AuthenticatedRequest, res) => {
   try {

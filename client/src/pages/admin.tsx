@@ -23,6 +23,7 @@ export default function Admin() {
   const [selectedConcert, setSelectedConcert] = useState<number | null>(null);
   const [selectedLeague, setSelectedLeague] = useState<number | null>(null);
   const [isAdjustmentDialogOpen, setIsAdjustmentDialogOpen] = useState(false);
+  const [showMembers, setShowMembers] = useState(false);
   const [adjustmentForm, setAdjustmentForm] = useState({
     songId: 0,
     userId: 0,
@@ -66,6 +67,12 @@ export default function Admin() {
     enabled: !!(selectedLeague && isAdmin),
   });
 
+  // Get league members when league is selected
+  const { data: leagueMembers, isLoading: isLoadingMembers } = useQuery({
+    queryKey: ["/api/admin/leagues", selectedLeague, "members"],
+    enabled: !!(selectedLeague && isAdmin),
+  });
+
   const adjustmentMutation = useMutation({
     mutationFn: async (data: any) => {
       return apiRequest("POST", "/api/admin/adjustments", {
@@ -87,6 +94,28 @@ export default function Admin() {
       toast({
         title: "Failed to adjust points",
         description: error.message || "Please try again later.",
+        variant: "destructive",
+      });
+    },
+  });
+
+  const promoteMutation = useMutation({
+    mutationFn: async ({ userId, leagueId }: { userId: number; leagueId: number }) => {
+      return apiRequest("POST", `/api/admin/leagues/${leagueId}/promote/${userId}`);
+    },
+    onSuccess: () => {
+      toast({
+        title: "Success",
+        description: "User promoted to league admin successfully",
+      });
+      queryClient.invalidateQueries({
+        queryKey: ["/api/admin/leagues", selectedLeague, "members"],
+      });
+    },
+    onError: () => {
+      toast({
+        title: "Error",
+        description: "Failed to promote user",
         variant: "destructive",
       });
     },
@@ -203,8 +232,87 @@ export default function Admin() {
                   </Select>
                 </div>
               </div>
+
+              {selectedLeague && (
+                <div className="flex gap-4 mb-6">
+                  <Button
+                    onClick={() => setShowMembers(!showMembers)}
+                    variant="outline"
+                    className="border-blue-500 text-blue-500 hover:bg-blue-500/10"
+                  >
+                    <Users className="mr-2" size={16} />
+                    {showMembers ? 'Hide' : 'Show'} League Members
+                  </Button>
+                </div>
+              )}
             </CardContent>
           </Card>
+
+          {/* League Members Management */}
+          {selectedLeague && showMembers && (
+            <Card className="glassmorphism border-blue-600">
+              <CardContent className="p-6">
+                <div className="flex items-center justify-between mb-4">
+                  <h4 className="text-lg font-bold text-white">League Members</h4>
+                  <Badge variant="outline" className="border-blue-500 text-blue-500">
+                    {leagueMembers?.length || 0} Members
+                  </Badge>
+                </div>
+                
+                {isLoadingMembers ? (
+                  <div className="flex items-center justify-center py-8">
+                    <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-500"></div>
+                    <span className="ml-2 text-gray-400">Loading members...</span>
+                  </div>
+                ) : (
+                  <Table>
+                    <TableHeader>
+                      <TableRow className="border-gray-600">
+                        <TableHead className="text-gray-300">Username</TableHead>
+                        <TableHead className="text-gray-300">Role</TableHead>
+                        <TableHead className="text-gray-300">Joined</TableHead>
+                        <TableHead className="text-gray-300">Total Points</TableHead>
+                        <TableHead className="text-gray-300">Actions</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {leagueMembers?.map((member: any) => (
+                        <TableRow key={member.id} className="border-gray-600">
+                          <TableCell className="text-white font-medium">{member.username}</TableCell>
+                          <TableCell>
+                            <Badge 
+                              variant={member.role === 'admin' ? 'default' : 'outline'}
+                              className={member.role === 'admin' ? 'bg-green-600 text-white' : 'border-gray-500 text-gray-300'}
+                            >
+                              {member.role === 'admin' ? 'League Admin' : 'Member'}
+                            </Badge>
+                          </TableCell>
+                          <TableCell className="text-gray-300">
+                            {member.joinedAt ? format(new Date(member.joinedAt), "MMM dd, yyyy") : 'N/A'}
+                          </TableCell>
+                          <TableCell className="text-gray-300">{member.totalPoints || 0}</TableCell>
+                          <TableCell>
+                            {member.role !== 'admin' && (
+                              <Button
+                                onClick={() => promoteMutation.mutate({ userId: member.id, leagueId: selectedLeague! })}
+                                disabled={promoteMutation.isPending}
+                                size="sm"
+                                variant="outline"
+                                className="border-green-500 text-green-500 hover:bg-green-500/10"
+                              >
+                                <TrendingUp className="mr-1" size={14} />
+                                Promote
+                              </Button>
+                            )}
+                          </TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                )}
+              </CardContent>
+            </Card>
+          )}
 
           {/* Show Points Grid */}
           {selectedConcert && selectedLeague && (

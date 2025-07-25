@@ -101,6 +101,7 @@ export interface IStorage {
   isUserAdmin(userId: number): Promise<boolean>;
   isUserLeagueAdmin(userId: number, leagueId: number): Promise<boolean>;
   promoteToLeagueAdmin(userId: number, leagueId: number): Promise<void>;
+  getLeagueMembers(leagueId: number): Promise<(User & { role: string; joinedAt: Date | null })[]>;
   getShowPointsForAdmin(leagueId: number, concertId: number): Promise<{
     concert: Concert,
     songPerformances: (SongPerformance & { song: Song, draftedBy?: { userId: number, username: string }[] })[]
@@ -941,6 +942,37 @@ export class DatabaseStorage implements IStorage {
         eq(leagueMembers.leagueId, leagueId),
         eq(leagueMembers.userId, userId)
       ));
+  }
+
+  async getLeagueMembers(leagueId: number): Promise<(User & { role: string; joinedAt: Date | null })[]> {
+    const members = await db
+      .select({
+        id: users.id,
+        username: users.username,
+        email: users.email,
+        password: users.password,
+        userRole: users.role,
+        totalPoints: users.totalPoints,
+        createdAt: users.createdAt,
+        memberRole: leagueMembers.role,
+        joinedAt: leagueMembers.joinedAt
+      })
+      .from(leagueMembers)
+      .innerJoin(users, eq(leagueMembers.userId, users.id))
+      .where(eq(leagueMembers.leagueId, leagueId))
+      .orderBy(users.username);
+
+    return members.map(member => ({
+      id: member.id,
+      username: member.username,
+      email: member.email,
+      password: member.password,
+      role: member.userRole,
+      totalPoints: member.totalPoints,
+      createdAt: member.createdAt,
+      role: member.memberRole || 'member',
+      joinedAt: member.joinedAt
+    }));
   }
 
   async getShowPointsForAdmin(leagueId: number, concertId: number): Promise<{
