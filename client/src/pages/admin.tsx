@@ -60,7 +60,7 @@ export default function Admin() {
 
   // Get point adjustments for selected league/concert
   const { data: adjustments } = useQuery({
-    queryKey: ["/api/admin/adjustments/league", selectedLeague],
+    queryKey: ["/api/admin/adjustments/league", selectedLeague, selectedConcert],
     queryFn: async () => {
       const url = selectedConcert 
         ? `/api/admin/adjustments/league/${selectedLeague}?concertId=${selectedConcert}`
@@ -68,7 +68,18 @@ export default function Admin() {
       const response = await fetch(url);
       if (!response.ok) throw new Error('Failed to fetch adjustments');
       const data = await response.json();
-      return Array.isArray(data) ? data : [];
+      const adjustmentsArray = Array.isArray(data) ? data : [];
+      
+      // Remove duplicates based on unique combination of songId, userId, concertId
+      const uniqueAdjustments = adjustmentsArray.filter((adjustment, index, self) => 
+        index === self.findIndex(a => 
+          a.songId === adjustment.songId && 
+          a.userId === adjustment.userId && 
+          a.concertId === adjustment.concertId
+        )
+      );
+      
+      return uniqueAdjustments;
     },
     enabled: !!(selectedLeague && isAdmin),
   });
@@ -145,9 +156,9 @@ export default function Admin() {
     if (!adjustments || !Array.isArray(adjustments)) return calculateOriginalPoints(performance);
     
     const adjustment = adjustments.find((adj: any) => 
-      adj.songId === performance.song.id && 
-      adj.userId === userId &&
-      adj.concertId === selectedConcert
+      Number(adj.songId) === Number(performance.song.id) && 
+      Number(adj.userId) === Number(userId) &&
+      Number(adj.concertId) === Number(selectedConcert)
     );
     
     return adjustment ? adjustment.adjustedPoints : calculateOriginalPoints(performance);
@@ -158,16 +169,16 @@ export default function Admin() {
     if (!adjustments || !Array.isArray(adjustments)) return null;
     
     return adjustments.find((adj: any) => 
-      adj.songId === performance.song.id && 
-      adj.userId === userId &&
-      adj.concertId === selectedConcert
+      Number(adj.songId) === Number(performance.song.id) && 
+      Number(adj.userId) === Number(userId) &&
+      Number(adj.concertId) === Number(selectedConcert)
     );
   };
 
   const openAdjustmentDialog = (performance: any, drafter: any) => {
     const originalPoints = calculateOriginalPoints(performance);
     setAdjustmentForm({
-      songId: performance.songId,
+      songId: performance.song?.id || performance.songId,
       userId: drafter.userId,
       originalPoints,
       adjustedPoints: originalPoints,
