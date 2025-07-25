@@ -208,6 +208,17 @@ PhishDraft is a fantasy sports application specifically designed for Phish conce
 - **Complete Catalog Access**: Successfully accessing entire Phish.net song catalog with 970+ songs for maximum draft variety
 - **RESOLVED**: Fixed API connectivity and parsing issues - system now properly accesses complete Phish.net catalog instead of fallback data
 
+### July 25, 2025 - Admin Point Adjustment Display System Fix
+- **FIXED**: Resolved critical bug where point adjustments were saved to database but not displaying in admin interface
+- **Data Validation**: Added proper Array.isArray() checks to prevent "find is not a function" errors
+- **Duplicate Filtering**: Implemented unique adjustment filtering based on songId, userId, and concertId combination
+- **Enhanced Matching**: Added Number() type conversion for reliable data matching between adjustments and performances
+- **UI Display**: Adjusted points now properly show with crossed-out original points and highlighted new values
+- **Adjustment Info**: Displays who made the adjustment and the reason in the admin interface
+- **Cache Optimization**: Improved query key structure with selectedConcert parameter for proper cache invalidation
+- **Real-time Updates**: Point adjustments now immediately reflect in the UI after saving
+- **Error Prevention**: Robust error handling prevents UI crashes when adjustment data is malformed
+
 ## User Preferences
 
 Preferred communication style: Simple, everyday language.
