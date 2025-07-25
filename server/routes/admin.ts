@@ -1,7 +1,8 @@
 import { Router } from 'express';
 import { storage } from '../storage';
 import { requireAdmin, requireLeagueAdmin, AuthenticatedRequest } from '../middleware/admin';
-import { insertPointAdjustmentSchema } from '@shared/schema';
+import { insertPointAdjustmentSchema, insertLeagueInviteSchema } from '@shared/schema';
+import { nanoid } from 'nanoid';
 
 const router = Router();
 
@@ -180,6 +181,71 @@ router.get('/user-admin-leagues', async (req: AuthenticatedRequest, res) => {
   } catch (error) {
     console.error('Error fetching user admin leagues:', error);
     res.status(500).json({ message: 'Failed to fetch admin leagues' });
+  }
+});
+
+// Create league invite (requires league admin or global admin)
+router.post('/leagues/:leagueId/invites', requireLeagueAdmin, async (req: AuthenticatedRequest, res) => {
+  try {
+    if (!req.session?.user?.id) {
+      return res.status(401).json({ message: 'Not authenticated' });
+    }
+
+    const leagueId = parseInt(req.params.leagueId);
+    if (isNaN(leagueId)) {
+      return res.status(400).json({ message: 'Invalid league ID' });
+    }
+
+    const { maxUses, expiresAt } = req.body;
+    
+    // Generate unique invite code
+    const inviteCode = nanoid(10);
+
+    const inviteData = {
+      leagueId,
+      inviteCode,
+      createdBy: req.session.user.id,
+      maxUses: maxUses || null,
+      expiresAt: expiresAt ? new Date(expiresAt) : null
+    };
+
+    const invite = await storage.createLeagueInvite(inviteData);
+    res.json(invite);
+  } catch (error) {
+    console.error('Error creating league invite:', error);
+    res.status(500).json({ message: 'Failed to create league invite' });
+  }
+});
+
+// Get league invites (requires league admin or global admin)
+router.get('/leagues/:leagueId/invites', requireLeagueAdmin, async (req: AuthenticatedRequest, res) => {
+  try {
+    const leagueId = parseInt(req.params.leagueId);
+    if (isNaN(leagueId)) {
+      return res.status(400).json({ message: 'Invalid league ID' });
+    }
+
+    const invites = await storage.getLeagueInvites(leagueId);
+    res.json(invites);
+  } catch (error) {
+    console.error('Error fetching league invites:', error);
+    res.status(500).json({ message: 'Failed to fetch league invites' });
+  }
+});
+
+// Deactivate league invite (requires league admin or global admin)
+router.delete('/leagues/:leagueId/invites/:inviteId', requireLeagueAdmin, async (req: AuthenticatedRequest, res) => {
+  try {
+    const inviteId = parseInt(req.params.inviteId);
+    if (isNaN(inviteId)) {
+      return res.status(400).json({ message: 'Invalid invite ID' });
+    }
+
+    await storage.deactivateInvite(inviteId);
+    res.json({ message: 'Invite deactivated successfully' });
+  } catch (error) {
+    console.error('Error deactivating invite:', error);
+    res.status(500).json({ message: 'Failed to deactivate invite' });
   }
 });
 

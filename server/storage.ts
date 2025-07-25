@@ -10,6 +10,7 @@ import {
   Activity,
   PasswordResetToken,
   PointAdjustment,
+  LeagueInvite,
   InsertUser,
   InsertTour,
   InsertLeague,
@@ -18,6 +19,7 @@ import {
   InsertSongPerformance,
   InsertPasswordResetToken,
   InsertPointAdjustment,
+  InsertLeagueInvite,
   users,
   tours,
   leagues,
@@ -27,6 +29,7 @@ import {
   songPerformances,
   activities,
   leagueMembers,
+  leagueInvites,
   passwordResetTokens,
   pointAdjustments
 } from "@shared/schema";
@@ -102,6 +105,13 @@ export interface IStorage {
   isUserLeagueAdmin(userId: number, leagueId: number): Promise<boolean>;
   promoteToLeagueAdmin(userId: number, leagueId: number): Promise<void>;
   getLeagueMembers(leagueId: number): Promise<(User & { role: string; joinedAt: Date | null })[]>;
+  
+  // League Invite operations
+  createLeagueInvite(invite: InsertLeagueInvite): Promise<LeagueInvite>;
+  getLeagueInvites(leagueId: number): Promise<LeagueInvite[]>;
+  getInviteByCode(inviteCode: string): Promise<LeagueInvite | undefined>;
+  joinLeagueByInvite(inviteCode: string, userId: number): Promise<boolean>;
+  deactivateInvite(inviteId: number): Promise<void>;
   getShowPointsForAdmin(leagueId: number, concertId: number): Promise<{
     concert: Concert,
     songPerformances: (SongPerformance & { song: Song, draftedBy?: { userId: number, username: string }[] })[]
@@ -973,6 +983,87 @@ export class DatabaseStorage implements IStorage {
       role: member.memberRole || 'member',
       joinedAt: member.joinedAt
     }));
+  }
+
+  // League Invite operations
+  async createLeagueInvite(invite: InsertLeagueInvite): Promise<LeagueInvite> {
+    const [createdInvite] = await db
+      .insert(leagueInvites)
+      .values(invite)
+      .returning();
+    return createdInvite;
+  }
+
+  async getLeagueInvites(leagueId: number): Promise<LeagueInvite[]> {
+    return db
+      .select()
+      .from(leagueInvites)
+      .where(and(
+        eq(leagueInvites.leagueId, leagueId),
+        eq(leagueInvites.isActive, true)
+      ))
+      .orderBy(leagueInvites.createdAt);
+  }
+
+  async getInviteByCode(inviteCode: string): Promise<LeagueInvite | undefined> {
+    const [invite] = await db
+      .select()
+      .from(leagueInvites)
+      .where(and(
+        eq(leagueInvites.inviteCode, inviteCode),
+        eq(leagueInvites.isActive, true)
+      ));
+    return invite;
+  }
+
+  async joinLeagueByInvite(inviteCode: string, userId: number): Promise<boolean> {
+    const invite = await this.getInviteByCode(inviteCode);
+    if (!invite) return false;
+
+    // Check if invite is expired
+    if (invite.expiresAt && new Date() > invite.expiresAt) {
+      return false;
+    }
+
+    // Check if invite has reached max uses
+    if (invite.maxUses && invite.currentUses >= invite.maxUses) {
+      return false;
+    }
+
+    // Check if user is already a member
+    const existingMember = await db
+      .select()
+      .from(leagueMembers)
+      .where(and(
+        eq(leagueMembers.leagueId, invite.leagueId),
+        eq(leagueMembers.userId, userId)
+      ));
+
+    if (existingMember.length > 0) {
+      return false; // Already a member
+    }
+
+    // Add user to league
+    await db.insert(leagueMembers).values({
+      leagueId: invite.leagueId,
+      userId: userId,
+      role: 'member'
+    });
+
+    // Increment invite usage count
+    await db
+      .update(leagueInvites)
+      .set({ currentUses: invite.currentUses + 1 })
+      .where(eq(leagueInvites.id, invite.id));
+
+    return true;
+  }
+
+  async deactivateInvite(inviteId: number): Promise<void> {
+    await db
+      .update(leagueInvites)
+      .set({ isActive: false })
+      .where(eq(leagueInvites.id, inviteId));
   }
 
   async getShowPointsForAdmin(leagueId: number, concertId: number): Promise<{

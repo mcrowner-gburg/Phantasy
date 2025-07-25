@@ -63,6 +63,18 @@ export const leagueMembers = pgTable("league_members", {
   joinedAt: timestamp("joined_at").defaultNow(),
 });
 
+export const leagueInvites = pgTable("league_invites", {
+  id: serial("id").primaryKey(),
+  leagueId: integer("league_id").references(() => leagues.id).notNull(),
+  inviteCode: text("invite_code").notNull().unique(),
+  createdBy: integer("created_by").references(() => users.id).notNull(),
+  maxUses: integer("max_uses").default(null), // null = unlimited
+  currentUses: integer("current_uses").default(0),
+  expiresAt: timestamp("expires_at").default(null), // null = no expiration
+  isActive: boolean("is_active").default(true),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
 export const songs = pgTable("songs", {
   id: serial("id").primaryKey(),
   title: text("title").notNull(),
@@ -220,3 +232,14 @@ export type PasswordResetToken = typeof passwordResetTokens.$inferSelect;
 export type InsertPasswordResetToken = z.infer<typeof insertPasswordResetTokenSchema>;
 export type PointAdjustment = typeof pointAdjustments.$inferSelect;
 export type InsertPointAdjustment = z.infer<typeof insertPointAdjustmentSchema>;
+export type LeagueInvite = typeof leagueInvites.$inferSelect;
+
+export const insertLeagueInviteSchema = createInsertSchema(leagueInvites).pick({
+  leagueId: true,
+  inviteCode: true,
+  createdBy: true,
+  maxUses: true,
+  expiresAt: true,
+});
+
+export type InsertLeagueInvite = z.infer<typeof insertLeagueInviteSchema>;

@@ -14,6 +14,7 @@ import Login from "@/pages/login";
 import Register from "@/pages/register";
 import ForgotPassword from "@/pages/forgot-password";
 import ResetPassword from "@/pages/reset-password";
+import JoinLeague from "@/pages/join-league";
 import NotFound from "@/pages/not-found";
 
 function Router() {
@@ -32,7 +33,8 @@ function Router() {
       <Switch>
         <Route path="/register" component={Register} />
         <Route path="/forgot-password" component={ForgotPassword} />
-        <Route path="/reset-password" component={ResetPassword} />
+        <Route path="/reset-password/:token" component={ResetPassword} />
+        <Route path="/join/:inviteCode" component={JoinLeague} />
         <Route path="/" component={Login} />
         <Route component={Login} />
       </Switch>
@@ -48,6 +50,7 @@ function Router() {
       <Route path="/concerts" component={Concerts} />
       <Route path="/leagues" component={Leagues} />
       <Route path="/admin" component={Admin} />
+      <Route path="/join/:inviteCode" component={JoinLeague} />
       <Route component={NotFound} />
     </Switch>
   );

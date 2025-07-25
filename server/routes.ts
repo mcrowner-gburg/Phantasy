@@ -115,6 +115,29 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Join league by invite code
+  app.post("/api/leagues/join/:inviteCode", requireAuth, async (req, res) => {
+    try {
+      const inviteCode = req.params.inviteCode;
+      const userId = req.user?.id;
+
+      if (!userId) {
+        return res.status(401).json({ message: 'User not authenticated' });
+      }
+
+      const success = await storage.joinLeagueByInvite(inviteCode, userId);
+      
+      if (success) {
+        res.json({ message: 'Successfully joined league' });
+      } else {
+        res.status(400).json({ message: 'Invalid invite code or unable to join league' });
+      }
+    } catch (error) {
+      console.error('Error joining league by invite:', error);
+      res.status(500).json({ message: 'Failed to join league' });
+    }
+  });
+
   app.post("/api/leagues/:id/join", async (req, res) => {
     try {
       const leagueId = parseInt(req.params.id);

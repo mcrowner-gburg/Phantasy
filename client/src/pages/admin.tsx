@@ -10,7 +10,8 @@ import { Badge } from "@/components/ui/badge";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogTrigger } from "@/components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { Settings, Edit, Calendar, Music, Users, TrendingUp, AlertCircle } from "lucide-react";
+import { Settings, Edit, Calendar, Music, Users, TrendingUp, AlertCircle, Link as LinkIcon } from "lucide-react";
+import { LeagueInviteGenerator } from "@/components/admin/league-invite-generator";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest } from "@/lib/queryClient";
 import { useAuth } from "@/hooks/useAuth";
@@ -243,6 +244,27 @@ export default function Admin() {
                     <Users className="mr-2" size={16} />
                     {showMembers ? 'Hide' : 'Show'} League Members
                   </Button>
+                  
+                  <Dialog>
+                    <DialogTrigger asChild>
+                      <Button variant="outline" className="border-green-500 text-green-500 hover:bg-green-500/10">
+                        <LinkIcon className="mr-2" size={16} />
+                        Invite Generator
+                      </Button>
+                    </DialogTrigger>
+                    <DialogContent className="max-w-2xl max-h-[80vh] overflow-y-auto">
+                      <DialogHeader>
+                        <DialogTitle>League Invite Generator</DialogTitle>
+                        <DialogDescription>
+                          Create shareable invite links for your league
+                        </DialogDescription>
+                      </DialogHeader>
+                      <LeagueInviteGenerator 
+                        leagueId={selectedLeague!} 
+                        leagueName={leagues?.find(l => l.id === selectedLeague)?.name || "Unknown League"} 
+                      />
+                    </DialogContent>
+                  </Dialog>
                 </div>
               )}
             </CardContent>
