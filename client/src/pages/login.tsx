@@ -93,6 +93,11 @@ export default function Login() {
           </form>
           <div className="mt-4 space-y-2 text-center">
             <div>
+              <Link href="/phone-login" className="text-sm text-blue-600 hover:underline">
+                Login with phone number
+              </Link>
+            </div>
+            <div>
               <Link href="/forgot-password" className="text-sm text-blue-600 hover:underline">
                 Forgot your password?
               </Link>

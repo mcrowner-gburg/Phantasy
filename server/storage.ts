@@ -11,6 +11,7 @@ import {
   PasswordResetToken,
   PointAdjustment,
   LeagueInvite,
+  PhoneVerificationCode,
   InsertUser,
   InsertTour,
   InsertLeague,
@@ -20,6 +21,7 @@ import {
   InsertPasswordResetToken,
   InsertPointAdjustment,
   InsertLeagueInvite,
+  InsertPhoneVerificationCode,
   users,
   tours,
   leagues,
@@ -31,10 +33,11 @@ import {
   leagueMembers,
   leagueInvites,
   passwordResetTokens,
-  pointAdjustments
+  pointAdjustments,
+  phoneVerificationCodes
 } from "@shared/schema";
 import { db } from "./db";
-import { eq, and, sql } from "drizzle-orm";
+import { eq, and, sql, desc, count, or, not, gte, lte, asc, gt } from "drizzle-orm";
 
 // Interface for storage operations
 export interface IStorage {
@@ -42,6 +45,7 @@ export interface IStorage {
   getUser(id: number): Promise<User | undefined>;
   getUserByUsername(username: string): Promise<User | undefined>;
   getUserByEmail(email: string): Promise<User | undefined>;
+  getUserByPhone(phoneNumber: string): Promise<User | undefined>;
   createUser(user: InsertUser): Promise<User>;
   updateUserPoints(userId: number, points: number): Promise<void>;
   updateUserPassword(userId: number, hashedPassword: string): Promise<void>;
@@ -119,6 +123,11 @@ export interface IStorage {
   createPointAdjustment(adjustment: InsertPointAdjustment): Promise<PointAdjustment>;
   getPointAdjustments(leagueId: number, concertId?: number): Promise<(PointAdjustment & { song: Song, user?: User, adjustedByUser: User })[]>;
   updateUserPointsAfterAdjustment(userId: number, pointsDifference: number): Promise<void>;
+  
+  // Phone verification operations
+  createPhoneVerificationCode(code: InsertPhoneVerificationCode): Promise<PhoneVerificationCode>;
+  getValidPhoneVerificationCode(phoneNumber: string, code: string): Promise<PhoneVerificationCode | undefined>;
+  markPhoneVerificationCodeUsed(id: number): Promise<void>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -135,6 +144,11 @@ export class DatabaseStorage implements IStorage {
 
   async getUserByEmail(email: string): Promise<User | undefined> {
     const [user] = await db.select().from(users).where(eq(users.email, email));
+    return user || undefined;
+  }
+
+  async getUserByPhone(phoneNumber: string): Promise<User | undefined> {
+    const [user] = await db.select().from(users).where(eq(users.phoneNumber, phoneNumber));
     return user || undefined;
   }
 
@@ -1164,6 +1178,38 @@ export class DatabaseStorage implements IStorage {
         totalPoints: sql`${users.totalPoints} + ${pointsDifference}`
       })
       .where(eq(users.id, userId));
+  }
+
+  // Phone verification operations
+  async createPhoneVerificationCode(codeData: InsertPhoneVerificationCode): Promise<PhoneVerificationCode> {
+    const [code] = await db
+      .insert(phoneVerificationCodes)
+      .values(codeData)
+      .returning();
+    return code;
+  }
+
+  async getValidPhoneVerificationCode(phoneNumber: string, code: string): Promise<PhoneVerificationCode | undefined> {
+    const [verificationCode] = await db
+      .select()
+      .from(phoneVerificationCodes)
+      .where(
+        and(
+          eq(phoneVerificationCodes.phoneNumber, phoneNumber),
+          eq(phoneVerificationCodes.code, code),
+          eq(phoneVerificationCodes.used, false),
+          gt(phoneVerificationCodes.expiresAt, new Date())
+        )
+      )
+      .limit(1);
+    return verificationCode;
+  }
+
+  async markPhoneVerificationCodeUsed(id: number): Promise<void> {
+    await db
+      .update(phoneVerificationCodes)
+      .set({ used: true })
+      .where(eq(phoneVerificationCodes.id, id));
   }
 }
 

@@ -129,6 +129,20 @@ PhishDraft is a fantasy sports application specifically designed for Phish conce
 - **Member Management UI**: "Show League Members" button in admin panel displays member table with roles, join dates, and promotion controls
 - **WORKING**: Full league admin system tested and functional with member promotion capabilities
 
+### July 25, 2025 - Phone Authentication & SMS Invite System Implementation
+- **NEW**: Complete phone-based authentication system with SMS verification codes
+- **Phone Registration**: Added optional phone number field to user registration with validation
+- **Phone Login**: Created dedicated phone login page with 6-digit verification code system
+- **SMS Service**: Integrated Twilio SMS service for authentication codes and league invites
+- **Database Schema**: Added phone_verification_codes table with expiration and usage tracking
+- **API Endpoints**: /api/auth/request-phone-code, /api/auth/verify-phone-code, /api/auth/send-sms-invite
+- **Security Features**: 10-minute code expiration, single-use verification codes, proper phone validation
+- **SMS League Invites**: Admin panel now includes SMS invite functionality alongside email invites
+- **Development Mode**: SMS service gracefully handles missing Twilio credentials for local development
+- **User Experience**: Added phone login option to login page, seamless authentication flow
+- **Admin Enhancement**: League invite generator now includes SMS invite dialog for direct phone invitations
+- **Mobile-First**: Phone authentication designed for mobile-first user experience with SMS notifications
+
 ## User Preferences
 
 Preferred communication style: Simple, everyday language.

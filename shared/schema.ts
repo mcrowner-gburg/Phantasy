@@ -17,6 +17,7 @@ export const users = pgTable("users", {
   id: serial("id").primaryKey(),
   username: text("username").notNull().unique(),
   email: text("email").notNull().unique(),
+  phoneNumber: text("phone_number").unique(), // Optional phone number for SMS features
   password: text("password").notNull(),
   role: text("role").default("user"), // "admin", "user"
   totalPoints: integer("total_points").default(0),
@@ -144,10 +145,24 @@ export const pointAdjustments = pgTable("point_adjustments", {
   createdAt: timestamp("created_at").defaultNow(),
 });
 
+// Phone verification codes for SMS authentication
+export const phoneVerificationCodes = pgTable("phone_verification_codes", {
+  id: serial("id").primaryKey(),
+  phoneNumber: varchar("phone_number", { length: 20 }).notNull(),
+  code: varchar("code", { length: 6 }).notNull(),
+  expiresAt: timestamp("expires_at").notNull(),
+  used: boolean("used").default(false),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export type PhoneVerificationCode = typeof phoneVerificationCodes.$inferSelect;
+export type InsertPhoneVerificationCode = typeof phoneVerificationCodes.$inferInsert;
+
 // Insert schemas
 export const insertUserSchema = createInsertSchema(users).pick({
   username: true,
   email: true,
+  phoneNumber: true,
   password: true,
   role: true,
   totalPoints: true,

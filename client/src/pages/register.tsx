@@ -12,13 +12,14 @@ export default function Register() {
   const [, navigate] = useLocation();
   const [username, setUsername] = useState("");
   const [email, setEmail] = useState("");
+  const [phoneNumber, setPhoneNumber] = useState("");
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
   const { toast } = useToast();
   const queryClient = useQueryClient();
 
   const registerMutation = useMutation({
-    mutationFn: async (userData: { username: string; email: string; password: string }) => {
+    mutationFn: async (userData: { username: string; email: string; phoneNumber?: string; password: string }) => {
       const res = await apiRequest("POST", "/api/auth/register", userData);
       return await res.json();
     },
@@ -80,7 +81,12 @@ export default function Register() {
       return;
     }
 
-    registerMutation.mutate({ username, email, password });
+    registerMutation.mutate({ 
+      username, 
+      email, 
+      phoneNumber: phoneNumber || undefined, 
+      password 
+    });
   };
 
   return (
@@ -115,6 +121,19 @@ export default function Register() {
                 placeholder="Enter your email address"
                 required
               />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="phoneNumber">Phone Number (optional)</Label>
+              <Input
+                id="phoneNumber"
+                type="tel"
+                value={phoneNumber}
+                onChange={(e) => setPhoneNumber(e.target.value)}
+                placeholder="+1 (555) 123-4567"
+              />
+              <p className="text-xs text-gray-500 mt-1">
+                For SMS notifications and invite links
+              </p>
             </div>
             <div className="space-y-2">
               <Label htmlFor="password">Password</Label>

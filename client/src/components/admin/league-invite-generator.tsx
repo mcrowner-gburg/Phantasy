@@ -5,6 +5,7 @@ import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Trash2, Copy, Plus, Users } from "lucide-react";
+import SMSInviteDialog from "./sms-invite-dialog";
 import { useToast } from "@/hooks/use-toast";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { apiRequest } from "@/lib/queryClient";
@@ -180,6 +181,10 @@ export function LeagueInviteGenerator({ leagueId, leagueName }: LeagueInviteGene
                       >
                         <Copy className="h-4 w-4" />
                       </Button>
+                      <SMSInviteDialog 
+                        leagueName={leagueName} 
+                        inviteCode={invite.inviteCode} 
+                      />
                       <Button
                         size="sm"
                         variant="destructive"

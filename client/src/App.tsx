@@ -11,6 +11,7 @@ import Concerts from "@/pages/concerts";
 import Leagues from "@/pages/leagues";
 import Admin from "@/pages/admin";
 import Login from "@/pages/login";
+import PhoneLogin from "@/pages/phone-login";
 import Register from "@/pages/register";
 import ForgotPassword from "@/pages/forgot-password";
 import ResetPassword from "@/pages/reset-password";
@@ -32,6 +33,7 @@ function Router() {
     return (
       <Switch>
         <Route path="/register" component={Register} />
+        <Route path="/phone-login" component={PhoneLogin} />
         <Route path="/forgot-password" component={ForgotPassword} />
         <Route path="/reset-password/:token" component={ResetPassword} />
         <Route path="/join/:inviteCode" component={JoinLeague} />
