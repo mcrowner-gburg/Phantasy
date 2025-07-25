@@ -98,10 +98,16 @@ export function setupAuth(app: express.Application) {
         return res.status(401).json({ message: 'Invalid credentials' });
       }
 
-      // Set session
+      // Set session with both userId and user object for compatibility
       (req.session as any).userId = user.id;
+      (req.session as any).user = { 
+        id: user.id, 
+        username: user.username, 
+        email: user.email, 
+        role: user.role || 'user' 
+      };
 
-      res.json({ user: { id: user.id, username: user.username, email: user.email, totalPoints: user.totalPoints } });
+      res.json({ user: { id: user.id, username: user.username, email: user.email, totalPoints: user.totalPoints, role: user.role || 'user' } });
     } catch (error) {
       console.error('Login error:', error);
       res.status(500).json({ message: 'Internal server error' });
@@ -129,7 +135,7 @@ export function setupAuth(app: express.Application) {
         return res.status(404).json({ message: 'User not found' });
       }
 
-      res.json({ user: { id: user.id, username: user.username, email: user.email, totalPoints: user.totalPoints } });
+      res.json({ user: { id: user.id, username: user.username, email: user.email, totalPoints: user.totalPoints, role: user.role || 'user' } });
     } catch (error) {
       console.error('User fetch error:', error);
       res.status(500).json({ message: 'Internal server error' });

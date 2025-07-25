@@ -7,7 +7,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogTrigger } from "@/components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Settings, Edit, Calendar, Music, Users, TrendingUp, AlertCircle } from "lucide-react";
@@ -357,6 +357,9 @@ export default function Admin() {
         <DialogContent className="bg-gray-900 border-gray-600">
           <DialogHeader>
             <DialogTitle className="text-white">Adjust Points</DialogTitle>
+            <DialogDescription className="text-gray-400">
+              Manually adjust the points awarded for this song performance.
+            </DialogDescription>
           </DialogHeader>
           <div className="space-y-4">
             <div className="grid grid-cols-2 gap-4">
