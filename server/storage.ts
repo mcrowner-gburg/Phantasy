@@ -9,6 +9,7 @@ import {
   SongPerformance, 
   Activity,
   PasswordResetToken,
+  PointAdjustment,
   InsertUser,
   InsertTour,
   InsertLeague,
@@ -16,6 +17,7 @@ import {
   InsertConcert,
   InsertSongPerformance,
   InsertPasswordResetToken,
+  InsertPointAdjustment,
   users,
   tours,
   leagues,
@@ -25,7 +27,8 @@ import {
   songPerformances,
   activities,
   leagueMembers,
-  passwordResetTokens
+  passwordResetTokens,
+  pointAdjustments
 } from "@shared/schema";
 import { db } from "./db";
 import { eq, and, sql } from "drizzle-orm";
@@ -93,6 +96,16 @@ export interface IStorage {
 
   // Leaderboard
   getLeagueStandings(leagueId: number): Promise<(User & { rank: number; todayPoints: number; songCount: number })[]>;
+
+  // Admin operations
+  isUserAdmin(userId: number): Promise<boolean>;
+  getShowPointsForAdmin(leagueId: number, concertId: number): Promise<{
+    concert: Concert,
+    songPerformances: (SongPerformance & { song: Song, draftedBy?: { userId: number, username: string }[] })[]
+  } | undefined>;
+  createPointAdjustment(adjustment: InsertPointAdjustment): Promise<PointAdjustment>;
+  getPointAdjustments(leagueId: number, concertId?: number): Promise<(PointAdjustment & { song: Song, user?: User, adjustedByUser: User })[]>;
+  updateUserPointsAfterAdjustment(userId: number, pointsDifference: number): Promise<void>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -886,6 +899,112 @@ export class DatabaseStorage implements IStorage {
       ...user,
       rank: index + 1,
     }));
+  }
+
+  // Admin operations
+  async isUserAdmin(userId: number): Promise<boolean> {
+    const user = await this.getUser(userId);
+    return user?.role === "admin";
+  }
+
+  async getShowPointsForAdmin(leagueId: number, concertId: number): Promise<{
+    concert: Concert,
+    songPerformances: (SongPerformance & { song: Song, draftedBy?: { userId: number, username: string }[] })[]
+  } | undefined> {
+    // Get concert
+    const [concert] = await db.select().from(concerts).where(eq(concerts.id, concertId));
+    if (!concert) return undefined;
+
+    // Get song performances for this concert
+    const performances = await db
+      .select({
+        id: songPerformances.id,
+        concertId: songPerformances.concertId,
+        songId: songPerformances.songId,
+        setNumber: songPerformances.setNumber,
+        position: songPerformances.position,
+        isOpener: songPerformances.isOpener,
+        isEncore: songPerformances.isEncore,
+        notes: songPerformances.notes,
+        song: songs
+      })
+      .from(songPerformances)
+      .innerJoin(songs, eq(songPerformances.songId, songs.id))
+      .where(eq(songPerformances.concertId, concertId));
+
+    // For each performance, get users who drafted this song in this league
+    const performancesWithDrafts = await Promise.all(
+      performances.map(async (perf) => {
+        const drafters = await db
+          .select({
+            userId: users.id,
+            username: users.username
+          })
+          .from(draftedSongs)
+          .innerJoin(users, eq(draftedSongs.userId, users.id))
+          .where(and(
+            eq(draftedSongs.songId, perf.songId!),
+            eq(draftedSongs.leagueId, leagueId)
+          ));
+
+        return {
+          ...perf,
+          draftedBy: drafters
+        };
+      })
+    );
+
+    return {
+      concert,
+      songPerformances: performancesWithDrafts
+    };
+  }
+
+  async createPointAdjustment(adjustment: InsertPointAdjustment): Promise<PointAdjustment> {
+    const [newAdjustment] = await db
+      .insert(pointAdjustments)
+      .values(adjustment)
+      .returning();
+    return newAdjustment;
+  }
+
+  async getPointAdjustments(leagueId: number, concertId?: number): Promise<(PointAdjustment & { song: Song, user?: User, adjustedByUser: User })[]> {
+    let query = db
+      .select({
+        id: pointAdjustments.id,
+        leagueId: pointAdjustments.leagueId,
+        concertId: pointAdjustments.concertId,
+        songId: pointAdjustments.songId,
+        userId: pointAdjustments.userId,
+        originalPoints: pointAdjustments.originalPoints,
+        adjustedPoints: pointAdjustments.adjustedPoints,
+        reason: pointAdjustments.reason,
+        adjustedBy: pointAdjustments.adjustedBy,
+        createdAt: pointAdjustments.createdAt,
+        song: songs,
+        user: users,
+        adjustedByUser: sql<User>`admin_user.*`
+      })
+      .from(pointAdjustments)
+      .innerJoin(songs, eq(pointAdjustments.songId, songs.id))
+      .leftJoin(users, eq(pointAdjustments.userId, users.id))
+      .innerJoin(sql`${users} as admin_user`, sql`${pointAdjustments.adjustedBy} = admin_user.id`)
+      .where(eq(pointAdjustments.leagueId, leagueId));
+
+    if (concertId) {
+      query = query.where(eq(pointAdjustments.concertId, concertId));
+    }
+
+    return await query;
+  }
+
+  async updateUserPointsAfterAdjustment(userId: number, pointsDifference: number): Promise<void> {
+    await db
+      .update(users)
+      .set({
+        totalPoints: sql`${users.totalPoints} + ${pointsDifference}`
+      })
+      .where(eq(users.id, userId));
   }
 }
 

@@ -14,6 +14,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Set up authentication middleware
   setupAuth(app);
 
+  // Admin routes
+  app.use("/api/admin", adminRoutes);
+
   // User routes
   app.get("/api/users/:id", async (req, res) => {
     try {

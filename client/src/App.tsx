@@ -9,6 +9,7 @@ import Draft from "@/pages/draft";
 import Leaderboard from "@/pages/leaderboard";
 import Concerts from "@/pages/concerts";
 import Leagues from "@/pages/leagues";
+import Admin from "@/pages/admin";
 import Login from "@/pages/login";
 import Register from "@/pages/register";
 import ForgotPassword from "@/pages/forgot-password";
@@ -46,6 +47,7 @@ function Router() {
       <Route path="/leaderboard" component={Leaderboard} />
       <Route path="/concerts" component={Concerts} />
       <Route path="/leagues" component={Leagues} />
+      <Route path="/admin" component={Admin} />
       <Route component={NotFound} />
     </Switch>
   );

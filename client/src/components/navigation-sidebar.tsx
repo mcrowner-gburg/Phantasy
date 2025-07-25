@@ -1,10 +1,11 @@
 import { Link, useLocation } from "wouter";
-import { Music, Home, Trophy, Calendar, Users, User, Menu, X } from "lucide-react";
+import { Music, Home, Trophy, Calendar, Users, User, Menu, X, Settings } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
 import { useState } from "react";
 import UserMenu from "@/components/user-menu";
+import { useAuth } from "@/hooks/useAuth";
 
 interface NavigationSidebarProps {
   user?: {
@@ -17,14 +18,20 @@ interface NavigationSidebarProps {
 export function NavigationSidebar({ user }: NavigationSidebarProps) {
   const [location] = useLocation();
   const [isOpen, setIsOpen] = useState(false);
+  const { user: authUser } = useAuth();
 
-  const navItems = [
+  const baseNavItems = [
     { path: "/", icon: Home, label: "Dashboard" },
     { path: "/draft", icon: Music, label: "Song Draft" },
     { path: "/leaderboard", icon: Trophy, label: "Leaderboard" },
     { path: "/concerts", icon: Calendar, label: "Concerts" },
     { path: "/leagues", icon: Users, label: "My Leagues" },
   ];
+
+  // Add admin link if user is admin
+  const navItems = authUser?.role === "admin" 
+    ? [...baseNavItems, { path: "/admin", icon: Settings, label: "Admin Panel" }]
+    : baseNavItems;
 
   const SidebarContent = () => (
     <div className="h-full flex flex-col">
@@ -50,6 +57,9 @@ export function NavigationSidebar({ user }: NavigationSidebarProps) {
               >
                 <item.icon className="mr-3" size={20} />
                 <span className="font-medium">{item.label}</span>
+                {item.path === "/admin" && (
+                  <Badge className="ml-auto bg-orange-500 text-black text-xs">ADMIN</Badge>
+                )}
               </Link>
             );
           })}

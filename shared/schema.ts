@@ -18,6 +18,7 @@ export const users = pgTable("users", {
   username: text("username").notNull().unique(),
   email: text("email").notNull().unique(),
   password: text("password").notNull(),
+  role: text("role").default("user"), // "admin", "user"
   totalPoints: integer("total_points").default(0),
   createdAt: timestamp("created_at").defaultNow(),
 });
@@ -117,11 +118,25 @@ export const activities = pgTable("activities", {
   createdAt: timestamp("created_at").defaultNow(),
 });
 
+export const pointAdjustments = pgTable("point_adjustments", {
+  id: serial("id").primaryKey(),
+  leagueId: integer("league_id").references(() => leagues.id).notNull(),
+  concertId: integer("concert_id").references(() => concerts.id).notNull(),
+  songId: integer("song_id").references(() => songs.id).notNull(),
+  userId: integer("user_id").references(() => users.id), // User who drafted the song
+  originalPoints: integer("original_points").default(0),
+  adjustedPoints: integer("adjusted_points").default(0),
+  reason: text("reason"), // Admin note for the adjustment
+  adjustedBy: integer("adjusted_by").references(() => users.id).notNull(), // Admin who made the adjustment
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
 // Insert schemas
 export const insertUserSchema = createInsertSchema(users).pick({
   username: true,
   email: true,
   password: true,
+  role: true,
   totalPoints: true,
 });
 
@@ -173,6 +188,17 @@ export const insertPasswordResetTokenSchema = createInsertSchema(passwordResetTo
   expiresAt: true,
 });
 
+export const insertPointAdjustmentSchema = createInsertSchema(pointAdjustments).pick({
+  leagueId: true,
+  concertId: true,
+  songId: true,
+  userId: true,
+  originalPoints: true,
+  adjustedPoints: true,
+  reason: true,
+  adjustedBy: true,
+});
+
 // Types
 export type User = typeof users.$inferSelect;
 export type InsertUser = z.infer<typeof insertUserSchema>;
@@ -191,3 +217,5 @@ export type Activity = typeof activities.$inferSelect;
 export type LeagueMember = typeof leagueMembers.$inferSelect;
 export type PasswordResetToken = typeof passwordResetTokens.$inferSelect;
 export type InsertPasswordResetToken = z.infer<typeof insertPasswordResetTokenSchema>;
+export type PointAdjustment = typeof pointAdjustments.$inferSelect;
+export type InsertPointAdjustment = z.infer<typeof insertPointAdjustmentSchema>;
