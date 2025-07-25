@@ -115,6 +115,78 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Get league by ID
+  app.get("/api/leagues/:id", requireAuth, async (req, res) => {
+    try {
+      const leagueId = parseInt(req.params.id);
+      const league = await storage.getLeague(leagueId);
+      
+      if (!league) {
+        return res.status(404).json({ message: "League not found" });
+      }
+      
+      res.json(league);
+    } catch (error) {
+      console.error("Error fetching league:", error);
+      res.status(500).json({ message: "Failed to fetch league" });
+    }
+  });
+
+  // Update league by ID
+  app.patch("/api/leagues/:id", requireAuth, async (req, res) => {
+    try {
+      const leagueId = parseInt(req.params.id);
+      const updates = req.body;
+      
+      // Check if user is league owner or admin
+      const league = await storage.getLeague(leagueId);
+      if (!league) {
+        return res.status(404).json({ message: "League not found" });
+      }
+      
+      const userId = (req as any).userId;
+      const user = await storage.getUser(userId);
+      const userRole = user?.role;
+      
+      if (league.ownerId !== userId && userRole !== "admin") {
+        return res.status(403).json({ message: "Not authorized to update this league" });
+      }
+      
+      const updatedLeague = await storage.updateLeague(leagueId, updates);
+      res.json(updatedLeague);
+    } catch (error) {
+      console.error("Error updating league:", error);
+      res.status(500).json({ message: "Failed to update league" });
+    }
+  });
+
+  // Delete league by ID
+  app.delete("/api/leagues/:id", requireAuth, async (req, res) => {
+    try {
+      const leagueId = parseInt(req.params.id);
+      
+      // Check if user is league owner or admin
+      const league = await storage.getLeague(leagueId);
+      if (!league) {
+        return res.status(404).json({ message: "League not found" });
+      }
+      
+      const userId = (req as any).userId;
+      const user = await storage.getUser(userId);
+      const userRole = user?.role;
+      
+      if (league.ownerId !== userId && userRole !== "admin") {
+        return res.status(403).json({ message: "Not authorized to delete this league" });
+      }
+      
+      await storage.deleteLeague(leagueId);
+      res.json({ message: "League deleted successfully" });
+    } catch (error) {
+      console.error("Error deleting league:", error);
+      res.status(500).json({ message: "Failed to delete league" });
+    }
+  });
+
   // Join league by invite code
   app.post("/api/leagues/join/:inviteCode", requireAuth, async (req, res) => {
     try {

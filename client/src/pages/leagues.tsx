@@ -300,6 +300,15 @@ export default function Leagues() {
                         <Eye className="mr-2" size={14} />
                         View
                       </Button>
+                      {user?.id === league.ownerId && (
+                        <Button 
+                          variant="outline"
+                          className="border-gray-600 text-white text-sm px-3"
+                          onClick={() => setLocation(`/leagues/${league.id}/settings`)}
+                        >
+                          <Settings className="h-4 w-4" />
+                        </Button>
+                      )}
                     </div>
                   </CardContent>
                 </Card>

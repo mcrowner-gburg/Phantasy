@@ -51,6 +51,7 @@ export const leagues = pgTable("leagues", {
   description: text("description"),
   tourId: integer("tour_id").references(() => tours.id),
   ownerId: integer("owner_id").references(() => users.id),
+  isPublic: boolean("is_public").default(true),
   maxPlayers: integer("max_players").default(24),
   draftStatus: text("draft_status").default("scheduled"), // scheduled, active, completed, paused
   draftDate: timestamp("draft_date"), // When the draft is scheduled to start
@@ -59,6 +60,8 @@ export const leagues = pgTable("leagues", {
   currentRound: integer("current_round").default(1), // Current round
   currentPlayer: integer("current_player"), // User ID of whose turn it is
   pickTimeLimit: integer("pick_time_limit").default(90), // Seconds per pick
+  seasonStartDate: timestamp("season_start_date"), // Start of scoring period
+  seasonEndDate: timestamp("season_end_date"), // End of scoring period
   createdAt: timestamp("created_at").defaultNow(),
 });
 

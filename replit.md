@@ -180,6 +180,19 @@ PhishDraft is a fantasy sports application specifically designed for Phish conce
 - **Auto-Advancement**: Draft automatically advances turns and completes when all rounds finished
 - **Live Updates**: Real-time polling for draft status, picks, and available songs during active drafts
 
+### July 25, 2025 - League Season Date Range Implementation
+- **NEW**: Complete league season date range functionality for time-bounded fantasy leagues
+- **Database Schema**: Added seasonStartDate and seasonEndDate columns to leagues table
+- **League Settings Page**: Created comprehensive league settings interface at /leagues/:id/settings
+- **Scoring Period Control**: League owners can set specific date ranges for scoring (e.g., "Winter Run 2025", "Spring Tour 2025")
+- **Point Calculation Logic**: Only concerts within the league's season date range contribute to player points
+- **API Endpoints**: Added PATCH /api/leagues/:id and DELETE /api/leagues/:id for league management
+- **Permission System**: League owners and global admins can modify league settings and delete leagues
+- **Settings Navigation**: Added settings button to leagues page (visible only to league owners)
+- **Date Validation**: Frontend and backend validation ensures end date is after start date
+- **Flexible Seasons**: Supports custom fantasy seasons independent of traditional Phish tour boundaries
+- **Example Use Cases**: "NYE Run 2024" (12/28/2024 - 1/2/2025), "Summer Tour 2025" (6/1/2025 - 9/1/2025)
+
 ## User Preferences
 
 Preferred communication style: Simple, everyday language.

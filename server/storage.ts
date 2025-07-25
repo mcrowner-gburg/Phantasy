@@ -257,6 +257,19 @@ export class DatabaseStorage implements IStorage {
     return newLeague;
   }
 
+  async updateLeague(leagueId: number, updates: Partial<League>): Promise<League> {
+    const [updatedLeague] = await db
+      .update(leagues)
+      .set(updates)
+      .where(eq(leagues.id, leagueId))
+      .returning();
+    return updatedLeague;
+  }
+
+  async deleteLeague(leagueId: number): Promise<void> {
+    await db.delete(leagues).where(eq(leagues.id, leagueId));
+  }
+
   async getUserLeagues(userId: number): Promise<League[]> {
     const userLeagues = await db
       .select({
