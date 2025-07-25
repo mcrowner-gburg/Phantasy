@@ -61,10 +61,15 @@ export default function Admin() {
   // Get point adjustments for selected league/concert
   const { data: adjustments } = useQuery({
     queryKey: ["/api/admin/adjustments/league", selectedLeague],
-    queryFn: () => 
-      selectedConcert 
-        ? fetch(`/api/admin/adjustments/league/${selectedLeague}?concertId=${selectedConcert}`)
-        : fetch(`/api/admin/adjustments/league/${selectedLeague}`),
+    queryFn: async () => {
+      const url = selectedConcert 
+        ? `/api/admin/adjustments/league/${selectedLeague}?concertId=${selectedConcert}`
+        : `/api/admin/adjustments/league/${selectedLeague}`;
+      const response = await fetch(url);
+      if (!response.ok) throw new Error('Failed to fetch adjustments');
+      const data = await response.json();
+      return Array.isArray(data) ? data : [];
+    },
     enabled: !!(selectedLeague && isAdmin),
   });
 
@@ -137,7 +142,7 @@ export default function Admin() {
 
   // Calculate adjusted points for a specific user and song performance
   const calculateAdjustedPoints = (performance: any, userId: number) => {
-    if (!adjustments) return calculateOriginalPoints(performance);
+    if (!adjustments || !Array.isArray(adjustments)) return calculateOriginalPoints(performance);
     
     const adjustment = adjustments.find((adj: any) => 
       adj.songId === performance.song.id && 
@@ -150,7 +155,7 @@ export default function Admin() {
 
   // Get adjustment info for a specific user and song performance
   const getAdjustmentInfo = (performance: any, userId: number) => {
-    if (!adjustments) return null;
+    if (!adjustments || !Array.isArray(adjustments)) return null;
     
     return adjustments.find((adj: any) => 
       adj.songId === performance.song.id && 
