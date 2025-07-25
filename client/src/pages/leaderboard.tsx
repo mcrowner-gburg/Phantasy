@@ -4,11 +4,13 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Crown, Trophy, User, Medal, TrendingUp } from "lucide-react";
 import { useAuth } from "@/hooks/useAuth";
+import { useLocation } from "wouter";
 
 
 
 export default function Leaderboard() {
   const { user } = useAuth();
+  const [, setLocation] = useLocation();
   
   // Get user's first league as default
   const { data: leagues } = useQuery({
@@ -154,9 +156,10 @@ export default function Leaderboard() {
                   {standings.map((player: any, index: number) => (
                     <div
                       key={player.id}
-                      className={`flex items-center justify-between p-4 rounded-lg transition-colors hover:bg-black hover:bg-opacity-50 ${
+                      className={`flex items-center justify-between p-4 rounded-lg transition-colors hover:bg-black hover:bg-opacity-50 cursor-pointer ${
                         index < 3 ? "bg-black bg-opacity-30" : "bg-black bg-opacity-20"
                       }`}
+                      onClick={() => setLocation("/profile")}
                     >
                       <div className="flex items-center space-x-4">
                         <Badge className={`w-10 h-10 rounded-full flex items-center justify-center font-bold ${getRankBadgeColor(player.rank)}`}>
@@ -198,7 +201,14 @@ export default function Leaderboard() {
                 <div className="text-center py-12 phish-text">
                   <Trophy className="mx-auto mb-4" size={48} />
                   <p className="text-lg mb-2">No standings available</p>
-                  <p>Join a league to see standings here!</p>
+                  <p>
+                    <button 
+                      className="text-green-400 hover:text-green-300 underline"
+                      onClick={() => setLocation("/leagues")}
+                    >
+                      Join a league
+                    </button> to see standings here!
+                  </p>
                 </div>
               )}
             </CardContent>

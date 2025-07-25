@@ -4,6 +4,7 @@ import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { format } from "date-fns";
 import { useState, useMemo } from "react";
+import { useLocation } from "wouter";
 
 interface DraftedSong {
   id: number;
@@ -29,6 +30,7 @@ interface DraftedSongsProps {
 export default function DraftedSongs({ draftedSongs, onDraftClick }: DraftedSongsProps) {
   const [categoryFilter, setCategoryFilter] = useState<string>("all");
   const [pointsFilter, setPointsFilter] = useState<string>("all");
+  const [, setLocation] = useLocation();
   
   // Get unique categories from drafted songs
   const categories = useMemo(() => {
@@ -81,7 +83,7 @@ export default function DraftedSongs({ draftedSongs, onDraftClick }: DraftedSong
         <div className="flex flex-col sm:flex-row space-y-2 sm:space-y-0 sm:space-x-3">
           <Button 
             className="gradient-button px-4 py-2 rounded-lg text-sm font-medium hover:opacity-90 transition-opacity"
-            onClick={onDraftClick}
+            onClick={onDraftClick || (() => setLocation("/draft"))}
           >
             <Plus className="mr-2" size={16} />
             Draft Song
@@ -155,7 +157,11 @@ export default function DraftedSongs({ draftedSongs, onDraftClick }: DraftedSong
             </thead>
             <tbody className="divide-y divide-gray-700">
               {filteredSongs.map((draft) => (
-                <tr key={draft.id} className="hover:bg-black hover:bg-opacity-30 transition-colors">
+                <tr 
+                  key={draft.id} 
+                  className="hover:bg-black hover:bg-opacity-30 transition-colors cursor-pointer"
+                  onClick={() => setLocation("/draft")}
+                >
                   <td className="py-4">
                     <div className="flex items-center space-x-3">
                       <div className="w-10 h-10 bg-gradient-to-r from-green-500 to-orange-500 rounded-lg flex items-center justify-center">

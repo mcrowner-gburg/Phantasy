@@ -293,6 +293,13 @@ export default function Concerts() {
                   <Calendar className="mx-auto mb-4" size={48} />
                   <p className="text-lg mb-2">No concerts scheduled</p>
                   <p>Check back later for upcoming Phish shows!</p>
+                  <Button 
+                    variant="outline" 
+                    className="mt-4 border-gray-600 hover:border-green-500"
+                    onClick={() => window.open("https://phish.net/tour", "_blank")}
+                  >
+                    View Tour Calendar
+                  </Button>
                 </div>
               )}
             </CardContent>

@@ -1,4 +1,5 @@
 import { Star, Trophy, Music, Calendar, TrendingUp } from "lucide-react";
+import { useLocation } from "wouter";
 
 interface StatsOverviewProps {
   stats: {
@@ -10,6 +11,7 @@ interface StatsOverviewProps {
 }
 
 export default function StatsOverview({ stats }: StatsOverviewProps) {
+  const [, setLocation] = useLocation();
   const statCards = [
     {
       title: "Total Points",
@@ -18,6 +20,7 @@ export default function StatsOverview({ stats }: StatsOverviewProps) {
       color: "score-gradient",
       change: "+12.5%",
       changeText: "from last week",
+      onClick: () => setLocation("/leaderboard"),
     },
     {
       title: "League Rank",
@@ -25,6 +28,7 @@ export default function StatsOverview({ stats }: StatsOverviewProps) {
       icon: Trophy,
       color: "bg-phish-green",
       changeText: "of 24 players",
+      onClick: () => setLocation("/leaderboard"),
     },
     {
       title: "Songs Drafted",
@@ -32,6 +36,7 @@ export default function StatsOverview({ stats }: StatsOverviewProps) {
       icon: Music,
       color: "bg-phish-orange",
       changeText: "2 slots remaining",
+      onClick: () => setLocation("/draft"),
     },
     {
       title: "Next Show",
@@ -39,13 +44,18 @@ export default function StatsOverview({ stats }: StatsOverviewProps) {
       icon: Calendar,
       color: "bg-purple-600",
       changeText: "Madison Square Garden",
+      onClick: () => setLocation("/concerts"),
     },
   ];
 
   return (
     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
       {statCards.map((stat, index) => (
-        <div key={index} className="glassmorphism rounded-xl p-6">
+        <div 
+          key={index} 
+          className="glassmorphism rounded-xl p-6 cursor-pointer hover:border-green-500 transition-colors"
+          onClick={stat.onClick}
+        >
           <div className="flex items-center justify-between">
             <div>
               <p className="text-phish-text text-sm font-medium">{stat.title}</p>

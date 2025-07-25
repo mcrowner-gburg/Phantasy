@@ -1,5 +1,6 @@
 import { Crown, User, Users } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { useLocation } from "wouter";
 
 interface LeagueStanding {
   id: number;
@@ -23,6 +24,7 @@ export default function LeagueStandings({
   leagueName,
   onViewFullStandings 
 }: LeagueStandingsProps) {
+  const [, setLocation] = useLocation();
   const getRankBadgeColor = (rank: number) => {
     switch (rank) {
       case 1:
@@ -95,7 +97,7 @@ export default function LeagueStandings({
           <Button 
             variant="link" 
             className="text-green-500 hover:text-green-400 text-sm font-medium p-0"
-            onClick={onViewFullStandings}
+            onClick={onViewFullStandings || (() => setLocation("/leaderboard"))}
           >
             View Full Standings
           </Button>

@@ -1,5 +1,6 @@
 import { Music, Star, Users } from "lucide-react";
 import { formatDistanceToNow } from "date-fns";
+import { useLocation } from "wouter";
 
 interface Activity {
   id: number;
@@ -15,6 +16,7 @@ interface RecentActivityProps {
 }
 
 export default function RecentActivity({ activities }: RecentActivityProps) {
+  const [, setLocation] = useLocation();
   const getActivityIcon = (type: string) => {
     switch (type) {
       case "draft":
@@ -59,7 +61,10 @@ export default function RecentActivity({ activities }: RecentActivityProps) {
     <div className="glassmorphism rounded-xl p-6">
       <div className="flex items-center justify-between mb-6">
         <h3 className="text-xl font-bold text-white">Recent Activity</h3>
-        <button className="text-phish-green hover:text-green-400 text-sm transition-colors">
+        <button 
+          className="text-phish-green hover:text-green-400 text-sm transition-colors"
+          onClick={() => setLocation("/draft")}
+        >
           View All
         </button>
       </div>

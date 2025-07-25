@@ -83,9 +83,10 @@ export default function Leagues() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/leagues"] });
       toast({
-        title: "Successfully joined league!",
-        description: "You can now draft songs and compete.",
+        title: "Joined league successfully!",
+        description: "Welcome to your new fantasy league!",
       });
+      setActiveTab("my-leagues");
     },
     onError: (error: any) => {
       toast({
@@ -95,6 +96,8 @@ export default function Leagues() {
       });
     },
   });
+
+
 
   const handleCreateLeague = () => {
     if (!newLeague.name.trim()) {
@@ -348,7 +351,11 @@ export default function Leagues() {
                           {joinLeagueMutation.isPending ? "Joining..." : 
                            league.memberCount >= league.maxPlayers ? "Full" : "Join League"}
                         </Button>
-                        <Button variant="outline" className="border-gray-600 p-2">
+                        <Button 
+                          variant="outline" 
+                          className="border-gray-600 p-2"
+                          onClick={() => setLocation(`/leaderboard?league=${league.id}`)}
+                        >
                           <Eye size={16} />
                         </Button>
                       </div>

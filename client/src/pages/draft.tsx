@@ -9,12 +9,14 @@ import { Music, Search, Plus, Check } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest } from "@/lib/queryClient";
 import { useAuth } from "@/hooks/useAuth";
+import { useLocation } from "wouter";
 
 export default function Draft() {
   const [searchQuery, setSearchQuery] = useState("");
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const { user } = useAuth();
+  const [, setLocation] = useLocation();
 
   // Use the first league as default for now
   const { data: leagues } = useQuery({
@@ -120,7 +122,14 @@ export default function Draft() {
                 <div className="text-center py-12 phish-text">
                   <Music className="mx-auto mb-4" size={48} />
                   <p className="text-lg mb-2">No songs found</p>
-                  <p>Try adjusting your search criteria.</p>
+                  <p>Try adjusting your search criteria or clear your search to see all songs.</p>
+                  <Button 
+                    variant="outline" 
+                    className="mt-4 border-gray-600 hover:border-green-500"
+                    onClick={() => setSearchQuery("")}
+                  >
+                    Clear Search
+                  </Button>
                 </div>
               ) : (
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
@@ -131,9 +140,14 @@ export default function Draft() {
                     return (
                       <Card
                         key={song.id}
-                        className={`bg-black bg-opacity-50 border transition-all hover:border-green-500 ${
+                        className={`bg-black bg-opacity-50 border transition-all hover:border-green-500 cursor-pointer ${
                           isDrafted ? "border-green-500 bg-green-500 bg-opacity-20" : "border-gray-600"
                         }`}
+                        onClick={() => {
+                          if (!isDrafted && canDraft) {
+                            draftMutation.mutate(song.id);
+                          }
+                        }}
                       >
                         <CardContent className="p-4">
                           <div className="flex items-start justify-between mb-3">

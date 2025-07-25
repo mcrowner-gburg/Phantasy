@@ -1,4 +1,5 @@
 import { format, isToday, isTomorrow, isThisYear } from "date-fns";
+import { useLocation } from "wouter";
 
 interface Concert {
   id: number;
@@ -14,6 +15,7 @@ interface UpcomingShowsProps {
 }
 
 export default function UpcomingShows({ shows }: UpcomingShowsProps) {
+  const [, setLocation] = useLocation();
   const getDateBadge = (dateString: string) => {
     const date = new Date(dateString);
     
@@ -58,7 +60,10 @@ export default function UpcomingShows({ shows }: UpcomingShowsProps) {
     <div className="glassmorphism rounded-xl p-6">
       <div className="flex items-center justify-between mb-6">
         <h3 className="text-xl font-bold text-white">Upcoming Shows</h3>
-        <button className="text-phish-green hover:text-green-400 text-sm transition-colors">
+        <button 
+          className="text-phish-green hover:text-green-400 text-sm transition-colors"
+          onClick={() => setLocation("/concerts")}
+        >
           View All
         </button>
       </div>
