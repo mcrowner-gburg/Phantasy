@@ -269,22 +269,27 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Song routes
-  app.get("/api/songs", async (req, res) => {
+  // Debug API endpoint to test direct API call - MUST BE BEFORE general songs route
+  app.get("/api/songs/debug", async (req, res) => {
     try {
-      const leagueId = req.query.leagueId ? parseInt(req.query.leagueId as string) : null;
+      console.log('🔧 DEBUG: Testing direct Phish.net API call...');
       
-      if (leagueId) {
-        // Return only available songs for this league (excluding already drafted)
-        const availableSongs = await storage.getAvailableSongsForLeague(leagueId);
-        res.json(availableSongs);
-      } else {
-        // Return all songs if no league specified
-        const songs = await storage.getAllSongs();
-        res.json(songs);
+      const apiKey = process.env.PHISH_NET_API_KEY;
+      if (!apiKey) {
+        return res.json({ error: 'API key not found' });
       }
+      
+      const response = await fetch(`https://api.phish.net/v5/songs.json?apikey=${apiKey}&limit=5`);
+      const data = await response.json();
+      
+      res.json({
+        status: response.status,
+        ok: response.ok,
+        data: data,
+        dataLength: (data.data || []).length
+      });
     } catch (error) {
-      res.status(500).json({ message: "Failed to fetch songs" });
+      res.json({ error: error.message });
     }
   });
 
@@ -292,22 +297,28 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.get("/api/songs", async (req, res) => {
     try {
       const leagueId = req.query.leagueId ? parseInt(req.query.leagueId as string) : null;
+      console.log(`🎵 Songs API endpoint called with leagueId: ${leagueId}`);
       
       // Use dynamic API to fetch songs
       const { phishApi } = await import('./services/phish-api');
+      console.log('🔄 Calling phishApi.getAllSongsForDraft()...');
       const allSongs = await phishApi.getAllSongsForDraft();
+      console.log(`📊 PhishAPI returned ${allSongs.length} songs`);
       
       if (leagueId) {
         // Filter out songs already drafted in this league
+        console.log(`🔍 Filtering for league ${leagueId}`);
         const draftedSongIds = await storage.getDraftedSongIdsForLeague(leagueId);
         const availableSongs = allSongs.filter(song => !draftedSongIds.includes(song.id));
+        console.log(`✅ Returning ${availableSongs.length} available songs for league`);
         res.json(availableSongs);
       } else {
         // Return all songs from API
+        console.log(`✅ Returning all ${allSongs.length} songs`);
         res.json(allSongs);
       }
     } catch (error) {
-      console.error("Error fetching songs:", error);
+      console.error("❌ Error fetching songs:", error);
       res.status(500).json({ message: "Failed to fetch songs" });
     }
   });

@@ -15,7 +15,7 @@ interface PhishNetSong {
   avg_gap: number;
 }
 
-// In-memory cache for songs - force complete refresh
+// In-memory cache for songs - CLEARED FOR DEBUG
 let songsCache: any[] = [];
 let songsCacheTimestamp = 0;
 const SONGS_CACHE_DURATION = 60 * 60 * 1000; // 1 hour
@@ -180,6 +180,7 @@ export class PhishNetService {
       // Check cache first
       const now = Date.now();
       if (songsCache.length > 0 && (now - songsCacheTimestamp) < SONGS_CACHE_DURATION) {
+        console.log(`Returning ${songsCache.length} cached songs from Phish.net API`);
         return songsCache;
       }
 
