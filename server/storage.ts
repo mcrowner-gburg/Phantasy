@@ -730,17 +730,24 @@ export class DatabaseStorage implements IStorage {
     console.log('Deleting expired tokens');
   }
 
-  // Concert operations - stub implementations
+  // Concert operations - database implementations
   async getConcerts(): Promise<Concert[]> {
-    return [];
+    console.log('DatabaseStorage.getConcerts() called');
+    const result = await db.select().from(concerts).orderBy(concerts.date);
+    console.log('Concerts query result:', result);
+    return result;
   }
 
   async getUpcomingConcerts(): Promise<Concert[]> {
-    return [];
+    const now = new Date();
+    return await db.select().from(concerts)
+      .where(sql`${concerts.date} > ${now}`)
+      .orderBy(concerts.date);
   }
 
   async createConcert(concert: InsertConcert): Promise<Concert> {
-    return { id: Date.now(), ...concert } as Concert;
+    const [newConcert] = await db.insert(concerts).values(concert).returning();
+    return newConcert;
   }
 
   async updateConcertSetlist(concertId: number, setlist: string[]): Promise<void> {
