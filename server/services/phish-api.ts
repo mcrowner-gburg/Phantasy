@@ -181,9 +181,9 @@ export class PhishNetService {
         return songsCache;
       }
 
-      console.log('Fetching fresh song catalog from Phish.net API...');
+      console.log('Fetching complete song catalog from Phish.net API...');
       const response = await fetch(
-        `${this.baseUrl}/songs.json?apikey=${this.apiKey}`
+        `${this.baseUrl}/songs.json?apikey=${this.apiKey}&limit=10000`
       );
 
       if (!response.ok) {
@@ -193,7 +193,7 @@ export class PhishNetService {
       const data = await response.json();
       const songs = data.data || [];
 
-      // Transform songs to match our expected format
+      // Transform ALL songs to match our expected format - no limits!
       songsCache = songs.map((song: any, index: number) => ({
         id: index + 1000, // Use high IDs to avoid conflicts with DB songs
         title: song.song || song.title,
@@ -205,11 +205,12 @@ export class PhishNetService {
       }));
 
       songsCacheTimestamp = now;
-      console.log(`Cached ${songsCache.length} songs from Phish.net API`);
+      console.log(`Cached ${songsCache.length} complete songs from Phish.net API - no limits!`);
       
       return songsCache;
     } catch (error) {
-      console.error("Error fetching songs for draft:", error);
+      console.error("Error fetching complete song catalog:", error);
+      console.log("Using expanded fallback song catalog...");
       // Return fallback if API fails
       return this.getFallbackSongs();
     }
@@ -272,13 +273,23 @@ export class PhishNetService {
   }
 
   private getFallbackSongs(): any[] {
+    // Expanded fallback with more authentic Phish songs if API fails
     return [
       { id: 1001, title: "Wilson", category: "classic", rarity_score: 25, total_plays: 300, plays_24_months: 11 },
       { id: 1002, title: "Fluffhead", category: "epic", rarity_score: 30, total_plays: 286, plays_24_months: 10 },
       { id: 1003, title: "Tweezer", category: "jam", rarity_score: 5, total_plays: 411, plays_24_months: 22 },
       { id: 1004, title: "You Enjoy Myself", category: "jam", rarity_score: 15, total_plays: 350, plays_24_months: 20 },
       { id: 1005, title: "Simple", category: "jam", rarity_score: 10, total_plays: 320, plays_24_months: 19 },
-      { id: 1006, title: "Ghost", category: "jam", rarity_score: 15, total_plays: 290, plays_24_months: 17 }
+      { id: 1006, title: "Ghost", category: "jam", rarity_score: 15, total_plays: 290, plays_24_months: 17 },
+      { id: 1007, title: "Harry Hood", category: "epic", rarity_score: 20, total_plays: 275, plays_24_months: 15 },
+      { id: 1008, title: "Run Like an Antelope", category: "rock", rarity_score: 18, total_plays: 280, plays_24_months: 16 },
+      { id: 1009, title: "Divided Sky", category: "composed", rarity_score: 35, total_plays: 250, plays_24_months: 8 },
+      { id: 1010, title: "Reba", category: "composed", rarity_score: 25, total_plays: 270, plays_24_months: 12 },
+      { id: 1011, title: "David Bowie", category: "jam", rarity_score: 22, total_plays: 260, plays_24_months: 14 },
+      { id: 1012, title: "Possum", category: "rock", rarity_score: 15, total_plays: 310, plays_24_months: 18 },
+      { id: 1013, title: "Mike's Song", category: "jam", rarity_score: 12, total_plays: 320, plays_24_months: 20 },
+      { id: 1014, title: "Weekapaug Groove", category: "jam", rarity_score: 12, total_plays: 315, plays_24_months: 19 },
+      { id: 1015, title: "Slave to the Traffic Light", category: "epic", rarity_score: 28, total_plays: 245, plays_24_months: 9 }
     ];
   }
 

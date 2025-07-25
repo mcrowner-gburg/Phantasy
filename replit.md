@@ -205,6 +205,7 @@ PhishDraft is a fantasy sports application specifically designed for Phish conce
 - **Fallback System**: Graceful fallback to curated song list if API is unavailable
 - **Performance Optimized**: In-memory caching prevents redundant API calls during active drafts
 - **Data Integrity**: Eliminates song database sync issues by using authoritative source data
+- **Complete Catalog Access**: Removed artificial song limits - now fetches entire Phish.net song catalog for maximum draft variety
 
 ## User Preferences
 
