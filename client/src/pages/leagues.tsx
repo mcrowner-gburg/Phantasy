@@ -9,7 +9,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
-import { Users, Plus, Trophy, Calendar, Settings, Eye } from "lucide-react";
+import { Users, Plus, Trophy, Calendar, Settings, Eye, Clock, Play } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest } from "@/lib/queryClient";
 
@@ -272,21 +272,33 @@ export default function Leagues() {
 
                     <div className="flex space-x-2 mt-6">
                       <Button 
-                        className="flex-1 gradient-button text-sm"
-                        onClick={() => setLocation(`/leaderboard?league=${league.id}`)}
+                        className={`flex-1 text-sm ${league.draftStatus === 'active' ? 'gradient-button' : 'bg-blue-600 hover:bg-blue-700 text-white'}`}
+                        onClick={() => setLocation(`/draft-room/${league.id}`)}
                       >
-                        View League
+                        {league.draftStatus === 'active' ? (
+                          <>
+                            <Play className="mr-2" size={14} />
+                            Join Draft
+                          </>
+                        ) : league.draftStatus === 'scheduled' ? (
+                          <>
+                            <Clock className="mr-2" size={14} />
+                            Draft Room
+                          </>
+                        ) : (
+                          <>
+                            <Trophy className="mr-2" size={14} />
+                            Draft
+                          </>
+                        )}
                       </Button>
                       <Button 
-                        variant="outline" 
-                        className="border-gray-600 p-2"
-                        onClick={() => {
-                          // For now, show a message that settings are coming soon
-                          // In the future, this would open a league settings dialog
-                          alert("League settings coming soon!");
-                        }}
+                        variant="outline"
+                        className="flex-1 border-gray-600 text-white text-sm"
+                        onClick={() => setLocation(`/leaderboard?league=${league.id}`)}
                       >
-                        <Settings size={16} />
+                        <Eye className="mr-2" size={14} />
+                        View
                       </Button>
                     </div>
                   </CardContent>

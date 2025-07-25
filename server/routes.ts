@@ -226,6 +226,113 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Draft management routes
+  app.post("/api/leagues/:id/schedule-draft", async (req, res) => {
+    try {
+      const leagueId = parseInt(req.params.id);
+      const { draftDate, draftRounds, pickTimeLimit } = req.body;
+      
+      if (!draftDate) {
+        return res.status(400).json({ message: "Draft date is required" });
+      }
+      
+      await storage.scheduleDraft(
+        leagueId, 
+        new Date(draftDate), 
+        draftRounds || 10, 
+        pickTimeLimit || 90
+      );
+      
+      res.json({ message: "Draft scheduled successfully" });
+    } catch (error: any) {
+      res.status(500).json({ message: error.message || "Failed to schedule draft" });
+    }
+  });
+
+  app.post("/api/leagues/:id/start-draft", async (req, res) => {
+    try {
+      const leagueId = parseInt(req.params.id);
+      await storage.startDraft(leagueId);
+      res.json({ message: "Draft started successfully" });
+    } catch (error: any) {
+      res.status(500).json({ message: error.message || "Failed to start draft" });
+    }
+  });
+
+  app.get("/api/leagues/:id/draft-status", async (req, res) => {
+    try {
+      const leagueId = parseInt(req.params.id);
+      const league = await storage.getDraftStatus(leagueId);
+      res.json(league);
+    } catch (error) {
+      res.status(500).json({ message: "Failed to get draft status" });
+    }
+  });
+
+  app.get("/api/leagues/:id/draft-order", async (req, res) => {
+    try {
+      const leagueId = parseInt(req.params.id);
+      const draftOrder = await storage.getDraftOrder(leagueId);
+      res.json(draftOrder);
+    } catch (error) {
+      res.status(500).json({ message: "Failed to get draft order" });
+    }
+  });
+
+  app.post("/api/leagues/:id/draft-order", async (req, res) => {
+    try {
+      const leagueId = parseInt(req.params.id);
+      const { userIds } = req.body;
+      
+      if (!Array.isArray(userIds)) {
+        return res.status(400).json({ message: "userIds must be an array" });
+      }
+      
+      await storage.setDraftOrder(leagueId, userIds);
+      res.json({ message: "Draft order set successfully" });
+    } catch (error: any) {
+      res.status(500).json({ message: error.message || "Failed to set draft order" });
+    }
+  });
+
+  app.get("/api/leagues/:id/draft-picks", async (req, res) => {
+    try {
+      const leagueId = parseInt(req.params.id);
+      const picks = await storage.getDraftPicks(leagueId);
+      res.json(picks);
+    } catch (error) {
+      res.status(500).json({ message: "Failed to get draft picks" });
+    }
+  });
+
+  app.post("/api/leagues/:id/draft-pick", async (req, res) => {
+    try {
+      const leagueId = parseInt(req.params.id);
+      const { userId, songId, timeUsed } = req.body;
+      
+      if (!userId || !songId) {
+        return res.status(400).json({ message: "userId and songId are required" });
+      }
+      
+      // Verify it's the user's turn
+      const league = await storage.getDraftStatus(leagueId);
+      if (league?.currentPlayer !== userId) {
+        return res.status(400).json({ message: "It's not your turn to pick" });
+      }
+      
+      // Verify song is available
+      const isTaken = await storage.isSongDraftedInLeague(songId, leagueId);
+      if (isTaken) {
+        return res.status(400).json({ message: "Song already drafted" });
+      }
+      
+      const pick = await storage.makeDraftPick(leagueId, userId, songId, timeUsed || 0);
+      res.json(pick);
+    } catch (error: any) {
+      res.status(500).json({ message: error.message || "Failed to make draft pick" });
+    }
+  });
+
   // Draft routes
   app.get("/api/drafted-songs", async (req, res) => {
     try {

@@ -17,6 +17,7 @@ import ForgotPassword from "@/pages/forgot-password";
 import ResetPassword from "@/pages/reset-password";
 import JoinLeague from "@/pages/join-league";
 import Profile from "@/pages/profile";
+import DraftRoom from "@/pages/draft-room";
 import NotFound from "@/pages/not-found";
 
 function Router() {
@@ -54,6 +55,7 @@ function Router() {
       <Route path="/leagues" component={Leagues} />
       <Route path="/admin" component={Admin} />
       <Route path="/profile" component={Profile} />
+      <Route path="/draft-room/:id" component={DraftRoom} />
       <Route path="/join/:inviteCode" component={JoinLeague} />
       <Route component={NotFound} />
     </Switch>

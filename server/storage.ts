@@ -34,7 +34,10 @@ import {
   leagueInvites,
   passwordResetTokens,
   pointAdjustments,
-  phoneVerificationCodes
+  phoneVerificationCodes,
+  draftPicks,
+  DraftPick,
+  InsertDraftPick
 } from "@shared/schema";
 import { db } from "./db";
 import { eq, and, sql, desc, count, or, not, gte, lte, asc, gt } from "drizzle-orm";
@@ -91,6 +94,17 @@ export interface IStorage {
   isSongDraftedInLeague(songId: number, leagueId: number): Promise<boolean>;
   getAllDraftedSongsInLeague(leagueId: number): Promise<number[]>;
   getAvailableSongsForLeague(leagueId: number): Promise<Song[]>;
+
+  // Draft management methods
+  scheduleDraft(leagueId: number, draftDate: Date, draftRounds?: number, pickTimeLimit?: number): Promise<void>;
+  startDraft(leagueId: number): Promise<void>;
+  getDraftStatus(leagueId: number): Promise<League | undefined>;
+  makeDraftPick(leagueId: number, userId: number, songId: number, timeUsed: number): Promise<DraftPick>;
+  getNextPlayer(leagueId: number): Promise<number | null>;
+  advanceDraft(leagueId: number): Promise<void>;
+  getDraftOrder(leagueId: number): Promise<(LeagueMember & { user: User })[]>;
+  setDraftOrder(leagueId: number, userIds: number[]): Promise<void>;
+  getDraftPicks(leagueId: number): Promise<(DraftPick & { user: User; song: Song })[]>;
 
   // Concerts
   getConcerts(): Promise<Concert[]>;
@@ -690,6 +704,237 @@ export class DatabaseStorage implements IStorage {
     
     // Filter out songs that are already drafted in this league
     return allSongs.filter(song => !draftedSongIds.includes(song.id));
+  }
+
+  // Draft management methods
+  async scheduleDraft(leagueId: number, draftDate: Date, draftRounds: number = 10, pickTimeLimit: number = 90): Promise<void> {
+    try {
+      await db
+        .update(leagues)
+        .set({
+          draftDate,
+          draftRounds,
+          pickTimeLimit,
+          draftStatus: "scheduled",
+          currentPick: 1,
+          currentRound: 1,
+        })
+        .where(eq(leagues.id, leagueId));
+    } catch (error) {
+      console.error("Error scheduling draft:", error);
+      throw new Error("Failed to schedule draft");
+    }
+  }
+
+  async startDraft(leagueId: number): Promise<void> {
+    try {
+      // Get league members and set draft positions if not already set
+      const members = await this.getLeagueMembers(leagueId);
+      
+      // Randomize draft order if positions not set
+      const membersNeedingPositions = members.filter(m => !m.draftPosition);
+      if (membersNeedingPositions.length > 0) {
+        const shuffled = [...membersNeedingPositions].sort(() => Math.random() - 0.5);
+        
+        for (let i = 0; i < shuffled.length; i++) {
+          await db
+            .update(leagueMembers)
+            .set({ draftPosition: i + 1 })
+            .where(eq(leagueMembers.id, shuffled[i].id));
+        }
+      }
+
+      // Get the first player (position 1)
+      const firstPlayer = members.find(m => m.draftPosition === 1)?.userId;
+      
+      await db
+        .update(leagues)
+        .set({
+          draftStatus: "active",
+          currentPlayer: firstPlayer,
+          currentPick: 1,
+          currentRound: 1,
+        })
+        .where(eq(leagues.id, leagueId));
+    } catch (error) {
+      console.error("Error starting draft:", error);
+      throw new Error("Failed to start draft");
+    }
+  }
+
+  async getDraftStatus(leagueId: number): Promise<League | undefined> {
+    return await this.getLeague(leagueId);
+  }
+
+  async makeDraftPick(leagueId: number, userId: number, songId: number, timeUsed: number): Promise<DraftPick> {
+    try {
+      const league = await this.getLeague(leagueId);
+      if (!league) throw new Error("League not found");
+
+      // Create draft pick record
+      const [draftPick] = await db
+        .insert(draftPicks)
+        .values({
+          leagueId,
+          userId,
+          songId,
+          pickNumber: league.currentPick || 1,
+          round: league.currentRound || 1,
+          timeUsed,
+          isAutoPick: false,
+        })
+        .returning();
+
+      // Create drafted song record for compatibility
+      await db
+        .insert(draftedSongs)
+        .values({
+          userId,
+          leagueId,
+          songId,
+          draftRound: league.currentRound || 1,
+          draftPick: league.currentPick || 1,
+          points: 0,
+          playedCount: 0,
+          openerCount: 0,
+          encoreCount: 0,
+          status: "active",
+        });
+
+      // Advance to next pick
+      await this.advanceDraft(leagueId);
+
+      return draftPick;
+    } catch (error) {
+      console.error("Error making draft pick:", error);
+      throw new Error("Failed to make draft pick");
+    }
+  }
+
+  async advanceDraft(leagueId: number): Promise<void> {
+    try {
+      const league = await this.getLeague(leagueId);
+      if (!league) return;
+
+      const members = await this.getLeagueMembers(leagueId);
+      const totalPlayers = members.length;
+      const maxPicks = (league.draftRounds || 10) * totalPlayers;
+
+      let nextPick = (league.currentPick || 1) + 1;
+      let nextRound = league.currentRound || 1;
+      let nextPlayer = league.currentPlayer;
+
+      // Check if draft is complete
+      if (nextPick > maxPicks) {
+        await db
+          .update(leagues)
+          .set({ draftStatus: "completed" })
+          .where(eq(leagues.id, leagueId));
+        return;
+      }
+
+      // Calculate next round and player
+      if (nextPick > nextRound * totalPlayers) {
+        nextRound++;
+      }
+
+      // Snake draft logic (even rounds go in reverse order)
+      const pickInRound = ((nextPick - 1) % totalPlayers) + 1;
+      const isEvenRound = nextRound % 2 === 0;
+      const draftPosition = isEvenRound ? totalPlayers - pickInRound + 1 : pickInRound;
+      
+      const nextMember = members.find(m => m.draftPosition === draftPosition);
+      nextPlayer = nextMember?.userId || nextPlayer;
+
+      await db
+        .update(leagues)
+        .set({
+          currentPick: nextPick,
+          currentRound: nextRound,
+          currentPlayer: nextPlayer,
+        })
+        .where(eq(leagues.id, leagueId));
+    } catch (error) {
+      console.error("Error advancing draft:", error);
+    }
+  }
+
+  async getDraftOrder(leagueId: number): Promise<(LeagueMember & { user: User })[]> {
+    const members = await this.getLeagueMembers(leagueId);
+    return members.sort((a, b) => (a.draftPosition || 0) - (b.draftPosition || 0));
+  }
+
+  async setDraftOrder(leagueId: number, userIds: number[]): Promise<void> {
+    try {
+      for (let i = 0; i < userIds.length; i++) {
+        const member = await db
+          .select()
+          .from(leagueMembers)
+          .where(and(eq(leagueMembers.leagueId, leagueId), eq(leagueMembers.userId, userIds[i])))
+          .limit(1);
+
+        if (member.length > 0) {
+          await db
+            .update(leagueMembers)
+            .set({ draftPosition: i + 1 })
+            .where(eq(leagueMembers.id, member[0].id));
+        }
+      }
+    } catch (error) {
+      console.error("Error setting draft order:", error);
+      throw new Error("Failed to set draft order");
+    }
+  }
+
+  async getDraftPicks(leagueId: number): Promise<(DraftPick & { user: User; song: Song })[]> {
+    try {
+      const picks = await db
+        .select({
+          id: draftPicks.id,
+          leagueId: draftPicks.leagueId,
+          userId: draftPicks.userId,
+          songId: draftPicks.songId,
+          pickNumber: draftPicks.pickNumber,
+          round: draftPicks.round,
+          timeUsed: draftPicks.timeUsed,
+          isAutoPick: draftPicks.isAutoPick,
+          pickedAt: draftPicks.pickedAt,
+          user: {
+            id: users.id,
+            username: users.username,
+            email: users.email,
+            password: users.password,
+            totalPoints: users.totalPoints,
+            createdAt: users.createdAt,
+          },
+        })
+        .from(draftPicks)
+        .innerJoin(users, eq(draftPicks.userId, users.id))
+        .where(eq(draftPicks.leagueId, leagueId))
+        .orderBy(asc(draftPicks.pickNumber));
+
+      const songs = await this.getAllSongs();
+      
+      return picks.map(pick => ({
+        ...pick,
+        song: songs.find(s => s.id === pick.songId) || {
+          id: pick.songId || 0,
+          title: "Unknown Song",
+          category: "Unknown",
+          rarityScore: 0,
+          lastPlayed: null,
+          totalPlays: 0
+        }
+      }));
+    } catch (error) {
+      console.error("Error fetching draft picks:", error);
+      return [];
+    }
+  }
+
+  async getNextPlayer(leagueId: number): Promise<number | null> {
+    const league = await this.getLeague(leagueId);
+    return league?.currentPlayer || null;
   }
 
   async getDraftedSongs(userId: number, leagueId: number): Promise<(DraftedSong & { song: Song })[]> {

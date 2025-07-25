@@ -52,7 +52,13 @@ export const leagues = pgTable("leagues", {
   tourId: integer("tour_id").references(() => tours.id),
   ownerId: integer("owner_id").references(() => users.id),
   maxPlayers: integer("max_players").default(24),
-  draftStatus: text("draft_status").default("active"), // active, completed, paused
+  draftStatus: text("draft_status").default("scheduled"), // scheduled, active, completed, paused
+  draftDate: timestamp("draft_date"), // When the draft is scheduled to start
+  draftRounds: integer("draft_rounds").default(10), // Number of rounds (songs per player)
+  currentPick: integer("current_pick").default(1), // Current overall pick number
+  currentRound: integer("current_round").default(1), // Current round
+  currentPlayer: integer("current_player"), // User ID of whose turn it is
+  pickTimeLimit: integer("pick_time_limit").default(90), // Seconds per pick
   createdAt: timestamp("created_at").defaultNow(),
 });
 
@@ -61,6 +67,7 @@ export const leagueMembers = pgTable("league_members", {
   leagueId: integer("league_id").references(() => leagues.id),
   userId: integer("user_id").references(() => users.id),
   role: text("role").default("member"), // "admin", "member"
+  draftPosition: integer("draft_position"), // 1, 2, 3, etc. - pick order in draft
   joinedAt: timestamp("joined_at").defaultNow(),
 });
 
@@ -95,6 +102,8 @@ export const draftedSongs = pgTable("drafted_songs", {
   openerCount: integer("opener_count").default(0), // Number of times as opener
   encoreCount: integer("encore_count").default(0), // Number of times as encore
   status: text("status").default("active"), // active, benched
+  draftRound: integer("draft_round"), // Which round this was drafted in
+  draftPick: integer("draft_pick"), // Overall pick number
   draftedAt: timestamp("drafted_at").defaultNow(),
 });
 
@@ -158,6 +167,22 @@ export const phoneVerificationCodes = pgTable("phone_verification_codes", {
 export type PhoneVerificationCode = typeof phoneVerificationCodes.$inferSelect;
 export type InsertPhoneVerificationCode = typeof phoneVerificationCodes.$inferInsert;
 
+// Draft picks table - tracks each individual pick in the draft
+export const draftPicks = pgTable("draft_picks", {
+  id: serial("id").primaryKey(),
+  leagueId: integer("league_id").references(() => leagues.id).notNull(),
+  userId: integer("user_id").references(() => users.id).notNull(),
+  songId: integer("song_id").references(() => songs.id),
+  pickNumber: integer("pick_number").notNull(), // Overall pick number (1, 2, 3...)
+  round: integer("round").notNull(), // Round number
+  timeUsed: integer("time_used"), // Seconds used for this pick
+  isAutoPick: boolean("is_auto_pick").default(false), // True if auto-drafted due to timeout
+  pickedAt: timestamp("picked_at").defaultNow(),
+});
+
+export type DraftPick = typeof draftPicks.$inferSelect;
+export type InsertDraftPick = typeof draftPicks.$inferInsert;
+
 // Insert schemas
 export const insertUserSchema = createInsertSchema(users).pick({
   username: true,
@@ -188,6 +213,16 @@ export const insertDraftedSongSchema = createInsertSchema(draftedSongs).pick({
   userId: true,
   leagueId: true,
   songId: true,
+});
+
+export const insertDraftPickSchema = createInsertSchema(draftPicks).pick({
+  leagueId: true,
+  userId: true,
+  songId: true,
+  pickNumber: true,
+  round: true,
+  timeUsed: true,
+  isAutoPick: true,
 });
 
 export const insertConcertSchema = createInsertSchema(concerts).pick({

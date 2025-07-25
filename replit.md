@@ -166,6 +166,20 @@ PhishDraft is a fantasy sports application specifically designed for Phish conce
 - **Fantasy Strategy**: Creates scarcity and strategic value - players must choose songs before others do
 - **Cache Management**: Song availability refreshes automatically after successful drafts
 
+### July 25, 2025 - Complete Real-Time Draft System Implementation (Yahoo Fantasy Football Style)
+- **NEW**: Comprehensive real-time draft system with scheduled draft times and turn-based picking
+- **Database Schema**: Enhanced leagues table with draft scheduling fields (draftDate, draftRounds, currentPick, currentPlayer, pickTimeLimit)
+- **Draft Tables**: Added draftPicks table for tracking individual picks and league_members.draftPosition for turn order
+- **Snake Draft Logic**: Implemented snake draft ordering (rounds alternate direction) with proper turn advancement
+- **Draft Management**: Created complete draft scheduling, starting, and turn-based pick system
+- **API Endpoints**: Added /api/leagues/:id/schedule-draft, start-draft, draft-status, draft-order, draft-pick, draft-picks
+- **Real-Time Interface**: Built comprehensive draft room with live updates, player queue, countdown timers, and available songs
+- **Draft States**: Support for scheduled, active, completed, and paused draft statuses
+- **League Integration**: Enhanced leagues page with draft room navigation based on draft status
+- **Turn Validation**: Server-side validation ensures only current player can make picks
+- **Auto-Advancement**: Draft automatically advances turns and completes when all rounds finished
+- **Live Updates**: Real-time polling for draft status, picks, and available songs during active drafts
+
 ## User Preferences
 
 Preferred communication style: Simple, everyday language.
