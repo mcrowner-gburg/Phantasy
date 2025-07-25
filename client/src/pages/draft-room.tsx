@@ -24,13 +24,13 @@ export default function DraftRoom() {
   const { data: league, isLoading: leagueLoading } = useQuery({
     queryKey: [`/api/leagues/${leagueId}/draft-status`],
     refetchInterval: 2000, // Poll every 2 seconds for real-time updates
-  });
+  }) as { data: any, isLoading: boolean };
 
   // Get draft order
   const { data: draftOrder, isLoading: draftOrderLoading } = useQuery({
     queryKey: [`/api/leagues/${leagueId}/draft-order`],
     enabled: !!leagueId,
-  });
+  }) as { data: any[], isLoading: boolean };
 
   // Get draft picks
   const { data: draftPicks } = useQuery({
