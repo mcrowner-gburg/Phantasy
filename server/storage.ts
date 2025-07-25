@@ -762,8 +762,32 @@ export class DatabaseStorage implements IStorage {
     }
   }
 
-  async getDraftStatus(leagueId: number): Promise<League | undefined> {
-    return await this.getLeague(leagueId);
+  async getDraftStatus(leagueId: number): Promise<League | null> {
+    try {
+      const [league] = await db
+        .select({
+          id: leagues.id,
+          name: leagues.name,
+          description: leagues.description,
+          tourId: leagues.tourId,
+          ownerId: leagues.ownerId,
+          isPublic: leagues.isPublic,
+          maxPlayers: leagues.maxPlayers,
+          createdAt: leagues.createdAt,
+          draftStatus: leagues.draftStatus,
+          currentPick: leagues.currentPick,
+          currentRound: leagues.currentRound,
+          currentPlayer: leagues.currentPlayer,
+          pickTimeLimit: leagues.pickTimeLimit,
+          draftRounds: leagues.draftRounds,
+        })
+        .from(leagues)
+        .where(eq(leagues.id, leagueId));
+      return league || null;
+    } catch (error) {
+      console.error("Error fetching draft status:", error);
+      throw error;
+    }
   }
 
   async makeDraftPick(leagueId: number, userId: number, songId: number, timeUsed: number): Promise<DraftPick> {
