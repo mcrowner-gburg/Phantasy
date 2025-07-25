@@ -288,6 +288,30 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Get all songs (dynamic API approach)
+  app.get("/api/songs", async (req, res) => {
+    try {
+      const leagueId = req.query.leagueId ? parseInt(req.query.leagueId as string) : null;
+      
+      // Use dynamic API to fetch songs
+      const { phishApi } = await import('./services/phish-api');
+      const allSongs = await phishApi.getAllSongsForDraft();
+      
+      if (leagueId) {
+        // Filter out songs already drafted in this league
+        const draftedSongIds = await storage.getDraftedSongIdsForLeague(leagueId);
+        const availableSongs = allSongs.filter(song => !draftedSongIds.includes(song.id));
+        res.json(availableSongs);
+      } else {
+        // Return all songs from API
+        res.json(allSongs);
+      }
+    } catch (error) {
+      console.error("Error fetching songs:", error);
+      res.status(500).json({ message: "Failed to fetch songs" });
+    }
+  });
+
   app.get("/api/songs/search", async (req, res) => {
     try {
       const { q } = req.query;
@@ -295,7 +319,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ message: "Search query required" });
       }
       
-      const songs = await storage.getAllSongs();
+      // Use dynamic API for search as well
+      const { phishApi } = await import('./services/phish-api');
+      const songs = await phishApi.getAllSongsForDraft();
       const filtered = songs.filter(song => 
         song.title.toLowerCase().includes((q as string).toLowerCase())
       );

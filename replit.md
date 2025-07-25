@@ -193,6 +193,19 @@ PhishDraft is a fantasy sports application specifically designed for Phish conce
 - **Flexible Seasons**: Supports custom fantasy seasons independent of traditional Phish tour boundaries
 - **Example Use Cases**: "NYE Run 2024" (12/28/2024 - 1/2/2025), "Summer Tour 2025" (6/1/2025 - 9/1/2025)
 
+### July 25, 2025 - Dynamic Song API System Implementation
+- **NEW**: Revolutionary dynamic song system using Phish.net API instead of static database
+- **Memory-Based Caching**: Songs cached in memory for 1 hour to minimize API calls while staying current
+- **On-Demand Persistence**: Songs only saved to database when actually drafted by users
+- **Real-Time Data**: All song statistics (total plays, rarity scores, categories) pulled fresh from authentic Phish.net data
+- **Smart Categorization**: Automatic song categorization (jam, epic, composed, rock, modern, rare, classic) based on song characteristics
+- **Rarity Calculation**: Dynamic rarity scoring based on actual total play counts from Phish.net
+- **API Integration**: Enhanced PhishNetService with getAllSongsForDraft(), getSongById(), and saveSongToDatabase() methods
+- **Draft Validation**: Songs validated against live API data before allowing draft picks
+- **Fallback System**: Graceful fallback to curated song list if API is unavailable
+- **Performance Optimized**: In-memory caching prevents redundant API calls during active drafts
+- **Data Integrity**: Eliminates song database sync issues by using authoritative source data
+
 ## User Preferences
 
 Preferred communication style: Simple, everyday language.

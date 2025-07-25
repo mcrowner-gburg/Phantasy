@@ -790,9 +790,11 @@ export class DatabaseStorage implements IStorage {
 
   async makeDraftPick(leagueId: number, userId: number, songId: number, timeUsed: number): Promise<DraftPick> {
     try {
-      // Validate that the song exists
-      const [song] = await db.select().from(songs).where(eq(songs.id, songId)).limit(1);
-      if (!song) {
+      // Get song data from API and save to database if drafting
+      const { phishApi } = await import('./services/phish-api');
+      const songData = await phishApi.getSongById(songId);
+      
+      if (!songData) {
         throw new Error("Invalid song ID");
       }
 
@@ -805,13 +807,22 @@ export class DatabaseStorage implements IStorage {
         throw new Error("Song already drafted in this league");
       }
 
+      // Save song to database when it's drafted (dynamic persistence)
+      let dbSongId = songId;
+      try {
+        const savedSong = await phishApi.saveSongToDatabase(songData);
+        dbSongId = savedSong.id;
+      } catch (saveError) {
+        console.log("Song may already exist in database, proceeding with API ID");
+      }
+
       // Create draft pick record
       const [draftPick] = await db
         .insert(draftPicks)
         .values({
           leagueId,
           userId,
-          songId,
+          songId: dbSongId, // Use database ID if saved, otherwise API ID
           pickNumber: league.currentPick || 1,
           round: league.currentRound || 1,
           timeUsed,
@@ -825,7 +836,7 @@ export class DatabaseStorage implements IStorage {
         .values({
           userId,
           leagueId,
-          songId,
+          songId: dbSongId,
           draftRound: league.currentRound || 1,
           draftPick: league.currentPick || 1,
           points: 0,
@@ -842,6 +853,20 @@ export class DatabaseStorage implements IStorage {
     } catch (error) {
       console.error("Error making draft pick:", error);
       throw new Error("Failed to make draft pick");
+    }
+  }
+
+  async getDraftedSongIdsForLeague(leagueId: number): Promise<number[]> {
+    try {
+      const picks = await db
+        .select({ songId: draftPicks.songId })
+        .from(draftPicks)
+        .where(eq(draftPicks.leagueId, leagueId));
+      
+      return picks.map(pick => pick.songId);
+    } catch (error) {
+      console.error("Error fetching drafted song IDs:", error);
+      return [];
     }
   }
 
