@@ -116,6 +116,17 @@ PhishDraft is a fantasy sports application specifically designed for Phish conce
 - **FIXED**: Admin concert data retrieval by implementing proper database storage for getConcerts() method
 - **WORKING**: Admin panel now fully functional with authentic concert and setlist data from database
 
+### July 25, 2025 - League-Specific Admin System Implementation
+- **NEW**: League-specific administration system alongside global admin capabilities
+- **League Admin Roles**: Added role column to league_members table with 'admin' and 'member' roles
+- **League Creator Admin**: League creators automatically become league admins with full management rights
+- **League Admin Middleware**: requireLeagueAdmin middleware checks both global admin and league-specific admin permissions
+- **League Admin Powers**: League admins can adjust points only within their specific leagues
+- **Promotion System**: League owners and global admins can promote other members to league admin status
+- **Admin Hierarchy**: Global admins > League owners > League admins > Regular members
+- **Security**: League-specific point adjustments require appropriate admin privileges for that league
+- **API Endpoints**: /api/admin/leagues/:leagueId/promote/:userId for promoting users to league admin
+
 ## User Preferences
 
 Preferred communication style: Simple, everyday language.

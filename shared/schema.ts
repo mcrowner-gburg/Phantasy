@@ -59,6 +59,7 @@ export const leagueMembers = pgTable("league_members", {
   id: serial("id").primaryKey(),
   leagueId: integer("league_id").references(() => leagues.id),
   userId: integer("user_id").references(() => users.id),
+  role: text("role").default("member"), // "admin", "member"
   joinedAt: timestamp("joined_at").defaultNow(),
 });
 

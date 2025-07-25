@@ -99,6 +99,8 @@ export interface IStorage {
 
   // Admin operations
   isUserAdmin(userId: number): Promise<boolean>;
+  isUserLeagueAdmin(userId: number, leagueId: number): Promise<boolean>;
+  promoteToLeagueAdmin(userId: number, leagueId: number): Promise<void>;
   getShowPointsForAdmin(leagueId: number, concertId: number): Promise<{
     concert: Concert,
     songPerformances: (SongPerformance & { song: Song, draftedBy?: { userId: number, username: string }[] })[]
@@ -909,6 +911,36 @@ export class DatabaseStorage implements IStorage {
   async isUserAdmin(userId: number): Promise<boolean> {
     const user = await this.getUser(userId);
     return user?.role === "admin";
+  }
+
+  async isUserLeagueAdmin(userId: number, leagueId: number): Promise<boolean> {
+    // Check if user is the league owner
+    const [league] = await db.select().from(leagues).where(eq(leagues.id, leagueId));
+    if (league?.ownerId === userId) {
+      return true;
+    }
+
+    // Check if user is a league admin
+    const [member] = await db
+      .select()
+      .from(leagueMembers)
+      .where(and(
+        eq(leagueMembers.leagueId, leagueId),
+        eq(leagueMembers.userId, userId),
+        eq(leagueMembers.role, 'admin')
+      ));
+    
+    return !!member;
+  }
+
+  async promoteToLeagueAdmin(userId: number, leagueId: number): Promise<void> {
+    await db
+      .update(leagueMembers)
+      .set({ role: 'admin' })
+      .where(and(
+        eq(leagueMembers.leagueId, leagueId),
+        eq(leagueMembers.userId, userId)
+      ));
   }
 
   async getShowPointsForAdmin(leagueId: number, concertId: number): Promise<{

@@ -1,15 +1,14 @@
 import { Router } from 'express';
 import { storage } from '../storage';
-import { requireAdmin, AuthenticatedRequest } from '../middleware/admin';
+import { requireAdmin, requireLeagueAdmin, AuthenticatedRequest } from '../middleware/admin';
 import { insertPointAdjustmentSchema } from '@shared/schema';
 
 const router = Router();
 
-// Apply admin middleware to all routes
-router.use(requireAdmin);
+// Note: Each route now has specific middleware requirements
 
-// Get show data for admin point adjustment
-router.get('/shows/:concertId/league/:leagueId', async (req: AuthenticatedRequest, res) => {
+// Get show data for admin point adjustment (requires league admin or global admin)
+router.get('/shows/:concertId/league/:leagueId', requireLeagueAdmin, async (req: AuthenticatedRequest, res) => {
   try {
     const concertId = parseInt(req.params.concertId);
     const leagueId = parseInt(req.params.leagueId);
@@ -30,8 +29,8 @@ router.get('/shows/:concertId/league/:leagueId', async (req: AuthenticatedReques
   }
 });
 
-// Create point adjustment
-router.post('/adjustments', async (req: AuthenticatedRequest, res) => {
+// Create point adjustment (requires league admin or global admin)
+router.post('/adjustments', requireLeagueAdmin, async (req: AuthenticatedRequest, res) => {
   try {
     const validatedData = insertPointAdjustmentSchema.parse({
       ...req.body,
@@ -63,8 +62,8 @@ router.post('/adjustments', async (req: AuthenticatedRequest, res) => {
   }
 });
 
-// Get point adjustments for a league/show
-router.get('/adjustments/league/:leagueId', async (req: AuthenticatedRequest, res) => {
+// Get point adjustments for a league/show (requires league admin or global admin)
+router.get('/adjustments/league/:leagueId', requireLeagueAdmin, async (req: AuthenticatedRequest, res) => {
   try {
     const leagueId = parseInt(req.params.leagueId);
     const concertId = req.query.concertId ? parseInt(req.query.concertId as string) : undefined;
@@ -100,6 +99,70 @@ router.get('/leagues', async (req: AuthenticatedRequest, res) => {
   } catch (error) {
     console.error('Error fetching leagues for admin:', error);
     res.status(500).json({ message: 'Failed to fetch leagues' });
+  }
+});
+
+// Promote user to league admin (only global admins or league owners)
+router.post('/leagues/:leagueId/promote/:userId', async (req: AuthenticatedRequest, res) => {
+  try {
+    if (!req.session?.user?.id) {
+      return res.status(401).json({ message: 'Not authenticated' });
+    }
+
+    const leagueId = parseInt(req.params.leagueId);
+    const userIdToPromote = parseInt(req.params.userId);
+
+    if (isNaN(leagueId) || isNaN(userIdToPromote)) {
+      return res.status(400).json({ message: 'Invalid league or user ID' });
+    }
+
+    // Check if current user is global admin or league owner
+    const isGlobalAdmin = await storage.isUserAdmin(req.session.user.id);
+    const league = await storage.getLeague(leagueId);
+    
+    if (!isGlobalAdmin && league?.ownerId !== req.session.user.id) {
+      return res.status(403).json({ message: 'Only global admins or league owners can promote members' });
+    }
+
+    await storage.promoteToLeagueAdmin(userIdToPromote, leagueId);
+    res.json({ message: 'User promoted to league admin successfully' });
+  } catch (error) {
+    console.error('Error promoting user to league admin:', error);
+    res.status(500).json({ message: 'Failed to promote user' });
+  }
+});
+
+// Get leagues user can admin (for league admin interface)
+router.get('/user-admin-leagues', async (req: AuthenticatedRequest, res) => {
+  try {
+    if (!req.session?.user?.id) {
+      return res.status(401).json({ message: 'Not authenticated' });
+    }
+
+    const userId = req.session.user.id;
+    
+    // Global admins can see all leagues
+    const isGlobalAdmin = await storage.isUserAdmin(userId);
+    if (isGlobalAdmin) {
+      const allLeagues = await storage.getAllLeagues();
+      return res.json(allLeagues);
+    }
+
+    // Otherwise, get leagues where user is admin or owner
+    const userLeagues = await storage.getUserLeagues(userId);
+    const adminLeagues = [];
+    
+    for (const league of userLeagues) {
+      const isLeagueAdmin = await storage.isUserLeagueAdmin(userId, league.id);
+      if (isLeagueAdmin) {
+        adminLeagues.push(league);
+      }
+    }
+
+    res.json(adminLeagues);
+  } catch (error) {
+    console.error('Error fetching user admin leagues:', error);
+    res.status(500).json({ message: 'Failed to fetch admin leagues' });
   }
 });
 
