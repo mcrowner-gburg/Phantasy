@@ -732,10 +732,7 @@ export class DatabaseStorage implements IStorage {
 
   // Concert operations - database implementations
   async getConcerts(): Promise<Concert[]> {
-    console.log('DatabaseStorage.getConcerts() called');
-    const result = await db.select().from(concerts).orderBy(concerts.date);
-    console.log('Concerts query result:', result);
-    return result;
+    return await db.select().from(concerts).orderBy(concerts.date);
   }
 
   async getUpcomingConcerts(): Promise<Concert[]> {
