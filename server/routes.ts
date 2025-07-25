@@ -136,7 +136,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.patch("/api/leagues/:id", requireAuth, async (req, res) => {
     try {
       const leagueId = parseInt(req.params.id);
-      const updates = req.body;
+      const updates = { ...req.body };
+      
+      // Convert date strings to Date objects for database
+      if (updates.seasonStartDate) {
+        updates.seasonStartDate = updates.seasonStartDate === 'null' ? null : new Date(updates.seasonStartDate);
+      }
+      if (updates.seasonEndDate) {
+        updates.seasonEndDate = updates.seasonEndDate === 'null' ? null : new Date(updates.seasonEndDate);
+      }
       
       // Check if user is league owner or admin
       const league = await storage.getLeague(leagueId);
