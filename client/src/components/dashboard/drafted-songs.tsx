@@ -32,8 +32,8 @@ export default function DraftedSongs({ draftedSongs, onDraftClick }: DraftedSong
   
   // Get unique categories from drafted songs
   const categories = useMemo(() => {
-    const uniqueCategories = [...new Set(draftedSongs?.map(song => song.song?.category).filter(Boolean))];
-    return uniqueCategories;
+    const categorySet = new Set(draftedSongs?.map(song => song.song?.category).filter(Boolean));
+    return Array.from(categorySet);
   }, [draftedSongs]);
 
   // Filter songs based on selected filters
