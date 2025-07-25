@@ -15,7 +15,7 @@ interface PhishNetSong {
   avg_gap: number;
 }
 
-// In-memory cache for songs - reset to force refresh
+// In-memory cache for songs - cache cleared to force API refresh
 let songsCache: any[] = [];
 let songsCacheTimestamp = 0;
 const SONGS_CACHE_DURATION = 60 * 60 * 1000; // 1 hour
@@ -29,6 +29,8 @@ export class PhishNetService {
       process.env.PHISH_NET_API_KEY ||
       process.env.PHISH_API_KEY ||
       "6F27E04F96EAC8C2C21B";
+    console.log(`Phish.net API initialized with key: ${this.apiKey ? 'PRESENT' : 'MISSING'}`);
+    console.log(`Using API key: ${this.apiKey.substring(0, 8)}...`);
   }
 
   async getUpcomingShows(): Promise<PhishNetShow[]> {
@@ -193,15 +195,15 @@ export class PhishNetService {
       const data = await response.json();
       console.log('API Response structure:', JSON.stringify(data, null, 2).substring(0, 500));
       
-      // Try multiple possible data structures from Phish.net API
-      const songs = data.data || data.response?.data || data.results || [];
+      // Phish.net v5 API returns data in .data array
+      const songs = data.data || [];
 
       // Transform ALL songs to match our expected format - no limits!
       songsCache = songs.map((song: any, index: number) => ({
-        id: index + 1000, // Use high IDs to avoid conflicts with DB songs
-        title: song.song || song.title,
-        category: this.categoryzeSong(song.song || song.title),
-        rarity_score: this.calculateRarityScore(song.times_played || 0),
+        id: song.songid || (index + 1000), // Use songid from API, fallback to index
+        title: song.song,
+        category: this.categoryzeSong(song.song),
+        rarity_score: this.calculateRarityScore(song.times_played || 0, song.gap || 0),
         total_plays: song.times_played || 0,
         last_played: song.last_played,
         plays_24_months: this.estimate24MonthPlays(song.times_played || 0)
