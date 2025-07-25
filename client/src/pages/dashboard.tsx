@@ -7,9 +7,11 @@ import { Bell, Plus, ArrowUp, Star, Trophy, Music, Calendar, Crown, Users, User 
 import DraftedSongs from "@/components/dashboard/drafted-songs";
 import { format } from "date-fns";
 import { useAuth } from "@/hooks/useAuth";
+import { useLocation } from "wouter";
 
 export default function Dashboard() {
   const { user: authUser } = useAuth();
+  const [, setLocation] = useLocation();
   
   // Extract user ID properly from auth structure
   const userId = authUser?.id || authUser?.user?.id;
@@ -70,7 +72,10 @@ export default function Dashboard() {
                   3
                 </Badge>
               </div>
-              <Button className="gradient-button px-6 py-2 rounded-full font-medium hover:opacity-90 transition-opacity">
+              <Button 
+                className="gradient-button px-6 py-2 rounded-full font-medium hover:opacity-90 transition-opacity"
+                onClick={() => setLocation("/leagues")}
+              >
                 <Plus className="mr-2" size={16} />
                 Join League
               </Button>
