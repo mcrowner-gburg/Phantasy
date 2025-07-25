@@ -34,7 +34,7 @@ export default function Admin() {
   // Check if user is admin
   const { data: isAdmin, isLoading: isCheckingAdmin } = useQuery({
     queryKey: ["/api/auth/user"],
-    select: (data: any) => data?.role === "admin",
+    select: (data: any) => data?.user?.role === "admin",
     enabled: !!user,
   });
 
