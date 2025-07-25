@@ -83,7 +83,13 @@ export default function Admin() {
       });
     },
     onSuccess: () => {
+      // Invalidate all related queries to refresh the data
       queryClient.invalidateQueries({ queryKey: ["/api/admin/adjustments"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/adjustments/league", selectedLeague] });
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/shows", selectedConcert, "league", selectedLeague] });
+      queryClient.invalidateQueries({ queryKey: ["/api/dashboard"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/leaderboard"] });
+      
       setIsAdjustmentDialogOpen(false);
       setAdjustmentForm({ songId: 0, userId: 0, originalPoints: 0, adjustedPoints: 0, reason: "" });
       toast({
@@ -127,6 +133,30 @@ export default function Admin() {
     if (performance.isOpener) points += 1;
     if (performance.isEncore) points += 1;
     return points;
+  }
+
+  // Calculate adjusted points for a specific user and song performance
+  const calculateAdjustedPoints = (performance: any, userId: number) => {
+    if (!adjustments) return calculateOriginalPoints(performance);
+    
+    const adjustment = adjustments.find((adj: any) => 
+      adj.songId === performance.song.id && 
+      adj.userId === userId &&
+      adj.concertId === selectedConcert
+    );
+    
+    return adjustment ? adjustment.adjustedPoints : calculateOriginalPoints(performance);
+  }
+
+  // Get adjustment info for a specific user and song performance
+  const getAdjustmentInfo = (performance: any, userId: number) => {
+    if (!adjustments) return null;
+    
+    return adjustments.find((adj: any) => 
+      adj.songId === performance.song.id && 
+      adj.userId === userId &&
+      adj.concertId === selectedConcert
+    );
   };
 
   const openAdjustmentDialog = (performance: any, drafter: any) => {
@@ -392,8 +422,29 @@ export default function Admin() {
                                   )}
                                 </div>
                               </TableCell>
-                              <TableCell className="text-green-400 font-bold">
-                                {calculateOriginalPoints(performance)}
+                              <TableCell>
+                                {performance.draftedBy?.map((drafter: any) => {
+                                  const originalPoints = calculateOriginalPoints(performance);
+                                  const adjustedPoints = calculateAdjustedPoints(performance, drafter.userId);
+                                  const hasAdjustment = originalPoints !== adjustedPoints;
+                                  
+                                  return (
+                                    <div key={drafter.userId} className="flex items-center gap-2 mb-1">
+                                      <span className="text-white text-sm">{drafter.username}:</span>
+                                      {hasAdjustment ? (
+                                        <div className="flex items-center gap-1">
+                                          <span className="text-gray-400 line-through text-sm">{originalPoints}</span>
+                                          <span className="text-green-400 font-bold">{adjustedPoints}</span>
+                                        </div>
+                                      ) : (
+                                        <span className="text-green-400 font-bold">{originalPoints}</span>
+                                      )}
+                                    </div>
+                                  );
+                                })}
+                                {!performance.draftedBy?.length && (
+                                  <span className="text-gray-500">-</span>
+                                )}
                               </TableCell>
                               <TableCell>
                                 {performance.draftedBy?.length > 0 ? (
@@ -418,10 +469,34 @@ export default function Admin() {
                                 )}
                               </TableCell>
                               <TableCell>
-                                <Badge variant="outline" className="border-gray-500 text-gray-400">
-                                  <TrendingUp className="mr-1" size={12} />
-                                  No adjustments
-                                </Badge>
+                                {performance.draftedBy?.map((drafter: any) => {
+                                  const adjustmentInfo = getAdjustmentInfo(performance, drafter.userId);
+                                  
+                                  return (
+                                    <div key={drafter.userId} className="mb-1">
+                                      {adjustmentInfo ? (
+                                        <div className="space-y-1">
+                                          <Badge className="bg-blue-500 text-white text-xs">
+                                            <TrendingUp className="mr-1" size={10} />
+                                            Adjusted by {adjustmentInfo.adjustedByUser?.username || 'Admin'}
+                                          </Badge>
+                                          {adjustmentInfo.reason && (
+                                            <div className="text-xs text-gray-400 max-w-32 truncate" title={adjustmentInfo.reason}>
+                                              {adjustmentInfo.reason}
+                                            </div>
+                                          )}
+                                        </div>
+                                      ) : (
+                                        <Badge variant="outline" className="border-gray-500 text-gray-400 text-xs">
+                                          Original
+                                        </Badge>
+                                      )}
+                                    </div>
+                                  );
+                                })}
+                                {!performance.draftedBy?.length && (
+                                  <span className="text-gray-500">-</span>
+                                )}
                               </TableCell>
                             </TableRow>
                           ))}
