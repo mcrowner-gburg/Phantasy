@@ -94,8 +94,8 @@ export default function DraftRoom() {
 
   // Timer effect for pick countdown
   useEffect(() => {
-    if (league?.draftStatus === "active" && league?.currentPlayer === user?.id) {
-      setTimeRemaining(league?.pickTimeLimit || 90);
+    if (league && league.draftStatus === "active" && league.currentPlayer === user?.id) {
+      setTimeRemaining(league.pickTimeLimit || 90);
       
       const timer = setInterval(() => {
         setTimeRemaining(prev => {
@@ -116,16 +116,28 @@ export default function DraftRoom() {
     song.title.toLowerCase().includes(searchQuery.toLowerCase())
   ) || [];
 
-  const isMyTurn = league?.currentPlayer === user?.id;
-  const isOwner = league?.ownerId === user?.id;
-  const currentPlayer = draftOrder?.find(member => member.userId === league?.currentPlayer);
+  const isMyTurn = league && league.currentPlayer === user?.id;
+  const isOwner = league && league.ownerId === user?.id;
+  const currentPlayer = draftOrder?.find((member: any) => member.userId === league?.currentPlayer);
 
-  if (leagueLoading) {
+  // Loading and error handling
+  if (leagueLoading || draftOrderLoading || !user) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 dark:from-gray-900 dark:to-gray-800">
         <NavigationSidebar />
         <div className="lg:ml-64 p-4">
           <div className="text-center">Loading draft room...</div>
+        </div>
+      </div>
+    );
+  }
+
+  if (!league) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 dark:from-gray-900 dark:to-gray-800">
+        <NavigationSidebar />
+        <div className="lg:ml-64 p-4">
+          <div className="text-center text-red-600">League not found</div>
         </div>
       </div>
     );
@@ -173,7 +185,7 @@ export default function DraftRoom() {
                 </div>
               </div>
 
-              {league?.draftStatus === "scheduled" && isOwner && (
+              {league && league.draftStatus === "scheduled" && isOwner && (
                 <div className="mt-4 text-center">
                   <Button 
                     onClick={() => startDraftMutation.mutate()}
@@ -185,11 +197,11 @@ export default function DraftRoom() {
                 </div>
               )}
 
-              {league?.draftStatus === "active" && (
+              {league && league.draftStatus === "active" && (
                 <div className="mt-4">
                   <div className="text-center">
                     <div className="text-lg font-semibold">
-                      {isMyTurn ? "Your Turn!" : `${currentPlayer?.user.username}'s Turn`}
+                      {isMyTurn ? "Your Turn!" : `${currentPlayer?.user?.username || currentPlayer?.username || 'Unknown Player'}'s Turn`}
                     </div>
                     {isMyTurn && (
                       <div className="flex items-center justify-center gap-2 mt-2">
@@ -239,7 +251,7 @@ export default function DraftRoom() {
                               {song.category} • {song.totalPlays} plays (24 months)
                             </div>
                           </div>
-                          {isMyTurn && league?.draftStatus === "active" && (
+                          {isMyTurn && league && league.draftStatus === "active" && (
                             <Button
                               onClick={() => draftMutation.mutate(song.id)}
                               disabled={draftMutation.isPending}
@@ -268,7 +280,7 @@ export default function DraftRoom() {
                 </CardHeader>
                 <CardContent>
                   <div className="space-y-2">
-                    {draftOrder?.map((member: any, index: number) => (
+                    {draftOrder && Array.isArray(draftOrder) ? draftOrder.map((member: any, index: number) => (
                       <div
                         key={member.userId}
                         className={`flex items-center gap-2 p-2 rounded ${
@@ -281,7 +293,7 @@ export default function DraftRoom() {
                           {index + 1}
                         </div>
                         <div className="flex-1">
-                          <div className="font-medium">{member.user.username}</div>
+                          <div className="font-medium">{member.user?.username || member.username || 'Unknown User'}</div>
                           {member.userId === user?.id && (
                             <div className="text-xs text-blue-600">You</div>
                           )}
@@ -290,7 +302,9 @@ export default function DraftRoom() {
                           <Clock className="h-4 w-4 text-blue-600" />
                         )}
                       </div>
-                    ))}
+                    )) : (
+                      <div className="text-sm text-gray-500">No players in draft order</div>
+                    )}
                   </div>
                 </CardContent>
               </Card>
@@ -302,14 +316,16 @@ export default function DraftRoom() {
                 </CardHeader>
                 <CardContent>
                   <div className="space-y-2 max-h-64 overflow-y-auto">
-                    {draftPicks?.slice(-10).reverse().map((pick: any) => (
+                    {draftPicks && Array.isArray(draftPicks) ? draftPicks.slice(-10).reverse().map((pick: any) => (
                       <div key={pick.id} className="text-sm">
-                        <div className="font-medium">{pick.song.title}</div>
+                        <div className="font-medium">{pick.song?.title || 'Unknown Song'}</div>
                         <div className="text-gray-600">
-                          Pick #{pick.pickNumber} - {pick.user.username}
+                          Pick #{pick.pickNumber} - {pick.user?.username || 'Unknown User'}
                         </div>
                       </div>
-                    ))}
+                    )) : (
+                      <div className="text-sm text-gray-500">No picks yet</div>
+                    )}
                   </div>
                 </CardContent>
               </Card>
