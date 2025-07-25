@@ -790,8 +790,20 @@ export class DatabaseStorage implements IStorage {
 
   async makeDraftPick(leagueId: number, userId: number, songId: number, timeUsed: number): Promise<DraftPick> {
     try {
+      // Validate that the song exists
+      const [song] = await db.select().from(songs).where(eq(songs.id, songId)).limit(1);
+      if (!song) {
+        throw new Error("Invalid song ID");
+      }
+
       const league = await this.getLeague(leagueId);
       if (!league) throw new Error("League not found");
+
+      // Check if song is already drafted in this league
+      const isDrafted = await this.isSongDraftedInLeague(songId, leagueId);
+      if (isDrafted) {
+        throw new Error("Song already drafted in this league");
+      }
 
       // Create draft pick record
       const [draftPick] = await db
