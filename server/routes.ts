@@ -812,24 +812,22 @@ export async function registerRoutes(app: Express): Promise<Server> {
         isCompleted: true,
       }));
       
-      // Get upcoming concerts from cache (same source as concerts tab)
-      const { cacheService } = await import('./services/cache-service');
-      const cachedShows = await cacheService.getCachedShows();
-      const upcomingShows = cachedShows
-        .filter((show: any) => new Date(show.showDate) > new Date())
+      // Get upcoming concerts from Phish.net API
+      const upcomingShows = await phishApi.getUpcomingShows();
+      const upcomingConcerts = upcomingShows
+        .map((show: any) => ({
+          id: parseInt(show.showid),
+          tourId: 1,
+          date: new Date(show.showdate),
+          venue: show.venue,
+          city: show.city,
+          state: show.state,
+          country: show.country,
+          setlist: [],
+          isCompleted: false,
+        }))
+        .sort((a: any, b: any) => new Date(a.date).getTime() - new Date(b.date).getTime())
         .slice(0, 3);
-      
-      const upcomingConcerts = upcomingShows.map((show: any) => ({
-        id: show.id,
-        tourId: 1,
-        date: new Date(show.showDate),
-        venue: show.venue,
-        city: show.city,
-        state: show.state,
-        country: show.country,
-        setlist: [],
-        isCompleted: false,
-      }));
       
       // Get league standings
       const leagueStandings = await storage.getLeagueStandings(currentLeague.id);
