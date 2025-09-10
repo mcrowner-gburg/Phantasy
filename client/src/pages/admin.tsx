@@ -49,7 +49,7 @@ export default function Admin() {
   const { data: isAdmin, isLoading: isCheckingAdmin } = useQuery({
     queryKey: ["/api/auth/user"],
     select: (data: any) => data?.user?.role === "admin",
-    enabled: !!user,
+    enabled: !!currentUser,
   });
 
   // Get all concerts for admin
