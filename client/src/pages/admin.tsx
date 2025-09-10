@@ -45,10 +45,17 @@ export default function Admin() {
     role: "user"
   });
 
-  // Check if user is admin
+  // Check if user is admin (admin or superadmin)
   const { data: isAdmin, isLoading: isCheckingAdmin } = useQuery({
     queryKey: ["/api/auth/user"],
-    select: (data: any) => data?.user?.role === "admin",
+    select: (data: any) => data?.user?.role === "admin" || data?.user?.role === "superadmin",
+    enabled: !!currentUser,
+  });
+
+  // Check if user is super admin (can manage all users)
+  const { data: isSuperAdmin } = useQuery({
+    queryKey: ["/api/auth/user"],
+    select: (data: any) => data?.user?.role === "superadmin",
     enabled: !!currentUser,
   });
 
@@ -64,7 +71,7 @@ export default function Admin() {
     enabled: isAdmin,
   });
 
-  // Get all users for admin
+  // Get all users for super admin only
   const { data: users, isLoading: isLoadingUsers } = useQuery({
     queryKey: ["/api/admin/users", searchQuery],
     queryFn: async () => {
@@ -75,7 +82,7 @@ export default function Admin() {
       if (!response.ok) throw new Error('Failed to fetch users');
       return response.json();
     },
-    enabled: isAdmin && showUserManagement,
+    enabled: isSuperAdmin && showUserManagement,
   });
 
   // Get show data when concert and league are selected
@@ -352,7 +359,8 @@ export default function Admin() {
         </header>
 
         <main className="p-8 space-y-8">
-          {/* User Management Section */}
+          {/* User Management Section - Super Admin Only */}
+          {isSuperAdmin && (
           <Card className="glassmorphism border-purple-600">
             <CardContent className="p-6">
               <div className="flex items-center justify-between mb-6">
@@ -604,8 +612,10 @@ export default function Admin() {
               )}
             </CardContent>
           </Card>
+          )}
 
-          {/* Edit User Dialog */}
+          {/* Edit User Dialog - Super Admin Only */}
+          {isSuperAdmin && (
           <Dialog open={isEditUserDialogOpen} onOpenChange={setIsEditUserDialogOpen}>
             <DialogContent className="bg-gray-900 border-gray-600">
               <DialogHeader>
@@ -695,8 +705,9 @@ export default function Admin() {
               </div>
             </DialogContent>
           </Dialog>
+          )}
 
-          {/* Show/League Selection */}
+          {/* Show/League Selection - Available to all admins */}
           <Card className="glassmorphism border-gray-600">
             <CardContent className="p-6">
               <h3 className="text-xl font-bold mb-6">Select Show & League for Point Management</h3>
