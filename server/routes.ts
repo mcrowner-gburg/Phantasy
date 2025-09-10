@@ -81,18 +81,21 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // League routes
-  app.get("/api/leagues", async (req, res) => {
+  app.get("/api/leagues", requireAuth, async (req, res) => {
     try {
-      const { userId, tourId, public: isPublic } = req.query;
+      const { tourId, public: isPublic } = req.query;
       
       if (isPublic === "true") {
         const leagues = await storage.getPublicLeagues(tourId ? parseInt(tourId as string) : undefined);
         res.json(leagues);
-      } else if (userId) {
-        const leagues = await storage.getUserLeagues(parseInt(userId as string));
-        res.json(leagues);
       } else {
-        return res.status(400).json({ message: "User ID required or use public=true" });
+        // Use authenticated user from session
+        const userId = (req as any).userId;
+        if (!userId) {
+          return res.status(401).json({ message: "User not authenticated" });
+        }
+        const leagues = await storage.getUserLeagues(userId);
+        res.json(leagues);
       }
     } catch (error) {
       res.status(500).json({ message: "Failed to fetch leagues" });
@@ -308,10 +311,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
         id: index + 1,
         title: cached.title,
         category: cached.category,
-        rarity_score: cached.rarityScore,
-        total_plays: cached.timesPlayed,
-        last_played: cached.lastPlayed,
-        plays_24_months: Math.floor(cached.timesPlayed * 0.2) // Estimate
+        rarityScore: cached.rarityScore,
+        totalPlays: cached.timesPlayed,
+        lastPlayed: cached.lastPlayed,
+        plays24Months: Math.floor(cached.timesPlayed * 0.2) // Estimate
       }));
       
       console.log(`📊 Cache returned ${allSongs.length} songs`);
@@ -349,10 +352,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
         id: index + 1,
         title: cached.title,
         category: cached.category,
-        rarity_score: cached.rarityScore,
-        total_plays: cached.timesPlayed,
-        last_played: cached.lastPlayed,
-        plays_24_months: Math.floor(cached.timesPlayed * 0.2)
+        rarityScore: cached.rarityScore,
+        totalPlays: cached.timesPlayed,
+        lastPlayed: cached.lastPlayed,
+        plays24Months: Math.floor(cached.timesPlayed * 0.2)
       }));
       
       const filtered = allSongs.filter(song => 

@@ -123,28 +123,16 @@ export class PhishNetService {
       
       console.log('🎵 FIXED: Fetching complete song catalog from Phish.net API (robust parsing)...');
       
-      // Try multiple endpoints for robust fetching
-      let response;
-      let data;
+      // Use the working /songs.json endpoint (confirmed working with live API test)
+      console.log('📡 Calling working Phish.net API endpoint: /songs.json');
+      const response = await fetch(`${this.baseUrl}/songs.json?apikey=${this.apiKey}&limit=10000`);
       
-      // First try /songs/all.json (recommended endpoint)
-      try {
-        response = await fetch(`${this.baseUrl}/songs/all.json?apikey=${this.apiKey}&limit=10000`);
-        if (response.ok) {
-          data = await response.json();
-          console.log('✅ Successfully fetched from /songs/all.json');
-        } else {
-          throw new Error('all.json failed');
-        }
-      } catch {
-        console.log('⚠️ /songs/all.json failed, trying /songs.json...');
-        response = await fetch(`${this.baseUrl}/songs.json?apikey=${this.apiKey}&limit=10000`);
-        if (!response.ok) {
-          throw new Error(`Phish.net API error: ${response.statusText}`);
-        }
-        data = await response.json();
-        console.log('✅ Successfully fetched from /songs.json');
+      if (!response.ok) {
+        throw new Error(`Phish.net API error: ${response.statusText}`);
       }
+      
+      const data = await response.json();
+      console.log('✅ Successfully fetched from /songs.json (confirmed working endpoint)');
       
       console.log('📊 Full API Response keys:', Object.keys(data));
       console.log('📊 Response preview:', JSON.stringify(data, null, 2).substring(0, 500));

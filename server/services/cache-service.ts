@@ -129,7 +129,7 @@ export class CacheService {
 
   // Refresh songs cache from Phish.net API
   private async refreshSongsCache(): Promise<void> {
-    console.log('Refreshing songs cache from Phish.net API...');
+    console.log('🔄 [CacheService] refreshSongsCache v2 (dedup+upsert) - STARTING...');
     
     try {
       // Set refreshing flag
@@ -152,12 +152,25 @@ export class CacheService {
         // Clear existing cache
         await db.delete(cachedSongs);
 
-        // Insert new data in batches
+        // Normalize IDs and deduplicate using Set (fixes mixed-type issue)
+        const normalizeId = (s: any, idx: number) => String(s.songid ?? s.id ?? s.slug ?? idx + 10000);
+        const seen = new Set<string>();
+        const deduped = apiSongs.filter((s, i) => {
+          const id = normalizeId(s, i);
+          if (seen.has(id)) return false;
+          seen.add(id);
+          s.__normId = id; // Store normalized ID
+          return true;
+        });
+        
+        console.log(`✅ Deduplicated ${apiSongs.length} songs to ${deduped.length} unique songs (string-based)`);
+
+        // Insert deduplicated data with upsert to handle any remaining conflicts
         const batchSize = 100;
-        for (let i = 0; i < apiSongs.length; i += batchSize) {
-          const batch = apiSongs.slice(i, i + batchSize);
-          const insertData: InsertCachedSong[] = batch.map((song: any, batchIndex: number) => ({
-            phishNetId: song.songid || String(i + batchIndex),
+        for (let i = 0; i < deduped.length; i += batchSize) {
+          const batch = deduped.slice(i, i + batchSize);
+          const insertData: InsertCachedSong[] = batch.map((song: any) => ({
+            phishNetId: song.__normId, // Use normalized string ID
             title: song.song,
             artist: 'Phish',
             timesPlayed: song.times_played || 0,
@@ -169,7 +182,8 @@ export class CacheService {
             rarityScore: this.calculateRarityScore(song.times_played || 0, song.gap || 0),
           }));
 
-          await db.insert(cachedSongs).values(insertData);
+          // Use onConflictDoNothing for safety against any remaining duplicates
+          await db.insert(cachedSongs).values(insertData).onConflictDoNothing();
         }
 
         await this.updateCacheMetadata('songs', apiSongs.length);
