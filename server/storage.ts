@@ -50,13 +50,19 @@ import { cacheService } from "./services/cache-service";
 export interface IStorage {
   // User operations
   getUser(id: number): Promise<User | undefined>;
+  getAllUsers(): Promise<User[]>;
   getUserByUsername(username: string): Promise<User | undefined>;
   getUserByEmail(email: string): Promise<User | undefined>;
   getUserByPhone(phoneNumber: string): Promise<User | undefined>;
+  searchUsers(query: string): Promise<User[]>;
   createUser(user: InsertUser): Promise<User>;
+  updateUser(userId: number, updates: Partial<User>): Promise<User>;
   updateUserPoints(userId: number, points: number): Promise<void>;
   updateUserPassword(userId: number, hashedPassword: string): Promise<void>;
   updateUserProfile(userId: number, updates: { email?: string; phoneNumber?: string }): Promise<User>;
+  updateUserRole(userId: number, role: string): Promise<void>;
+  deleteUser(userId: number): Promise<void>;
+  isUserAdmin(userId: number): Promise<boolean>;
 
   // Password reset operations
   createPasswordResetToken(token: InsertPasswordResetToken): Promise<PasswordResetToken>;
@@ -185,7 +191,56 @@ export class DatabaseStorage implements IStorage {
     return user;
   }
 
+  async getAllUsers(): Promise<User[]> {
+    return await db.select().from(users).orderBy(users.createdAt);
+  }
 
+  async searchUsers(query: string): Promise<User[]> {
+    const searchTerm = `%${query.toLowerCase()}%`;
+    return await db
+      .select()
+      .from(users)
+      .where(
+        or(
+          sql`LOWER(${users.username}) LIKE ${searchTerm}`,
+          sql`LOWER(${users.email}) LIKE ${searchTerm}`
+        )
+      )
+      .orderBy(users.username);
+  }
+
+  async updateUser(userId: number, updates: Partial<User>): Promise<User> {
+    const [user] = await db
+      .update(users)
+      .set(updates)
+      .where(eq(users.id, userId))
+      .returning();
+    
+    if (!user) {
+      throw new Error('User not found');
+    }
+    
+    return user;
+  }
+
+  async updateUserRole(userId: number, role: string): Promise<void> {
+    await db
+      .update(users)
+      .set({ role })
+      .where(eq(users.id, userId));
+  }
+
+  async deleteUser(userId: number): Promise<void> {
+    // First delete related data to maintain referential integrity
+    await db.delete(draftedSongs).where(eq(draftedSongs.userId, userId));
+    await db.delete(activities).where(eq(activities.userId, userId));
+    await db.delete(leagueMembers).where(eq(leagueMembers.userId, userId));
+    await db.delete(passwordResetTokens).where(eq(passwordResetTokens.userId, userId));
+    await db.delete(pointAdjustments).where(eq(pointAdjustments.userId, userId));
+    
+    // Finally delete the user
+    await db.delete(users).where(eq(users.id, userId));
+  }
 
   // Tour operations - database implementations
   async getTours(): Promise<Tour[]> {
