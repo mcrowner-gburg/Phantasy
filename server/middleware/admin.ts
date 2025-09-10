@@ -21,14 +21,37 @@ export interface AuthenticatedRequest extends Request {
   };
 }
 
+// Superadmin only - can manage all users and assign admins
+export const requireSuperAdmin = async (req: AuthenticatedRequest, res: Response, next: NextFunction) => {
+  try {
+    if (!req.session?.user?.id) {
+      return res.status(401).json({ message: 'Not authenticated' });
+    }
+
+    const isSuperAdmin = await storage.isUserSuperAdmin(req.session.user.id);
+    if (!isSuperAdmin) {
+      return res.status(403).json({ message: 'Super admin access required' });
+    }
+
+    req.user = req.session.user;
+    next();
+  } catch (error) {
+    console.error('Super admin middleware error:', error);
+    res.status(500).json({ message: 'Server error' });
+  }
+};
+
+// Admin or Superadmin - legacy admin routes
 export const requireAdmin = async (req: AuthenticatedRequest, res: Response, next: NextFunction) => {
   try {
     if (!req.session?.user?.id) {
       return res.status(401).json({ message: 'Not authenticated' });
     }
 
+    const isSuperAdmin = await storage.isUserSuperAdmin(req.session.user.id);
     const isAdmin = await storage.isUserAdmin(req.session.user.id);
-    if (!isAdmin) {
+    
+    if (!isSuperAdmin && !isAdmin) {
       return res.status(403).json({ message: 'Admin access required' });
     }
 
@@ -46,9 +69,11 @@ export const requireLeagueAdmin = async (req: AuthenticatedRequest, res: Respons
       return res.status(401).json({ message: 'Not authenticated' });
     }
 
-    // Global admins can manage any league
+    // Super admins and global admins can manage any league
+    const isSuperAdmin = await storage.isUserSuperAdmin(req.session.user.id);
     const isGlobalAdmin = await storage.isUserAdmin(req.session.user.id);
-    if (isGlobalAdmin) {
+    
+    if (isSuperAdmin || isGlobalAdmin) {
       req.user = req.session.user;
       return next();
     }

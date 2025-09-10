@@ -136,6 +136,7 @@ export interface IStorage {
   getLeagueStandings(leagueId: number): Promise<(User & { rank: number; todayPoints: number; songCount: number })[]>;
 
   // Admin operations
+  isUserSuperAdmin(userId: number): Promise<boolean>;
   isUserAdmin(userId: number): Promise<boolean>;
   isUserLeagueAdmin(userId: number, leagueId: number): Promise<boolean>;
   promoteToLeagueAdmin(userId: number, leagueId: number): Promise<void>;
@@ -1421,6 +1422,11 @@ export class DatabaseStorage implements IStorage {
   }
 
   // Admin operations
+  async isUserSuperAdmin(userId: number): Promise<boolean> {
+    const user = await this.getUser(userId);
+    return user?.role === "superadmin";
+  }
+
   async isUserAdmin(userId: number): Promise<boolean> {
     const user = await this.getUser(userId);
     return user?.role === "admin";
