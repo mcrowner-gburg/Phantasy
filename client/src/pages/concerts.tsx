@@ -5,15 +5,19 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Calendar, MapPin, Clock, Music, ExternalLink } from "lucide-react";
 import { format, isToday, isFuture } from "date-fns";
+import UpcomingShows from "@/components/dashboard/upcoming-shows";
 
 export default function Concerts() {
   const { data: concerts, isLoading } = useQuery({
     queryKey: ["/api/concerts"],
   });
 
-  const { data: upcomingConcerts } = useQuery({
-    queryKey: ["/api/concerts/upcoming"],
+  // Use same data source as dashboard for consistency
+  const { data: dashboardData } = useQuery({
+    queryKey: ["/api/dashboard"],
   });
+  
+  const upcomingConcerts = dashboardData?.upcomingConcerts || [];
 
   const sortedConcerts = concerts?.filter((concert: any) => 
     new Date(concert.date) < new Date() // Only show completed shows
@@ -65,75 +69,8 @@ export default function Concerts() {
             </CardContent>
           </Card>
 
-          {/* Upcoming Shows */}
-          {upcomingConcerts?.length > 0 ? (
-            <Card className="glassmorphism border-gray-600">
-              <CardContent className="p-6">
-                <h3 className="text-xl font-bold mb-6 flex items-center">
-                  <Calendar className="mr-2 text-green-500" size={24} />
-                  Next Shows
-                </h3>
-                
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                  {upcomingConcerts.map((concert: any) => {
-                    const status = getShowStatus(concert.date);
-                    const isSpecial = format(new Date(concert.date), "MM-dd") === "12-31";
-                    
-                    return (
-                      <Card 
-                        key={concert.id} 
-                        className="bg-black bg-opacity-50 border border-gray-600 hover:border-green-500 transition-colors cursor-pointer"
-                        onClick={() => window.open(`https://phish.net/setlists/phish-${format(new Date(concert.date), "MMMM-dd-yyyy").toLowerCase()}-${concert.venue.toLowerCase().replace(/\s+/g, '-').replace(/[^a-z0-9-]/g, '')}-${concert.city.toLowerCase().replace(/\s+/g, '-')}-${concert.state.toLowerCase()}-usa.html`, '_blank')}
-                      >
-                        <CardContent className="p-4">
-                          <div className="flex justify-between items-start mb-3">
-                            <Badge className={status.color}>
-                              {status.label}
-                            </Badge>
-                            {isSpecial && (
-                              <Badge className="bg-yellow-500 text-black">NYE</Badge>
-                            )}
-                          </div>
-                          
-                          <div className="space-y-2">
-                            <h4 className="font-bold text-lg text-white">{concert.venue}</h4>
-                            <div className="flex items-center text-sm phish-text">
-                              <MapPin className="mr-1" size={14} />
-                              {concert.city}, {concert.state}
-                            </div>
-                            <div className="flex items-center text-sm phish-text">
-                              <Clock className="mr-1" size={14} />
-                              {formatShowTime(concert.date)}
-                            </div>
-                            <p className="text-green-500 font-medium">{formatShowDate(concert.date)}</p>
-                          </div>
-                          
-                          <Button variant="outline" className="w-full mt-4 border-gray-600 hover:border-green-500">
-                            <ExternalLink className="mr-2" size={14} />
-                            View on Phish.net
-                          </Button>
-                        </CardContent>
-                      </Card>
-                    );
-                  })}
-                </div>
-              </CardContent>
-            </Card>
-          ) : (
-            <Card className="glassmorphism border-gray-600">
-              <CardContent className="p-6">
-                <h3 className="text-xl font-bold mb-6 flex items-center">
-                  <Calendar className="mr-2 text-green-500" size={24} />
-                  Upcoming Shows
-                </h3>
-                <div className="text-center py-8 phish-text">
-                  <Calendar className="mx-auto mb-4 text-gray-400" size={48} />
-                  <p className="text-lg mb-2">No upcoming shows scheduled</p>
-                  <p>Check back later for new tour announcements</p>
-                </div>
-              </CardContent>
-            </Card>
-          )}
+          {/* Upcoming Shows - Use same component as dashboard */}
+          <UpcomingShows shows={upcomingConcerts} />
 
           {/* All Shows */}
           <Card className="glassmorphism border-gray-600">
