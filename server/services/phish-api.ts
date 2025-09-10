@@ -15,7 +15,7 @@ interface PhishNetSong {
   avg_gap: number;
 }
 
-// In-memory cache for songs - CLEARED FOR DEBUG
+// In-memory cache for songs - FORCE CLEARED TO FIX ISSUE
 let songsCache: any[] = [];
 let songsCacheTimestamp = 0;
 const SONGS_CACHE_DURATION = 60 * 60 * 1000; // 1 hour
@@ -117,54 +117,69 @@ export class PhishNetService {
 
   async getAllSongsForDraft(): Promise<any[]> {
     try {
-      // Check cache first
-      const now = Date.now();
-      if (songsCache.length > 0 && (now - songsCacheTimestamp) < SONGS_CACHE_DURATION) {
-        console.log(`Returning ${songsCache.length} cached songs from Phish.net API`);
-        return songsCache;
-      }
-
-      console.log('Fetching complete song catalog from Phish.net API...');
-      const response = await fetch(
-        `${this.baseUrl}/songs.json?apikey=${this.apiKey}&limit=10000`
-      );
-
-      if (!response.ok) {
-        throw new Error(`Phish.net API error: ${response.statusText}`);
-      }
-
-      const data = await response.json();
-      console.log('Full API Response:', JSON.stringify(data, null, 2).substring(0, 1000));
+      // FORCE CLEAR CACHE FOR DEBUGGING
+      songsCache = [];
+      songsCacheTimestamp = 0;
       
-      // Phish.net v5 API returns data in .data array
-      const songs = data.data || [];
-      console.log(`API returned ${songs.length} songs from response`);
+      console.log('🎵 FIXED: Fetching complete song catalog from Phish.net API (robust parsing)...');
+      
+      // Try multiple endpoints for robust fetching
+      let response;
+      let data;
+      
+      // First try /songs/all.json (recommended endpoint)
+      try {
+        response = await fetch(`${this.baseUrl}/songs/all.json?apikey=${this.apiKey}&limit=10000`);
+        if (response.ok) {
+          data = await response.json();
+          console.log('✅ Successfully fetched from /songs/all.json');
+        } else {
+          throw new Error('all.json failed');
+        }
+      } catch {
+        console.log('⚠️ /songs/all.json failed, trying /songs.json...');
+        response = await fetch(`${this.baseUrl}/songs.json?apikey=${this.apiKey}&limit=10000`);
+        if (!response.ok) {
+          throw new Error(`Phish.net API error: ${response.statusText}`);
+        }
+        data = await response.json();
+        console.log('✅ Successfully fetched from /songs.json');
+      }
+      
+      console.log('📊 Full API Response keys:', Object.keys(data));
+      console.log('📊 Response preview:', JSON.stringify(data, null, 2).substring(0, 500));
+      
+      // Robust parsing - try multiple possible response structures
+      const songs = data?.data || data?.response?.data || [];
+      console.log(`🎵 API returned ${songs.length} songs after robust parsing`);
       
       if (songs.length === 0) {
-        console.log('No songs returned, checking error:', data.error_message || 'No error message');
-        throw new Error(`No songs returned: ${data.error_message || 'Unknown error'}`);
+        console.log('❌ No songs found, error:', data.error_message || data.error || 'No error message');
+        throw new Error(`No songs returned: ${data.error_message || data.error || 'Unknown error'}`);
       }
 
-      // Transform ALL songs to match our expected format - no limits!
-      songsCache = songs.map((song: any, index: number) => ({
-        id: song.songid || (index + 1000), // Use songid from API, fallback to index
-        title: song.song,
-        category: this.categoryzeSong(song.song),
-        rarity_score: this.calculateRarityScore(song.times_played || 0),
-        total_plays: song.times_played || 0,
-        last_played: song.last_played,
-        plays_24_months: this.estimate24MonthPlays(song.times_played || 0)
-      }));
-
-      songsCacheTimestamp = now;
-      console.log(`Cached ${songsCache.length} complete songs from Phish.net API - no limits!`);
+      // Return RAW API shape for cache service compatibility
+      console.log(`✅ Returning ${songs.length} RAW songs (no transformation)`);
+      return songs; // Return raw API data, not transformed
       
-      return songsCache;
     } catch (error) {
-      console.error("Error fetching complete song catalog:", error);
-      console.log("Using expanded fallback song catalog...");
-      // Return fallback if API fails
-      return this.getFallbackSongs();
+      console.error("💥 Error fetching song catalog:", error);
+      console.log("🔄 Using fallback song catalog...");
+      
+      // Return fallback songs in RAW API format
+      const fallbackSongs = this.getFallbackSongs();
+      console.log(`🎵 Returning ${fallbackSongs.length} fallback songs`);
+      
+      // Convert fallback to raw API format
+      return fallbackSongs.map(song => ({
+        songid: song.id,
+        song: song.title,
+        times_played: song.total_plays,
+        last_played: song.last_played,
+        gap: 50, // default gap
+        debut_date: null,
+        original_artist: null
+      }));
     }
   }
 
@@ -340,15 +355,15 @@ export class PhishNetService {
         .values({
           title: songData.title,
           category: songData.category,
-          rarity_score: songData.rarity_score || 50,
-          total_plays: songData.total_plays || 0,
-          last_played: songData.last_played || null
+          rarityScore: songData.rarity_score || 50,
+          totalPlays: songData.total_plays || 0,
+          lastPlayed: songData.last_played || null
         })
         .onConflictDoUpdate({
           target: [songs.title],
           set: {
-            total_plays: songData.total_plays || 0,
-            last_played: songData.last_played || null
+            totalPlays: songData.total_plays || 0,
+            lastPlayed: songData.last_played || null
           }
         })
         .returning();
