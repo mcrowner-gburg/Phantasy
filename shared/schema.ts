@@ -79,9 +79,9 @@ export const leagueInvites = pgTable("league_invites", {
   leagueId: integer("league_id").references(() => leagues.id).notNull(),
   inviteCode: text("invite_code").notNull().unique(),
   createdBy: integer("created_by").references(() => users.id).notNull(),
-  maxUses: integer("max_uses").default(null), // null = unlimited
+  maxUses: integer("max_uses"), // null = unlimited
   currentUses: integer("current_uses").default(0),
-  expiresAt: timestamp("expires_at").default(null), // null = no expiration
+  expiresAt: timestamp("expires_at"), // null = no expiration
   isActive: boolean("is_active").default(true),
   createdAt: timestamp("created_at").defaultNow(),
 });
@@ -165,6 +165,54 @@ export const phoneVerificationCodes = pgTable("phone_verification_codes", {
   expiresAt: timestamp("expires_at").notNull(),
   used: boolean("used").default(false),
   createdAt: timestamp("created_at").defaultNow(),
+});
+
+// Cached Phish.net data tables for reducing external API calls
+export const cachedShows = pgTable("cached_shows", {
+  id: serial("id").primaryKey(),
+  phishNetId: text("phish_net_id").notNull().unique(), // Phish.net show ID
+  showDate: timestamp("show_date").notNull(),
+  venue: text("venue").notNull(),
+  city: text("city").notNull(),
+  state: text("state"),
+  country: text("country").default("USA"),
+  tourid: text("tourid"),
+  setlistdata: jsonb("setlistdata"), // Raw setlist data from Phish.net
+  isCompleted: boolean("is_completed").default(false),
+  cachedAt: timestamp("cached_at").defaultNow(),
+});
+
+export const cachedSongs = pgTable("cached_songs", {
+  id: serial("id").primaryKey(),
+  phishNetId: text("phish_net_id").notNull().unique(), // Phish.net song ID
+  title: text("title").notNull(),
+  artist: text("artist").default("Phish"),
+  timesPlayed: integer("times_played").default(0),
+  debutDate: text("debut_date"),
+  lastPlayed: text("last_played"),
+  gap: integer("gap").default(0), // Days since last played
+  originalArtist: text("original_artist"),
+  category: text("category"), // Calculated category
+  rarityScore: integer("rarity_score").default(0), // Calculated rarity
+  cachedAt: timestamp("cached_at").defaultNow(),
+});
+
+export const cachedSetlists = pgTable("cached_setlists", {
+  id: serial("id").primaryKey(),
+  showDate: text("show_date").notNull().unique(),
+  setlistData: jsonb("setlist_data"), // Complete setlist with positions
+  songs: jsonb("songs"), // Array of song names for quick access
+  cachedAt: timestamp("cached_at").defaultNow(),
+});
+
+export const cacheMetadata = pgTable("cache_metadata", {
+  id: serial("id").primaryKey(),
+  cacheType: text("cache_type").notNull().unique(), // 'shows', 'songs', 'setlists'
+  lastRefreshed: timestamp("last_refreshed").defaultNow(),
+  refreshInterval: integer("refresh_interval").default(3600), // Seconds
+  isRefreshing: boolean("is_refreshing").default(false),
+  lastError: text("last_error"),
+  totalRecords: integer("total_records").default(0),
 });
 
 export type PhoneVerificationCode = typeof phoneVerificationCodes.$inferSelect;
@@ -295,4 +343,50 @@ export const insertLeagueInviteSchema = createInsertSchema(leagueInvites).pick({
   expiresAt: true,
 });
 
+export const insertCachedShowSchema = createInsertSchema(cachedShows).pick({
+  phishNetId: true,
+  showDate: true,
+  venue: true,
+  city: true,
+  state: true,
+  country: true,
+  tourid: true,
+  setlistdata: true,
+  isCompleted: true,
+});
+
+export const insertCachedSongSchema = createInsertSchema(cachedSongs).pick({
+  phishNetId: true,
+  title: true,
+  artist: true,
+  timesPlayed: true,
+  debutDate: true,
+  lastPlayed: true,
+  gap: true,
+  originalArtist: true,
+  category: true,
+  rarityScore: true,
+});
+
+export const insertCachedSetlistSchema = createInsertSchema(cachedSetlists).pick({
+  showDate: true,
+  setlistData: true,
+  songs: true,
+});
+
+export const insertCacheMetadataSchema = createInsertSchema(cacheMetadata).pick({
+  cacheType: true,
+  refreshInterval: true,
+  lastError: true,
+  totalRecords: true,
+});
+
 export type InsertLeagueInvite = z.infer<typeof insertLeagueInviteSchema>;
+export type CachedShow = typeof cachedShows.$inferSelect;
+export type InsertCachedShow = z.infer<typeof insertCachedShowSchema>;
+export type CachedSong = typeof cachedSongs.$inferSelect;
+export type InsertCachedSong = z.infer<typeof insertCachedSongSchema>;
+export type CachedSetlist = typeof cachedSetlists.$inferSelect;
+export type InsertCachedSetlist = z.infer<typeof insertCachedSetlistSchema>;
+export type CacheMetadata = typeof cacheMetadata.$inferSelect;
+export type InsertCacheMetadata = z.infer<typeof insertCacheMetadataSchema>;
