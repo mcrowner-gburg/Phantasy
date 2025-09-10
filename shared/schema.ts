@@ -19,7 +19,7 @@ export const users = pgTable("users", {
   email: text("email").notNull().unique(),
   phoneNumber: text("phone_number").unique(), // Optional phone number for SMS features
   password: text("password").notNull(),
-  role: text("role").default("user"), // "admin", "user"
+  role: text("role").default("user"), // "superadmin", "admin", "user"
   totalPoints: integer("total_points").default(0),
   createdAt: timestamp("created_at").defaultNow(),
 });
