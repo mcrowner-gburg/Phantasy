@@ -28,8 +28,8 @@ export function NavigationSidebar({ user }: NavigationSidebarProps) {
     { path: "/leagues", icon: Users, label: "My Leagues" },
   ];
 
-  // Add admin link if user is admin
-  const navItems = authUser?.role === "admin" 
+  // Add admin link if user is admin or superadmin
+  const navItems = (authUser?.role === "admin" || authUser?.role === "superadmin")
     ? [...baseNavItems, { path: "/admin", icon: Settings, label: "Admin Panel" }]
     : baseNavItems;
 
