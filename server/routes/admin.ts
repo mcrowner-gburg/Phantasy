@@ -400,7 +400,7 @@ router.put('/users/:id/role', requireSuperAdmin, async (req: AuthenticatedReques
     }
     
     const roleSchema = z.object({
-      role: z.enum(['user', 'admin'])
+      role: z.enum(['user', 'admin', 'superadmin'])
     });
     
     const { role } = roleSchema.parse(req.body);
@@ -415,6 +415,77 @@ router.put('/users/:id/role', requireSuperAdmin, async (req: AuthenticatedReques
   } catch (error) {
     console.error('Error updating user role:', error);
     res.status(500).json({ message: 'Failed to update user role' });
+  }
+});
+
+// League Admin Assignment Routes - Super Admin Only
+
+// Get all league admin assignments
+router.get('/league-admin-assignments', requireSuperAdmin, async (req: AuthenticatedRequest, res) => {
+  try {
+    const assignments = await storage.getAllLeagueAdminAssignments();
+    res.json(assignments);
+  } catch (error) {
+    console.error('Error fetching league admin assignments:', error);
+    res.status(500).json({ message: 'Failed to fetch league admin assignments' });
+  }
+});
+
+// Assign user as league admin to a specific league
+router.post('/league-admin-assignments', requireSuperAdmin, async (req: AuthenticatedRequest, res) => {
+  try {
+    const assignmentSchema = z.object({
+      userId: z.number(),
+      leagueId: z.number()
+    });
+    
+    const { userId, leagueId } = assignmentSchema.parse(req.body);
+    
+    // Check if user exists
+    const user = await storage.getUser(userId);
+    if (!user) {
+      return res.status(404).json({ message: 'User not found' });
+    }
+    
+    // Check if league exists
+    const league = await storage.getLeague(leagueId);
+    if (!league) {
+      return res.status(404).json({ message: 'League not found' });
+    }
+    
+    // Check if user is already a member of the league
+    const isMember = await storage.isUserLeagueMember(userId, leagueId);
+    if (!isMember) {
+      // Add user to league first as regular member
+      await storage.joinLeague(userId, leagueId);
+    }
+    
+    // Promote to league admin
+    await storage.promoteToLeagueAdmin(userId, leagueId);
+    
+    res.json({ message: 'User assigned as league admin successfully' });
+  } catch (error) {
+    console.error('Error assigning league admin:', error);
+    res.status(500).json({ message: 'Failed to assign league admin' });
+  }
+});
+
+// Remove league admin assignment
+router.delete('/league-admin-assignments', requireSuperAdmin, async (req: AuthenticatedRequest, res) => {
+  try {
+    const removeSchema = z.object({
+      userId: z.number(),
+      leagueId: z.number()
+    });
+    
+    const { userId, leagueId } = removeSchema.parse(req.body);
+    
+    await storage.demoteFromLeagueAdmin(userId, leagueId);
+    
+    res.json({ message: 'League admin assignment removed successfully' });
+  } catch (error) {
+    console.error('Error removing league admin assignment:', error);
+    res.status(500).json({ message: 'Failed to remove league admin assignment' });
   }
 });
 

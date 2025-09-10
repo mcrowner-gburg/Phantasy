@@ -140,6 +140,9 @@ export interface IStorage {
   isUserAdmin(userId: number): Promise<boolean>;
   isUserLeagueAdmin(userId: number, leagueId: number): Promise<boolean>;
   promoteToLeagueAdmin(userId: number, leagueId: number): Promise<void>;
+  demoteFromLeagueAdmin(userId: number, leagueId: number): Promise<void>;
+  isUserLeagueMember(userId: number, leagueId: number): Promise<boolean>;
+  getAllLeagueAdminAssignments(): Promise<{ user: User; league: League; joinedAt: Date | null }[]>;
   getLeagueMembers(leagueId: number): Promise<(User & { role: string; joinedAt: Date | null })[]>;
   
   // League Invite operations
@@ -1460,6 +1463,44 @@ export class DatabaseStorage implements IStorage {
         eq(leagueMembers.leagueId, leagueId),
         eq(leagueMembers.userId, userId)
       ));
+  }
+
+  async demoteFromLeagueAdmin(userId: number, leagueId: number): Promise<void> {
+    await db
+      .update(leagueMembers)
+      .set({ role: 'member' })
+      .where(and(
+        eq(leagueMembers.leagueId, leagueId),
+        eq(leagueMembers.userId, userId)
+      ));
+  }
+
+  async isUserLeagueMember(userId: number, leagueId: number): Promise<boolean> {
+    const [member] = await db
+      .select()
+      .from(leagueMembers)
+      .where(and(
+        eq(leagueMembers.leagueId, leagueId),
+        eq(leagueMembers.userId, userId)
+      ));
+    
+    return !!member;
+  }
+
+  async getAllLeagueAdminAssignments(): Promise<{ user: User; league: League; joinedAt: Date | null }[]> {
+    const assignments = await db
+      .select({
+        user: users,
+        league: leagues,
+        joinedAt: leagueMembers.joinedAt
+      })
+      .from(leagueMembers)
+      .innerJoin(users, eq(leagueMembers.userId, users.id))
+      .innerJoin(leagues, eq(leagueMembers.leagueId, leagues.id))
+      .where(eq(leagueMembers.role, 'admin'))
+      .orderBy(leagues.name, users.username);
+
+    return assignments;
   }
 
   async getLeagueMembers(leagueId: number): Promise<(User & { role: string; joinedAt: Date | null })[]> {
