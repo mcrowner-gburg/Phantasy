@@ -1,8 +1,10 @@
 import { Router } from 'express';
 import { storage } from '../storage';
 import { requireAdmin, requireLeagueAdmin, AuthenticatedRequest } from '../middleware/admin';
-import { insertPointAdjustmentSchema, insertLeagueInviteSchema } from '@shared/schema';
+import { insertPointAdjustmentSchema, insertLeagueInviteSchema, insertUserSchema } from '@shared/schema';
 import { nanoid } from 'nanoid';
+import bcrypt from 'bcrypt';
+import { z } from 'zod';
 
 const router = Router();
 
@@ -246,6 +248,173 @@ router.delete('/leagues/:leagueId/invites/:inviteId', requireLeagueAdmin, async 
   } catch (error) {
     console.error('Error deactivating invite:', error);
     res.status(500).json({ message: 'Failed to deactivate invite' });
+  }
+});
+
+// User Management Routes (requires global admin)
+
+// Get all users with optional search
+router.get('/users', requireAdmin, async (req: AuthenticatedRequest, res) => {
+  try {
+    const search = req.query.search as string;
+    
+    let users;
+    if (search) {
+      users = await storage.searchUsers(search);
+    } else {
+      users = await storage.getAllUsers();
+    }
+    
+    // Remove sensitive data like password hashes
+    const safeUsers = users.map(user => ({
+      id: user.id,
+      username: user.username,
+      email: user.email,
+      phoneNumber: user.phoneNumber,
+      role: user.role || 'user',
+      totalPoints: user.totalPoints,
+      createdAt: user.createdAt,
+      isPhoneVerified: user.isPhoneVerified
+    }));
+    
+    res.json(safeUsers);
+  } catch (error) {
+    console.error('Error fetching users:', error);
+    res.status(500).json({ message: 'Failed to fetch users' });
+  }
+});
+
+// Create new user
+router.post('/users', requireAdmin, async (req: AuthenticatedRequest, res) => {
+  try {
+    const userData = insertUserSchema.parse(req.body);
+    
+    // Check if user already exists
+    const existingUser = await storage.getUserByUsername(userData.username);
+    if (existingUser) {
+      return res.status(400).json({ message: 'Username already exists' });
+    }
+    
+    if (userData.email) {
+      const existingEmail = await storage.getUserByEmail(userData.email);
+      if (existingEmail) {
+        return res.status(400).json({ message: 'Email already exists' });
+      }
+    }
+    
+    // Hash password
+    const hashedPassword = await bcrypt.hash(userData.password, 10);
+    
+    const user = await storage.createUser({
+      ...userData,
+      password: hashedPassword,
+      role: userData.role || 'user'
+    });
+    
+    // Return safe user data
+    res.json({
+      id: user.id,
+      username: user.username,
+      email: user.email,
+      phoneNumber: user.phoneNumber,
+      role: user.role,
+      totalPoints: user.totalPoints,
+      createdAt: user.createdAt,
+      isPhoneVerified: user.isPhoneVerified
+    });
+  } catch (error) {
+    console.error('Error creating user:', error);
+    res.status(500).json({ message: 'Failed to create user' });
+  }
+});
+
+// Update user
+router.put('/users/:id', requireAdmin, async (req: AuthenticatedRequest, res) => {
+  try {
+    const userId = parseInt(req.params.id);
+    if (isNaN(userId)) {
+      return res.status(400).json({ message: 'Invalid user ID' });
+    }
+    
+    const updateSchema = z.object({
+      username: z.string().optional(),
+      email: z.string().email().optional(),
+      phoneNumber: z.string().optional(),
+      role: z.enum(['user', 'admin']).optional(),
+      password: z.string().min(6).optional()
+    });
+    
+    const updates = updateSchema.parse(req.body);
+    
+    // Hash password if provided
+    if (updates.password) {
+      updates.password = await bcrypt.hash(updates.password, 10);
+    }
+    
+    const user = await storage.updateUser(userId, updates);
+    
+    // Return safe user data
+    res.json({
+      id: user.id,
+      username: user.username,
+      email: user.email,
+      phoneNumber: user.phoneNumber,
+      role: user.role,
+      totalPoints: user.totalPoints,
+      createdAt: user.createdAt,
+      isPhoneVerified: user.isPhoneVerified
+    });
+  } catch (error) {
+    console.error('Error updating user:', error);
+    res.status(500).json({ message: 'Failed to update user' });
+  }
+});
+
+// Delete user
+router.delete('/users/:id', requireAdmin, async (req: AuthenticatedRequest, res) => {
+  try {
+    const userId = parseInt(req.params.id);
+    if (isNaN(userId)) {
+      return res.status(400).json({ message: 'Invalid user ID' });
+    }
+    
+    // Prevent self-deletion
+    if (userId === req.user!.id) {
+      return res.status(400).json({ message: 'Cannot delete your own account' });
+    }
+    
+    await storage.deleteUser(userId);
+    res.json({ message: 'User deleted successfully' });
+  } catch (error) {
+    console.error('Error deleting user:', error);
+    res.status(500).json({ message: 'Failed to delete user' });
+  }
+});
+
+// Update user role
+router.put('/users/:id/role', requireAdmin, async (req: AuthenticatedRequest, res) => {
+  try {
+    const userId = parseInt(req.params.id);
+    if (isNaN(userId)) {
+      return res.status(400).json({ message: 'Invalid user ID' });
+    }
+    
+    const roleSchema = z.object({
+      role: z.enum(['user', 'admin'])
+    });
+    
+    const { role } = roleSchema.parse(req.body);
+    
+    // Prevent self-demotion
+    if (userId === req.user!.id && role !== 'admin') {
+      return res.status(400).json({ message: 'Cannot demote your own account' });
+    }
+    
+    await storage.updateUserRole(userId, role);
+    res.json({ message: 'User role updated successfully' });
+  } catch (error) {
+    console.error('Error updating user role:', error);
+    res.status(500).json({ message: 'Failed to update user role' });
   }
 });
 
