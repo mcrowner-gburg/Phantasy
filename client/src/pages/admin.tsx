@@ -442,6 +442,7 @@ export default function Admin() {
                               <SelectContent className="bg-gray-900 border-gray-600">
                                 <SelectItem value="user">User</SelectItem>
                                 <SelectItem value="admin">Admin</SelectItem>
+                                <SelectItem value="superadmin">Super Admin</SelectItem>
                               </SelectContent>
                             </Select>
                           </div>
@@ -520,10 +521,15 @@ export default function Admin() {
                               <TableCell className="text-gray-300">{user.phoneNumber || 'N/A'}</TableCell>
                               <TableCell>
                                 <Badge 
-                                  variant={user.role === 'admin' ? 'default' : 'outline'}
-                                  className={user.role === 'admin' ? 'bg-purple-600 text-white' : 'border-gray-500 text-gray-300'}
+                                  variant={user.role === 'user' ? 'outline' : 'default'}
+                                  className={
+                                    user.role === 'superadmin' ? 'bg-red-600 text-white' : 
+                                    user.role === 'admin' ? 'bg-purple-600 text-white' : 
+                                    'border-gray-500 text-gray-300'
+                                  }
                                 >
-                                  {user.role === 'admin' ? 'Admin' : 'User'}
+                                  {user.role === 'superadmin' ? 'Super Admin' : 
+                                   user.role === 'admin' ? 'Admin' : 'User'}
                                 </Badge>
                               </TableCell>
                               <TableCell className="text-gray-300">{user.totalPoints || 0}</TableCell>
@@ -673,6 +679,7 @@ export default function Admin() {
                     <SelectContent className="bg-gray-900 border-gray-600">
                       <SelectItem value="user">User</SelectItem>
                       <SelectItem value="admin">Admin</SelectItem>
+                      <SelectItem value="superadmin">Super Admin</SelectItem>
                     </SelectContent>
                   </Select>
                 </div>
