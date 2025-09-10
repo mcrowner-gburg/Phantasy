@@ -30,8 +30,8 @@ export class CacheService {
         .from(cacheMetadata)
         .where(eq(cacheMetadata.cacheType, cacheType));
 
-      if (!metadata) {
-        return false; // No cache exists
+      if (!metadata || !metadata.lastRefreshed || !metadata.refreshInterval) {
+        return false; // No cache exists or incomplete metadata
       }
 
       const now = new Date();
@@ -156,12 +156,12 @@ export class CacheService {
         const batchSize = 100;
         for (let i = 0; i < apiSongs.length; i += batchSize) {
           const batch = apiSongs.slice(i, i + batchSize);
-          const insertData: InsertCachedSong[] = batch.map(song => ({
-            phishNetId: song.songid || String(song.id || i),
+          const insertData: InsertCachedSong[] = batch.map((song: any, batchIndex: number) => ({
+            phishNetId: song.songid || String(i + batchIndex),
             title: song.song,
             artist: 'Phish',
             timesPlayed: song.times_played || 0,
-            debutDate: song.debut || null,
+            debutDate: song.debut_date || null,
             lastPlayed: song.last_played || null,
             gap: song.gap || 0,
             originalArtist: song.original_artist || null,
@@ -177,7 +177,7 @@ export class CacheService {
       }
     } catch (error) {
       console.error('Error refreshing songs cache:', error);
-      await this.updateCacheMetadata('songs', 0, error.message);
+      await this.updateCacheMetadata('songs', 0, error instanceof Error ? error.message : String(error));
     }
   }
 
@@ -213,14 +213,14 @@ export class CacheService {
         // Only clear current year to preserve historical data
         
         // Insert new data
-        const insertData: InsertCachedShow[] = allShows.map(show => ({
+        const insertData: InsertCachedShow[] = allShows.map((show: any) => ({
           phishNetId: show.showid || show.showdate,
           showDate: new Date(show.showdate),
           venue: show.venue || 'Unknown Venue',
           city: show.city || 'Unknown City',
           state: show.state || null,
           country: show.country || 'USA',
-          tourid: show.tourid || null,
+          tourid: show.tour_id || null,
           setlistdata: show.setlistdata || null,
           isCompleted: new Date(show.showdate) < new Date(),
         }));
@@ -250,7 +250,7 @@ export class CacheService {
       }
     } catch (error) {
       console.error('Error refreshing shows cache:', error);
-      await this.updateCacheMetadata('shows', 0, error.message);
+      await this.updateCacheMetadata('shows', 0, error instanceof Error ? error.message : String(error));
     }
   }
 

@@ -12,6 +12,9 @@ import {
   PointAdjustment,
   LeagueInvite,
   PhoneVerificationCode,
+  CachedSong,
+  CachedShow,
+  CachedSetlist,
   InsertUser,
   InsertTour,
   InsertLeague,
@@ -41,6 +44,7 @@ import {
 } from "@shared/schema";
 import { db } from "./db";
 import { eq, and, sql, desc, count, or, not, gte, lte, asc, gt } from "drizzle-orm";
+import { cacheService } from "./services/cache-service";
 
 // Interface for storage operations
 export interface IStorage {
@@ -79,6 +83,7 @@ export interface IStorage {
 
   // Song operations
   getAllSongs(): Promise<Song[]>;
+  getCachedSongs(forceRefresh?: boolean): Promise<CachedSong[]>;
   getSong(id: number): Promise<Song | undefined>;
   getSongByTitle(title: string): Promise<Song | undefined>;
   createSong(title: string, category?: string): Promise<Song>;
@@ -358,17 +363,28 @@ export class DatabaseStorage implements IStorage {
     return result[0]?.count || 0;
   }
 
-  private songsCache: Song[] | null = null;
-  private cacheExpiry: number = 0;
-  private readonly CACHE_DURATION = 30 * 60 * 1000; // 30 minutes
-
-  // Song operations with authentic Phish.net data
+  // Song operations using cached Phish.net data
   async getAllSongs(): Promise<Song[]> {
-    // Return cached data if still valid
-    if (this.songsCache && Date.now() < this.cacheExpiry) {
-      return this.songsCache;
-    }
+    const cachedSongs = await this.getCachedSongs();
+    
+    // Transform cached songs to Song format
+    return cachedSongs.map((cached, index) => ({
+      id: index + 1,
+      title: cached.title,
+      category: cached.category,
+      rarityScore: cached.rarityScore,
+      lastPlayed: cached.lastPlayed ? new Date(cached.lastPlayed) : null,
+      totalPlays: cached.timesPlayed,
+    }));
+  }
 
+  // New method to get cached songs directly
+  async getCachedSongs(forceRefresh = false): Promise<CachedSong[]> {
+    return await cacheService.getCachedSongs(forceRefresh);
+  }
+
+  // Legacy method - kept for compatibility but now uses cache
+  async getAllSongsLegacy(): Promise<Song[]> {
     try {
       // Import the Phish API service
       const { PhishNetService } = await import("./services/phish-api");

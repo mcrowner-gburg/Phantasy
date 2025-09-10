@@ -293,17 +293,28 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Get all songs (dynamic API approach)
+  // Get all songs (using cached data)
   app.get("/api/songs", async (req, res) => {
     try {
       const leagueId = req.query.leagueId ? parseInt(req.query.leagueId as string) : null;
       console.log(`🎵 Songs API endpoint called with leagueId: ${leagueId}`);
       
-      // Use dynamic API to fetch songs
-      const { phishApi } = await import('./services/phish-api');
-      console.log('🔄 Calling phishApi.getAllSongsForDraft()...');
-      const allSongs = await phishApi.getAllSongsForDraft();
-      console.log(`📊 PhishAPI returned ${allSongs.length} songs`);
+      // Use cached songs instead of direct API calls
+      console.log('🔄 Getting cached songs...');
+      const cachedSongs = await storage.getCachedSongs();
+      
+      // Transform cached songs to the expected format for the frontend
+      const allSongs = cachedSongs.map((cached, index) => ({
+        id: index + 1,
+        title: cached.title,
+        category: cached.category,
+        rarity_score: cached.rarityScore,
+        total_plays: cached.timesPlayed,
+        last_played: cached.lastPlayed,
+        plays_24_months: Math.floor(cached.timesPlayed * 0.2) // Estimate
+      }));
+      
+      console.log(`📊 Cache returned ${allSongs.length} songs`);
       
       if (leagueId) {
         // Filter out songs already drafted in this league
@@ -313,12 +324,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
         console.log(`✅ Returning ${availableSongs.length} available songs for league`);
         res.json(availableSongs);
       } else {
-        // Return all songs from API
-        console.log(`✅ Returning all ${allSongs.length} songs`);
+        // Return all songs from cache
+        console.log(`✅ Returning all ${allSongs.length} songs from cache`);
         res.json(allSongs);
       }
     } catch (error) {
-      console.error("❌ Error fetching songs:", error);
+      console.error("❌ Error fetching cached songs:", error);
       res.status(500).json({ message: "Failed to fetch songs" });
     }
   });
@@ -330,10 +341,21 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ message: "Search query required" });
       }
       
-      // Use dynamic API for search as well
-      const { phishApi } = await import('./services/phish-api');
-      const songs = await phishApi.getAllSongsForDraft();
-      const filtered = songs.filter(song => 
+      // Use cached songs for search
+      const cachedSongs = await storage.getCachedSongs();
+      
+      // Transform and filter cached songs
+      const allSongs = cachedSongs.map((cached, index) => ({
+        id: index + 1,
+        title: cached.title,
+        category: cached.category,
+        rarity_score: cached.rarityScore,
+        total_plays: cached.timesPlayed,
+        last_played: cached.lastPlayed,
+        plays_24_months: Math.floor(cached.timesPlayed * 0.2)
+      }));
+      
+      const filtered = allSongs.filter(song => 
         song.title.toLowerCase().includes((q as string).toLowerCase())
       );
       
@@ -517,30 +539,26 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Concert routes
+  // Concert routes (using cached data)
   app.get("/api/concerts", async (req, res) => {
     try {
-      // Get recent shows from Phish.net API
-      const recentShows = await phishApi.getRecentShows(20);
+      // Get cached shows instead of direct API calls
+      const { cacheService } = await import('./services/cache-service');
+      const cachedShows = await cacheService.getCachedShows();
       
-      console.log(`Fetched ${recentShows.length} shows from Phish.net API`);
+      console.log(`Fetched ${cachedShows.length} shows from cache`);
       
-      // If API returns empty, log the issue but still try to use the data
-      if (recentShows.length === 0) {
-        console.log("No shows returned from Phish.net API - checking API response structure");
-      }
-      
-      // Transform Phish.net data to our format and fetch setlists for completed shows
-      const concerts = await Promise.all(recentShows.map(async (show: any) => {
-        const isCompleted = new Date(show.showdate) < new Date();
+      // Transform cached data to our format and fetch setlists for completed shows
+      const concerts = await Promise.all(cachedShows.map(async (show: any) => {
+        const isCompleted = new Date(show.showDate) < new Date();
         let setlist: string[] = [];
         
-        // Fetch setlist for completed shows or provide sample data for recent shows
+        // Fetch setlist for completed shows from cache
         if (isCompleted) {
           try {
-            const setlistData = await phishApi.getSetlist(show.showdate);
-            if (setlistData && setlistData.length > 0) {
-              setlist = setlistData.map((song: any) => song.song || song.title || song.songname).filter(Boolean);
+            const cachedSetlist = await cacheService.getCachedSetlist(show.showDate.toISOString().split('T')[0]);
+            if (cachedSetlist && cachedSetlist.songs) {
+              setlist = Array.isArray(cachedSetlist.songs) ? cachedSetlist.songs : [];
             } else {
               // Add sample setlists for recent July 2025 shows with authentic Phish show structure
               const sampleSetlists: Record<string, string[]> = {
@@ -551,17 +569,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
                 "2025-07-18": ["Sample in a Jar", "Maze", "The Squirming Coil", "Ghost", "Fluffhead", "Wilson", "Tweezer", "Backwards Down the Number Line", "Rocky Top"]
               };
               
-              setlist = sampleSetlists[show.showdate] || [];
+              setlist = sampleSetlists[show.showDate.toISOString().split('T')[0]] || [];
             }
           } catch (error) {
-            console.error(`Error fetching setlist for ${show.showdate}:`, error);
+            console.error(`Error fetching setlist for ${show.showDate}:`, error);
           }
         }
         
         return {
-          id: parseInt(show.showid),
+          id: show.id,
           tourId: 1, // Associate with current tour
-          date: new Date(show.showdate),
+          date: new Date(show.showDate),
           venue: show.venue,
           city: show.city,
           state: show.state,
@@ -580,14 +598,20 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.get("/api/concerts/upcoming", async (req, res) => {
     try {
-      // Get upcoming shows from Phish.net API
-      const upcomingShows = await phishApi.getUpcomingShows();
+      // Get upcoming shows from cache
+      const { cacheService } = await import('./services/cache-service');
+      const cachedShows = await cacheService.getCachedShows();
       
-      // Transform Phish.net data to our format and limit to 3 shows
-      const concerts = upcomingShows.slice(0, 3).map((show: any) => ({
-        id: parseInt(show.showid),
+      // Filter for upcoming shows and limit to 3
+      const upcomingShows = cachedShows
+        .filter((show: any) => new Date(show.showDate) > new Date())
+        .slice(0, 3);
+      
+      // Transform cached data to our format
+      const concerts = upcomingShows.map((show: any) => ({
+        id: show.id,
         tourId: 1, // Associate with current tour
-        date: new Date(show.showdate),
+        date: new Date(show.showDate),
         venue: show.venue,
         city: show.city,
         state: show.state,
@@ -606,13 +630,25 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.get("/api/concerts/:id/setlist", async (req, res) => {
     try {
       const showId = req.params.id;
-      const setlistData = await phishApi.getSetlist(showId);
       
-      if (!setlistData) {
+      // Find the show in cache to get its date
+      const { cacheService } = await import('./services/cache-service');
+      const cachedShows = await cacheService.getCachedShows();
+      const show = cachedShows.find((s: any) => s.id.toString() === showId);
+      
+      if (!show) {
+        return res.status(404).json({ message: "Show not found" });
+      }
+      
+      // Get cached setlist for this show date
+      const showDate = new Date(show.showDate).toISOString().split('T')[0];
+      const cachedSetlist = await cacheService.getCachedSetlist(showDate);
+      
+      if (!cachedSetlist) {
         return res.status(404).json({ message: "Setlist not found" });
       }
       
-      res.json(setlistData);
+      res.json(cachedSetlist.setlistData);
     } catch (error) {
       console.error("Error fetching setlist:", error);
       res.status(500).json({ message: "Failed to fetch setlist" });
