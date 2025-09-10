@@ -1,6 +1,6 @@
 import { Router } from 'express';
 import { storage } from '../storage';
-import { requireAdmin, requireLeagueAdmin, AuthenticatedRequest } from '../middleware/admin';
+import { requireSuperAdmin, requireAdmin, requireLeagueAdmin, AuthenticatedRequest } from '../middleware/admin';
 import { insertPointAdjustmentSchema, insertLeagueInviteSchema, insertUserSchema } from '@shared/schema';
 import { nanoid } from 'nanoid';
 import bcrypt from 'bcrypt';
@@ -254,7 +254,7 @@ router.delete('/leagues/:leagueId/invites/:inviteId', requireLeagueAdmin, async 
 // User Management Routes (requires global admin)
 
 // Get all users with optional search
-router.get('/users', requireAdmin, async (req: AuthenticatedRequest, res) => {
+router.get('/users', requireSuperAdmin, async (req: AuthenticatedRequest, res) => {
   try {
     const search = req.query.search as string;
     
@@ -285,7 +285,7 @@ router.get('/users', requireAdmin, async (req: AuthenticatedRequest, res) => {
 });
 
 // Create new user
-router.post('/users', requireAdmin, async (req: AuthenticatedRequest, res) => {
+router.post('/users', requireSuperAdmin, async (req: AuthenticatedRequest, res) => {
   try {
     const userData = insertUserSchema.parse(req.body);
     
@@ -329,7 +329,7 @@ router.post('/users', requireAdmin, async (req: AuthenticatedRequest, res) => {
 });
 
 // Update user
-router.put('/users/:id', requireAdmin, async (req: AuthenticatedRequest, res) => {
+router.put('/users/:id', requireSuperAdmin, async (req: AuthenticatedRequest, res) => {
   try {
     const userId = parseInt(req.params.id);
     if (isNaN(userId)) {
@@ -371,7 +371,7 @@ router.put('/users/:id', requireAdmin, async (req: AuthenticatedRequest, res) =>
 });
 
 // Delete user
-router.delete('/users/:id', requireAdmin, async (req: AuthenticatedRequest, res) => {
+router.delete('/users/:id', requireSuperAdmin, async (req: AuthenticatedRequest, res) => {
   try {
     const userId = parseInt(req.params.id);
     if (isNaN(userId)) {
@@ -392,7 +392,7 @@ router.delete('/users/:id', requireAdmin, async (req: AuthenticatedRequest, res)
 });
 
 // Update user role
-router.put('/users/:id/role', requireAdmin, async (req: AuthenticatedRequest, res) => {
+router.put('/users/:id/role', requireSuperAdmin, async (req: AuthenticatedRequest, res) => {
   try {
     const userId = parseInt(req.params.id);
     if (isNaN(userId)) {
