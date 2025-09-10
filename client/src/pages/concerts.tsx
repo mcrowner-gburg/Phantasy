@@ -12,12 +12,10 @@ export default function Concerts() {
     queryKey: ["/api/concerts"],
   });
 
-  // Use same data source as dashboard for consistency
-  const { data: dashboardData } = useQuery({
-    queryKey: ["/api/dashboard"],
+  // Use the same upcoming concerts endpoint but ensure it matches dashboard data
+  const { data: upcomingConcerts } = useQuery({
+    queryKey: ["/api/concerts/upcoming"],
   });
-  
-  const upcomingConcerts = dashboardData?.upcomingConcerts || [];
 
   const sortedConcerts = concerts?.filter((concert: any) => 
     new Date(concert.date) < new Date() // Only show completed shows
@@ -70,7 +68,7 @@ export default function Concerts() {
           </Card>
 
           {/* Upcoming Shows - Use same component as dashboard */}
-          <UpcomingShows shows={upcomingConcerts} />
+          <UpcomingShows shows={upcomingConcerts || []} />
 
           {/* All Shows */}
           <Card className="glassmorphism border-gray-600">

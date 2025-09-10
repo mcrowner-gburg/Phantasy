@@ -601,29 +601,24 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.get("/api/concerts/upcoming", async (req, res) => {
     try {
-      // Get upcoming shows from cache
-      const { cacheService } = await import('./services/cache-service');
-      const cachedShows = await cacheService.getCachedShows();
-      
-      // Filter for upcoming shows and limit to 3
-      const upcomingShows = cachedShows
-        .filter((show: any) => new Date(show.showDate) > new Date())
+      // Use same logic as dashboard to get upcoming shows from Phish.net API
+      const upcomingShows = await phishApi.getUpcomingShows();
+      const upcomingConcerts = upcomingShows
+        .map((show: any) => ({
+          id: parseInt(show.showid),
+          tourId: 1,
+          date: new Date(show.showdate),
+          venue: show.venue,
+          city: show.city,
+          state: show.state,
+          country: show.country,
+          setlist: [],
+          isCompleted: false,
+        }))
+        .sort((a: any, b: any) => new Date(a.date).getTime() - new Date(b.date).getTime())
         .slice(0, 3);
       
-      // Transform cached data to our format
-      const concerts = upcomingShows.map((show: any) => ({
-        id: show.id,
-        tourId: 1, // Associate with current tour
-        date: new Date(show.showDate),
-        venue: show.venue,
-        city: show.city,
-        state: show.state,
-        country: show.country,
-        setlist: [],
-        isCompleted: false,
-      }));
-      
-      res.json(concerts);
+      res.json(upcomingConcerts);
     } catch (error) {
       console.error("Error fetching upcoming concerts:", error);
       res.status(500).json({ message: "Failed to fetch upcoming concerts" });
@@ -817,22 +812,24 @@ export async function registerRoutes(app: Express): Promise<Server> {
         isCompleted: true,
       }));
       
-      // Get upcoming concerts from Phish.net API
-      const upcomingShows = await phishApi.getUpcomingShows();
-      const upcomingConcerts = upcomingShows
-        .map((show: any) => ({
-          id: parseInt(show.showid),
-          tourId: 1,
-          date: new Date(show.showdate),
-          venue: show.venue,
-          city: show.city,
-          state: show.state,
-          country: show.country,
-          setlist: [],
-          isCompleted: false,
-        }))
-        .sort((a: any, b: any) => new Date(a.date).getTime() - new Date(b.date).getTime())
+      // Get upcoming concerts from cache (same source as concerts tab)
+      const { cacheService } = await import('./services/cache-service');
+      const cachedShows = await cacheService.getCachedShows();
+      const upcomingShows = cachedShows
+        .filter((show: any) => new Date(show.showDate) > new Date())
         .slice(0, 3);
+      
+      const upcomingConcerts = upcomingShows.map((show: any) => ({
+        id: show.id,
+        tourId: 1,
+        date: new Date(show.showDate),
+        venue: show.venue,
+        city: show.city,
+        state: show.state,
+        country: show.country,
+        setlist: [],
+        isCompleted: false,
+      }));
       
       // Get league standings
       const leagueStandings = await storage.getLeagueStandings(currentLeague.id);
