@@ -76,42 +76,7 @@ export class PhishNetService {
     }
   }
 
-  async getAllSongs(): Promise<PhishNetSong[]> {
-    try {
-      const response = await fetch(
-        `${this.baseUrl}/songs.json?apikey=${this.apiKey}`,
-      );
 
-      if (!response.ok) {
-        throw new Error(`Phish.net API error: ${response.statusText}`);
-      }
-
-      const data = await response.json();
-      return data.data || [];
-    } catch (error) {
-      console.error("Error fetching all songs:", error);
-      return [];
-    }
-  }
-
-  async getSongStats(songName: string): Promise<any> {
-    try {
-      // Use the setlists/song endpoint to get performance statistics
-      const response = await fetch(
-        `${this.baseUrl}/setlists/song/${encodeURIComponent(songName)}.json?apikey=${this.apiKey}`,
-      );
-
-      if (!response.ok) {
-        throw new Error(`Phish.net API error: ${response.statusText}`);
-      }
-
-      const data = await response.json();
-      return data.data || [];
-    } catch (error) {
-      console.error(`Error fetching stats for song "${songName}":`, error);
-      return [];
-    }
-  }
 
   async getSetlist(showDate: string): Promise<any> {
     try {
@@ -149,32 +114,7 @@ export class PhishNetService {
     }
   }
 
-  async getAllSongs(): Promise<PhishNetSong[]> {
-    try {
-      const response = await fetch(
-        `${this.baseUrl}/songs/all.json?apikey=${this.apiKey}`,
-      );
 
-      if (!response.ok) {
-        throw new Error(`Phish.net API error: ${response.statusText}`);
-      }
-
-      const data = await response.json();
-      return data.response?.data || [];
-    } catch (error) {
-      console.error("Error fetching all songs:", error);
-      return [];
-    }
-  }
-
-  calculateRarityScore(timesPlayed: number, avgGap: number): number {
-    // Calculate rarity score based on times played and average gap
-    // Lower times played = higher rarity
-    // Higher average gap = higher rarity
-    const playScore = Math.max(0, 100 - timesPlayed / 10);
-    const gapScore = Math.min(100, avgGap * 2);
-    return Math.round((playScore + gapScore) / 2);
-  }
   async getAllSongsForDraft(): Promise<any[]> {
     try {
       // Check cache first
@@ -210,7 +150,7 @@ export class PhishNetService {
         id: song.songid || (index + 1000), // Use songid from API, fallback to index
         title: song.song,
         category: this.categoryzeSong(song.song),
-        rarity_score: this.calculateRarityScore(song.times_played || 0, song.gap || 0),
+        rarity_score: this.calculateRarityScore(song.times_played || 0),
         total_plays: song.times_played || 0,
         last_played: song.last_played,
         plays_24_months: this.estimate24MonthPlays(song.times_played || 0)

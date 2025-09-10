@@ -145,7 +145,7 @@ export class CacheService {
         });
 
       // Fetch from API
-      const apiSongs = await this.phishApi.getAllSongs();
+      const apiSongs = await this.phishApi.getAllSongsForDraft();
       console.log(`Fetched ${apiSongs.length} songs from Phish.net API`);
 
       if (apiSongs.length > 0) {
