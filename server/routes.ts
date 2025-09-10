@@ -655,6 +655,63 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Cache management routes (admin only)
+  app.post("/api/admin/cache/refresh", async (req, res) => {
+    try {
+      // TODO: Add admin authentication check here
+      // if (!req.user || req.user.role !== 'admin') {
+      //   return res.status(403).json({ message: "Admin access required" });
+      // }
+
+      const { cacheService } = await import('./services/cache-service');
+      await cacheService.refreshAllCaches();
+      
+      res.json({ message: "All caches refreshed successfully" });
+    } catch (error) {
+      console.error("Error refreshing caches:", error);
+      res.status(500).json({ message: "Failed to refresh caches" });
+    }
+  });
+
+  app.post("/api/admin/cache/refresh-songs", async (req, res) => {
+    try {
+      // TODO: Add admin authentication check here
+      const { cacheService } = await import('./services/cache-service');
+      await cacheService.getCachedSongs(true); // Force refresh
+      
+      res.json({ message: "Songs cache refreshed successfully" });
+    } catch (error) {
+      console.error("Error refreshing songs cache:", error);
+      res.status(500).json({ message: "Failed to refresh songs cache" });
+    }
+  });
+
+  app.post("/api/admin/cache/refresh-shows", async (req, res) => {
+    try {
+      // TODO: Add admin authentication check here
+      const { cacheService } = await import('./services/cache-service');
+      await cacheService.getCachedShows(true); // Force refresh
+      
+      res.json({ message: "Shows cache refreshed successfully" });
+    } catch (error) {
+      console.error("Error refreshing shows cache:", error);
+      res.status(500).json({ message: "Failed to refresh shows cache" });
+    }
+  });
+
+  app.get("/api/admin/cache/stats", async (req, res) => {
+    try {
+      // TODO: Add admin authentication check here
+      const { cacheService } = await import('./services/cache-service');
+      const stats = await cacheService.getCacheStats();
+      
+      res.json(stats);
+    } catch (error) {
+      console.error("Error getting cache stats:", error);
+      res.status(500).json({ message: "Failed to get cache stats" });
+    }
+  });
+
   // Activity routes
   app.get("/api/activities", async (req, res) => {
     try {
