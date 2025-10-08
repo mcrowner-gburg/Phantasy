@@ -93,6 +93,7 @@ export const songs = pgTable("songs", {
   rarityScore: integer("rarity_score").default(0), // Simple scoring: 0 base points, earned during tour
   lastPlayed: timestamp("last_played"),
   totalPlays: integer("total_plays").default(0),
+  plays24Months: integer("plays_24_months").default(0), // Plays in last 24 months
 });
 
 export const draftedSongs = pgTable("drafted_songs", {

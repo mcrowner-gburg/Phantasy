@@ -435,6 +435,7 @@ export class DatabaseStorage implements IStorage {
       rarityScore: cached.rarityScore,
       lastPlayed: cached.lastPlayed ? new Date(cached.lastPlayed) : null,
       totalPlays: cached.timesPlayed,
+      plays24Months: cached.plays24Months || 0,
     }));
   }
 

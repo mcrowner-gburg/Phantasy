@@ -19,6 +19,7 @@ interface DraftedSong {
     rarityScore: number | null;
     lastPlayed: string | null;
     totalPlays: number | null;
+    plays24Months?: number | null;
   };
 }
 
@@ -174,7 +175,7 @@ export default function DraftedSongs({ draftedSongs, onDraftClick }: DraftedSong
                     </div>
                   </td>
                   <td className="py-4 phish-text">
-                    {draft.song?.totalPlays || 0}
+                    {draft.song?.plays24Months ?? 0}
                   </td>
                   <td className="py-4 font-bold phish-gold">{draft.points || 0}</td>
                   <td className="py-4">
