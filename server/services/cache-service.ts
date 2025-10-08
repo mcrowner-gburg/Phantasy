@@ -216,13 +216,13 @@ export class CacheService {
           set: { isRefreshing: true },
         });
 
-      // Fetch recent and upcoming shows
-      const [recentShows, upcomingShows] = await Promise.all([
-        this.phishApi.getRecentShows(50),
+      // Fetch shows from last 24 months and upcoming shows
+      const [last24MonthsShows, upcomingShows] = await Promise.all([
+        this.phishApi.getShowsLast24Months(),
         this.phishApi.getUpcomingShows()
       ]);
 
-      const allShows = [...recentShows, ...upcomingShows];
+      const allShows = [...last24MonthsShows, ...upcomingShows];
       console.log(`Fetched ${allShows.length} shows from Phish.net API`);
 
       if (allShows.length > 0) {
@@ -326,10 +326,8 @@ export class CacheService {
       const recentShows = await db
         .select()
         .from(cachedShows)
-        .where(and(
-          desc(cachedShows.showDate),
-          eq(cachedShows.isCompleted, true)
-        ));
+        .where(eq(cachedShows.isCompleted, true))
+        .orderBy(desc(cachedShows.showDate));
       
       const showsLast24Months = recentShows.filter(show => 
         new Date(show.showDate) >= twentyFourMonthsAgo

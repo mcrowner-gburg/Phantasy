@@ -296,6 +296,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Force refresh cache endpoint
+  app.post("/api/cache/refresh", async (req, res) => {
+    try {
+      console.log('🔄 Force refreshing all caches...');
+      await storage.getCachedShows(true); // Force refresh shows
+      await storage.getCachedSongs(true); // Force refresh songs
+      res.json({ message: 'Cache refreshed successfully' });
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
   // Get all songs (using cached data)
   app.get("/api/songs", async (req, res) => {
     try {

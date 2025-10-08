@@ -76,6 +76,49 @@ export class PhishNetService {
     }
   }
 
+  async getShowsLast24Months(): Promise<PhishNetShow[]> {
+    try {
+      const currentYear = new Date().getFullYear();
+      const years = [currentYear, currentYear - 1, currentYear - 2]; // 2025, 2024, 2023
+      
+      console.log(`Fetching shows from years: ${years.join(', ')} for 24-month calculation...`);
+      
+      const allShows: PhishNetShow[] = [];
+      
+      for (const year of years) {
+        try {
+          const response = await fetch(
+            `${this.baseUrl}/shows/showyear/${year}.json?apikey=${this.apiKey}`,
+          );
+          
+          if (response.ok) {
+            const data = await response.json();
+            const shows = data.data || [];
+            allShows.push(...shows);
+            console.log(`  - Fetched ${shows.length} shows from ${year}`);
+          }
+        } catch (err) {
+          console.error(`Error fetching shows from ${year}:`, err);
+        }
+      }
+      
+      // Filter to only shows from last 24 months
+      const twentyFourMonthsAgo = new Date();
+      twentyFourMonthsAgo.setMonth(twentyFourMonthsAgo.getMonth() - 24);
+      
+      const filtered = allShows.filter(show => 
+        new Date(show.showdate) >= twentyFourMonthsAgo && 
+        new Date(show.showdate) <= new Date()
+      );
+      
+      console.log(`Total shows in last 24 months: ${filtered.length}`);
+      return filtered;
+    } catch (error) {
+      console.error("Error fetching last 24 months of shows:", error);
+      return [];
+    }
+  }
+
 
 
   async getSetlist(showDate: string): Promise<any> {

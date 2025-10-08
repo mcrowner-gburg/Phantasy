@@ -90,6 +90,7 @@ export interface IStorage {
   // Song operations
   getAllSongs(): Promise<Song[]>;
   getCachedSongs(forceRefresh?: boolean): Promise<CachedSong[]>;
+  getCachedShows(forceRefresh?: boolean): Promise<CachedShow[]>;
   getSong(id: number): Promise<Song | undefined>;
   getSongByTitle(title: string): Promise<Song | undefined>;
   createSong(title: string, category?: string): Promise<Song>;
@@ -440,6 +441,10 @@ export class DatabaseStorage implements IStorage {
   // New method to get cached songs directly
   async getCachedSongs(forceRefresh = false): Promise<CachedSong[]> {
     return await cacheService.getCachedSongs(forceRefresh);
+  }
+
+  async getCachedShows(forceRefresh = false): Promise<CachedShow[]> {
+    return await cacheService.getCachedShows(forceRefresh);
   }
 
   // Legacy method - kept for compatibility but now uses cache
