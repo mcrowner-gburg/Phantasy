@@ -249,7 +249,7 @@ export default function DraftRoom() {
                           <div>
                             <div className="font-medium">{song.title}</div>
                             <div className="text-sm text-gray-600">
-                              {song.category} • {song.totalPlays} plays (24 months)
+                              {song.category} • {song.plays24Months} plays (24 months)
                             </div>
                           </div>
                           {isMyTurn && league && league.draftStatus === "active" && (

@@ -314,7 +314,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         rarityScore: cached.rarityScore,
         totalPlays: cached.timesPlayed,
         lastPlayed: cached.lastPlayed,
-        plays24Months: Math.floor(cached.timesPlayed * 0.2) // Estimate
+        plays24Months: cached.plays24Months || 0
       }));
       
       console.log(`📊 Cache returned ${allSongs.length} songs`);
@@ -355,7 +355,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         rarityScore: cached.rarityScore,
         totalPlays: cached.timesPlayed,
         lastPlayed: cached.lastPlayed,
-        plays24Months: Math.floor(cached.timesPlayed * 0.2)
+        plays24Months: cached.plays24Months || 0
       }));
       
       const filtered = allSongs.filter(song => 

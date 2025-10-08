@@ -149,6 +149,9 @@ export class CacheService {
       console.log(`Fetched ${apiSongs.length} songs from Phish.net API`);
 
       if (apiSongs.length > 0) {
+        // Calculate 24-month play counts
+        const plays24MonthsMap = await this.calculate24MonthPlays();
+        
         // Clear existing cache
         await db.delete(cachedSongs);
 
@@ -174,6 +177,7 @@ export class CacheService {
             title: song.song,
             artist: 'Phish',
             timesPlayed: song.times_played || 0,
+            plays24Months: plays24MonthsMap.get(song.song) || 0,
             debutDate: song.debut_date || null,
             lastPlayed: song.last_played || null,
             gap: song.gap || 0,
@@ -307,6 +311,66 @@ export class CacheService {
     }
 
     return null;
+  }
+
+  // Calculate 24-month play counts from cached shows and setlists
+  private async calculate24MonthPlays(): Promise<Map<string, number>> {
+    console.log('📊 Calculating 24-month play counts from cached shows...');
+    const songPlayCounts = new Map<string, number>();
+    
+    try {
+      // Get shows from last 24 months
+      const twentyFourMonthsAgo = new Date();
+      twentyFourMonthsAgo.setMonth(twentyFourMonthsAgo.getMonth() - 24);
+      
+      const recentShows = await db
+        .select()
+        .from(cachedShows)
+        .where(and(
+          desc(cachedShows.showDate),
+          eq(cachedShows.isCompleted, true)
+        ));
+      
+      const showsLast24Months = recentShows.filter(show => 
+        new Date(show.showDate) >= twentyFourMonthsAgo
+      );
+      
+      console.log(`Found ${showsLast24Months.length} shows in last 24 months`);
+      
+      // For each show, get setlist and count songs
+      for (const show of showsLast24Months) {
+        // Try to get cached setlist first
+        const showDateStr = show.showDate.toISOString().split('T')[0];
+        const [cachedSetlist] = await db
+          .select()
+          .from(cachedSetlists)
+          .where(eq(cachedSetlists.showDate, showDateStr));
+        
+        let songs: string[] = [];
+        
+        if (cachedSetlist && cachedSetlist.songs) {
+          songs = Array.isArray(cachedSetlist.songs) ? cachedSetlist.songs : [];
+        } else if (show.setlistdata) {
+          // Try to extract songs from setlistdata
+          const setlistData = show.setlistdata;
+          if (Array.isArray(setlistData)) {
+            songs = setlistData.map((s: any) => s.song || s.title || s.songname).filter(Boolean);
+          }
+        }
+        
+        // Count each song
+        for (const songTitle of songs) {
+          const count = songPlayCounts.get(songTitle) || 0;
+          songPlayCounts.set(songTitle, count + 1);
+        }
+      }
+      
+      console.log(`✅ Calculated plays for ${songPlayCounts.size} unique songs`);
+    } catch (error) {
+      console.error('Error calculating 24-month plays:', error);
+    }
+    
+    return songPlayCounts;
   }
 
   // Helper method to categorize songs (copied from phish-api.ts)

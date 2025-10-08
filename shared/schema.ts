@@ -188,6 +188,7 @@ export const cachedSongs = pgTable("cached_songs", {
   title: text("title").notNull(),
   artist: text("artist").default("Phish"),
   timesPlayed: integer("times_played").default(0),
+  plays24Months: integer("plays_24_months").default(0), // Plays in last 24 months
   debutDate: text("debut_date"),
   lastPlayed: text("last_played"),
   gap: integer("gap").default(0), // Days since last played
@@ -360,6 +361,7 @@ export const insertCachedSongSchema = createInsertSchema(cachedSongs).pick({
   title: true,
   artist: true,
   timesPlayed: true,
+  plays24Months: true,
   debutDate: true,
   lastPlayed: true,
   gap: true,
