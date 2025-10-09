@@ -3,8 +3,9 @@ import { NavigationSidebar } from "@/components/navigation-sidebar";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Bell, Plus, ArrowUp, Star, Trophy, Music, Calendar, Crown, Users, User } from "lucide-react";
+import { Bell, Plus, ArrowUp, Star, Trophy, Music, Calendar } from "lucide-react";
 import DraftedSongs from "@/components/dashboard/drafted-songs";
+import LeagueStandings from "@/components/dashboard/league-standings";
 import { format } from "date-fns";
 import { useAuth } from "@/hooks/useAuth";
 import { useLocation } from "wouter";
@@ -290,61 +291,13 @@ export default function Dashboard() {
           />
 
           {/* League Standings */}
-          <Card className="glassmorphism border-gray-600">
-            <CardContent className="p-6">
-              <div className="flex items-center justify-between mb-6">
-                <h3 className="text-xl font-bold">League Standings</h3>
-                <div className="flex items-center space-x-2 text-sm phish-text">
-                  <Users className="" size={16} />
-                  <span>"{league?.name || "No League"}" - {tour?.name || "No Tour"}</span>
-                </div>
-              </div>
-
-              <div className="space-y-3">
-                {leagueStandings?.length > 0 ? (
-                  leagueStandings.map((player: any, index: number) => (
-                    <div key={player.id} className={`flex items-center justify-between p-4 bg-black bg-opacity-30 rounded-lg hover:bg-opacity-50 transition-colors ${
-                      player.id === user?.id ? "bg-green-500 bg-opacity-20 border border-green-500" : ""
-                    }`}>
-                      <div className="flex items-center space-x-4">
-                        <div className={`w-8 h-8 rounded-full flex items-center justify-center font-bold text-black ${
-                          index === 0 ? "bg-yellow-500" : index === 1 ? "bg-gray-400" : index === 2 ? "bg-orange-600" : "bg-gray-600"
-                        }`}>
-                          {player.rank}
-                        </div>
-                        <div className="w-10 h-10 bg-green-500 rounded-full flex items-center justify-center">
-                          {index === 0 ? <Crown className="text-yellow-400" size={20} /> : <User className="text-black" size={20} />}
-                        </div>
-                        <div>
-                          <p className="font-medium">
-                            {player.username} {player.id === user?.id && <span className="text-green-500">(You)</span>}
-                          </p>
-                          <p className="text-sm phish-text">{player.songCount || 0} songs drafted</p>
-                        </div>
-                      </div>
-                      <div className="text-right">
-                        <p className="font-bold phish-gold text-lg">{player.totalPoints?.toLocaleString() || 0}</p>
-                        <p className="text-sm text-green-500">+{player.todayPoints || 0} today</p>
-                      </div>
-                    </div>
-                  ))
-                ) : (
-                  <div className="text-center py-8 phish-text">
-                    <Trophy className="mx-auto mb-4" size={48} />
-                    <p>No league standings available</p>
-                  </div>
-                )}
-              </div>
-
-              {leagueStandings?.length > 3 && (
-                <div className="mt-6 text-center">
-                  <Button variant="link" className="text-green-500 hover:text-green-400 text-sm font-medium p-0">
-                    View Full Standings
-                  </Button>
-                </div>
-              )}
-            </CardContent>
-          </Card>
+          <LeagueStandings 
+            standings={leagueStandings || []} 
+            currentUserId={user?.id}
+            leagueName={league?.name}
+            leagueId={league?.id}
+            onViewFullStandings={() => setLocation("/leaderboard")}
+          />
         </main>
       </div>
     </div>

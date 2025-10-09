@@ -1,4 +1,4 @@
-import { Crown, User, Users } from "lucide-react";
+import { Crown, User, Users, Download } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useLocation } from "wouter";
 
@@ -15,6 +15,7 @@ interface LeagueStandingsProps {
   standings: LeagueStanding[];
   currentUserId?: number;
   leagueName?: string;
+  leagueId?: number;
   onViewFullStandings?: () => void;
 }
 
@@ -22,9 +23,17 @@ export default function LeagueStandings({
   standings, 
   currentUserId, 
   leagueName,
+  leagueId,
   onViewFullStandings 
 }: LeagueStandingsProps) {
   const [, setLocation] = useLocation();
+
+  const handleExportCSV = () => {
+    if (!leagueId) return;
+    // Trigger CSV download
+    window.location.href = `/api/leagues/${leagueId}/export-picks`;
+  };
+
   const getRankBadgeColor = (rank: number) => {
     switch (rank) {
       case 1:
@@ -49,9 +58,23 @@ export default function LeagueStandings({
     <div className="glassmorphism rounded-xl p-6">
       <div className="flex items-center justify-between mb-6">
         <h3 className="text-xl font-bold">League Standings</h3>
-        <div className="flex items-center space-x-2 text-sm phish-text">
-          <Users size={16} />
-          <span>"{leagueName || "No League"}" League</span>
+        <div className="flex items-center space-x-3">
+          <div className="flex items-center space-x-2 text-sm phish-text">
+            <Users size={16} />
+            <span>"{leagueName || "No League"}" League</span>
+          </div>
+          {leagueId && (
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={handleExportCSV}
+              className="border-gray-600 hover:border-green-500 transition-colors"
+              data-testid="button-export-csv"
+            >
+              <Download size={14} className="mr-2" />
+              Export CSV
+            </Button>
+          )}
         </div>
       </div>
 

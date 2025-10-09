@@ -274,6 +274,99 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Export league picks as CSV
+  app.get("/api/leagues/:id/export-picks", requireAuth, async (req, res) => {
+    try {
+      const leagueId = parseInt(req.params.id);
+      const userId = (req as any).userId;
+      
+      // Get league info
+      const league = await storage.getLeague(leagueId);
+      if (!league) {
+        return res.status(404).json({ message: "League not found" });
+      }
+
+      // Verify user is a member of the league
+      const members = await storage.getLeagueMembers(leagueId);
+      const isMember = members.some(m => m.userId === userId);
+      if (!isMember) {
+        return res.status(403).json({ message: "Not authorized to access this league's data" });
+      }
+
+      // Get all members and their drafted songs
+      const allPicks: any[] = [];
+
+      for (const member of members) {
+        // Skip if member doesn't have user data
+        if (!member.user || !member.user.id) {
+          console.warn('Member missing user data:', member);
+          continue;
+        }
+
+        const draftedSongs = await storage.getDraftedSongs(member.user.id, leagueId);
+        
+        for (const pick of draftedSongs) {
+          allPicks.push({
+            username: member.user.username || 'Unknown User',
+            songTitle: pick.song?.title || 'Unknown',
+            category: pick.song?.category || 'Unknown',
+            plays24Months: pick.song?.plays24Months || 0,
+            totalPlays: pick.song?.totalPlays || 0,
+            points: pick.points || 0,
+            draftedAt: pick.draftedAt ? new Date(pick.draftedAt).toLocaleString() : 'N/A'
+          });
+        }
+      }
+
+      // Helper function to escape CSV values and prevent injection
+      const escapeCSV = (value: string): string => {
+        let sanitized = value;
+        
+        // Remove ALL control characters including carriage returns, tabs, etc.
+        sanitized = sanitized.replace(/[\x00-\x1F\x7F]/g, '');
+        
+        // Trim leading/trailing whitespace to normalize
+        sanitized = sanitized.trim();
+        
+        // Check first character (now guaranteed non-whitespace) for dangerous prefixes
+        const dangerousChars = /^[=+\-@]/;
+        if (dangerousChars.test(sanitized)) {
+          // Prefix with single quote to neutralize formula injection
+          sanitized = "'" + sanitized;
+        }
+        
+        // Escape quotes by doubling them
+        sanitized = sanitized.replace(/"/g, '""');
+        
+        // Always wrap in quotes for consistency and safety
+        return `"${sanitized}"`;
+      };
+
+      // Generate CSV - handle empty case
+      const csvHeaders = 'Username,Song Title,Category,Plays (24 months),Total Plays,Points,Drafted At\n';
+      const csvRows = allPicks.length > 0 
+        ? allPicks.map(pick => 
+            `${escapeCSV(pick.username)},${escapeCSV(pick.songTitle)},${escapeCSV(pick.category)},${pick.plays24Months},${pick.totalPlays},${pick.points},${escapeCSV(pick.draftedAt)}`
+          ).join('\n')
+        : '';
+      
+      const csv = csvHeaders + csvRows;
+
+      // Sanitize filename and ensure it's not empty
+      let safeFilename = league.name.replace(/[^a-z0-9_-]/gi, '_');
+      // Remove leading/trailing underscores and ensure not empty
+      safeFilename = safeFilename.replace(/^_+|_+$/g, '') || 'league';
+      
+      // Set headers for file download
+      res.setHeader('Content-Type', 'text/csv');
+      res.setHeader('Content-Disposition', `attachment; filename="${safeFilename}_picks_${new Date().toISOString().split('T')[0]}.csv"`);
+      res.send(csv);
+    } catch (error) {
+      console.error('Error exporting picks:', error);
+      res.status(500).json({ message: "Failed to export picks" });
+    }
+  });
+
   // Debug API endpoint to test direct API call - MUST BE BEFORE general songs route
   app.get("/api/songs/debug", async (req, res) => {
     try {
