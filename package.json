@@ -113,3 +113,8 @@
     "bufferutil": "^4.0.8"
   }
 }
+"scripts": {
+  "build": "tsc",
+  "postinstall": "cd ../client && npm install && npm run build",
+  "start": "node dist/index.js"
+}
