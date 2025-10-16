@@ -9,6 +9,7 @@ const config: Config = {
     "./client/src/**/*.{ts,tsx,js,jsx}",
     "./server/**/*.{ts,tsx,js,jsx}",
     "./shared/**/*.{ts,tsx,js,jsx}",
+    "./src/**/*.{js,ts,jsx,tsx}"
   ],
   theme: {
     extend: {
