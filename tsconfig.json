@@ -21,9 +21,3 @@
     }
   }
 }
-{
-  "compilerOptions": {
-    ...
-  },
-  "exclude": ["node_modules", "dist", "storage-old.ts"]
-}
