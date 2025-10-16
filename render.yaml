@@ -1,0 +1,20 @@
+services:
+  - type: web
+    name: phantasy-backend
+    env: node
+    plan: free
+    buildCommand: "npm run build"
+    startCommand: "npm start"
+    rootDirectory: "/"
+    autoDeploy: true
+    envVars:
+      - key: NODE_ENV
+        value: production
+
+  - type: static
+    name: phantasy-frontend
+    env: static
+    plan: free
+    buildCommand: "cd client && npm install && npm run build"
+    publishDirectory: "client/dist"
+    autoDeploy: true
