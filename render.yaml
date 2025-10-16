@@ -3,7 +3,7 @@ services:
     name: phantasy-backend
     env: node
     plan: free
-    buildCommand: "npm run build"
+    buildCommand: npm install --include=dev && npm run build
     startCommand: "npm start"
     rootDirectory: "/"
     autoDeploy: true
