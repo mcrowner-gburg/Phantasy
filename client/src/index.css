@@ -110,4 +110,9 @@
   .phish-gold {
     color: var(--phish-gold);
   }
+  /* Utilities layer */
+@layer utilities {
+  .border-border {
+    border-color: var(--border);
+  }
 }
