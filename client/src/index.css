@@ -58,6 +58,12 @@
 }
 
 @layer base {
+  :root {
+    --border: 220 14% 96%;
+    --input: 220 14% 96%;
+    --ring: 220 14% 96%;
+    --background: 0 0% 100%;
+    --foreground: 222 47% 11%;
   * {
     @apply border-border;
   }
