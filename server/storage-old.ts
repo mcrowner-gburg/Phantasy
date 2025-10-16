@@ -349,3 +349,4 @@ export class DatabaseStorage implements IStorage {
 
   // --- Drafted Songs ---
   async getDraftedSongs(userId: number, leagueId: number): Promise
+}
