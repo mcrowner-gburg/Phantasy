@@ -2,6 +2,7 @@
 @tailwind components;
 @tailwind utilities;
 
+/* Root variables */
 :root {
   --background: hsl(0, 0%, 100%);
   --foreground: hsl(20, 14.3%, 4.1%);
@@ -23,7 +24,6 @@
   --destructive-foreground: hsl(60, 9.1%, 97.8%);
   --ring: hsl(20, 14.3%, 4.1%);
   --radius: 0.5rem;
-  
   /* Phish-specific colors */
   --phish-green: hsl(141, 84%, 44%);
   --phish-dark: hsl(0, 0%, 9.8%);
@@ -34,6 +34,7 @@
   --phish-text: hsl(0, 0%, 70%);
 }
 
+/* Dark mode overrides */
 .dark {
   --background: hsl(0, 0%, 9.8%);
   --foreground: hsl(0, 0%, 98%);
@@ -58,12 +59,7 @@
 }
 
 @layer base {
-  :root {
-    --border: 220 14% 96%;
-    --input: 220 14% 96%;
-    --ring: 220 14% 96%;
-    --background: 0 0% 100%;
-    --foreground: 222 47% 11%;
+  /* Apply global border style */
   * {
     @apply border-border;
   }
