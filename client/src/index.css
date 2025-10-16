@@ -24,6 +24,7 @@
   --destructive-foreground: hsl(60, 9.1%, 97.8%);
   --ring: hsl(20, 14.3%, 4.1%);
   --radius: 0.5rem;
+
   /* Phish-specific colors */
   --phish-green: hsl(141, 84%, 44%);
   --phish-dark: hsl(0, 0%, 9.8%);
@@ -34,7 +35,7 @@
   --phish-text: hsl(0, 0%, 70%);
 }
 
-/* Dark mode overrides */
+/* Dark mode */
 .dark {
   --background: hsl(0, 0%, 9.8%);
   --foreground: hsl(0, 0%, 98%);
@@ -59,7 +60,7 @@
 }
 
 @layer base {
-  /* Apply global border style */
+  /* Apply border-border to all elements */
   * {
     @apply border-border;
   }
@@ -87,30 +88,14 @@
     background: linear-gradient(135deg, var(--phish-gold) 0%, var(--phish-orange) 100%);
   }
   
-  .phish-card {
-    background-color: var(--phish-card);
-  }
-  
-  .phish-border {
-    border-color: var(--phish-border);
-  }
-  
-  .phish-text {
-    color: var(--phish-text);
-  }
-  
-  .phish-green {
-    color: var(--phish-green);
-  }
-  
-  .phish-orange {
-    color: var(--phish-orange);
-  }
-  
-  .phish-gold {
-    color: var(--phish-gold);
-  }
-  /* Utilities layer */
+  .phish-card { background-color: var(--phish-card); }
+  .phish-border { border-color: var(--phish-border); }
+  .phish-text { color: var(--phish-text); }
+  .phish-green { color: var(--phish-green); }
+  .phish-orange { color: var(--phish-orange); }
+  .phish-gold { color: var(--phish-gold); }
+}
+
 @layer utilities {
   .border-border {
     border-color: var(--border);
