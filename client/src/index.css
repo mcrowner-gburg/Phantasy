@@ -1,8 +1,13 @@
+/* =========================
+   Tailwind base imports
+========================= */
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
 
-/* Root variables */
+/* =========================
+   CSS Variables
+========================= */
 :root {
   --background: hsl(0, 0%, 100%);
   --foreground: hsl(20, 14.3%, 4.1%);
@@ -59,45 +64,66 @@
   --radius: 0.5rem;
 }
 
+/* =========================
+   Base styles
+========================= */
 @layer base {
-  /* Apply border-border to all elements */
-  * {
-    @apply border-border;
-  }
-
   body {
     @apply font-sans antialiased;
     background-color: var(--phish-dark);
     color: white;
     font-family: 'Inter', sans-serif;
   }
+
+  /* Remove invalid @apply rules */
+  /* All borders should use Tailwind border classes */
 }
 
+/* =========================
+   Components
+========================= */
 @layer components {
   .glassmorphism {
     background: rgba(40, 40, 40, 0.8);
     backdrop-filter: blur(10px);
     border: 1px solid rgba(83, 83, 83, 0.3);
+    border-radius: var(--radius);
   }
-  
+
   .gradient-button {
     background: linear-gradient(135deg, var(--phish-green) 0%, hsl(142, 85%, 55%) 100%);
+    color: var(--primary-foreground);
+    @apply px-4 py-2 rounded;
   }
-  
+
   .score-gradient {
     background: linear-gradient(135deg, var(--phish-gold) 0%, var(--phish-orange) 100%);
+    color: white;
   }
-  
-  .phish-card { background-color: var(--phish-card); }
-  .phish-border { border-color: var(--phish-border); }
-  .phish-text { color: var(--phish-text); }
-  .phish-green { color: var(--phish-green); }
-  .phish-orange { color: var(--phish-orange); }
-  .phish-gold { color: var(--phish-gold); }
-}
 
-@layer utilities {
-  .border-border {
-    border-color: var(--border);
+  .phish-card {
+    background-color: var(--phish-card);
+    border-radius: var(--radius);
+    padding: 1rem;
+  }
+
+  .phish-border {
+    border: 1px solid var(--phish-border);
+  }
+
+  .phish-text {
+    color: var(--phish-text);
+  }
+
+  .phish-green {
+    color: var(--phish-green);
+  }
+
+  .phish-orange {
+    color: var(--phish-orange);
+  }
+
+  .phish-gold {
+    color: var(--phish-gold);
   }
 }
