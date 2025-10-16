@@ -1,11 +1,15 @@
-import React, { useEffect, useState } from 'react';
-import axios from 'axios';
+import React from 'react';
+import ReactDOM from 'react-dom/client';
+import App from './App'; // now it's App.tsx
 
 interface User {
   id: string;
   name: string;
   email: string;
 }
+
+const root = ReactDOM.createRoot(document.getElementById('root')!);
+root.render(<App />);
 
 const App: React.FC = () => {
   const [users, setUsers] = useState<User[]>([]);
