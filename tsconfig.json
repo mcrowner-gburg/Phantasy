@@ -6,19 +6,25 @@
     "tsBuildInfoFile": "./node_modules/typescript/tsbuildinfo",
     "noEmit": true,
     "module": "ESNext",
+    "target": "ES6",
     "strict": true,
     "lib": ["esnext", "dom", "dom.iterable"],
+    "lib": ["DOM", "ESNext"],
     "jsx": "react-jsx",  // <-- important!
     "jsx": "preserve",
     "esModuleInterop": true,
     "skipLibCheck": true,
     "allowImportingTsExtensions": true,
     "moduleResolution": "bundler",
+    "moduleResolution": "Node",
+    "strict": true,
     "baseUrl": ".",
     "types": ["node", "vite/client"],
     "paths": {
       "@/*": ["./client/src/*"],
       "@shared/*": ["./shared/*"]
-    }
+    "esModuleInterop": true
+  },
+  "include": ["src"]
   }
 }
