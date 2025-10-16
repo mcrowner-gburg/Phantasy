@@ -1,6 +1,6 @@
-import React from 'react';
-import ReactDOM from 'react-dom/client';
-import App from './App'; // now it's App.tsx
+// src/App.tsx
+import React, { useEffect, useState } from 'react';
+import axios from 'axios';
 
 interface User {
   id: string;
@@ -8,20 +8,19 @@ interface User {
   email: string;
 }
 
-const root = ReactDOM.createRoot(document.getElementById('root')!);
-root.render(<App />);
-
 const App: React.FC = () => {
   const [users, setUsers] = useState<User[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState<boolean>(true);
+  const [error, setError] = useState<string | null>(null);
 
   // Fetch users from backend
   const fetchUsers = async () => {
     try {
       const response = await axios.get<User[]>('http://localhost:5000/api/admin/users');
       setUsers(response.data);
-    } catch (err) {
+    } catch (err: any) {
       console.error('Error fetching users:', err);
+      setError(err.message || 'Error fetching users');
     } finally {
       setLoading(false);
     }
@@ -32,20 +31,24 @@ const App: React.FC = () => {
   }, []);
 
   return (
-    <div style={{ padding: '2rem' }}>
+    <div style={{ padding: '2rem', fontFamily: 'sans-serif' }}>
       <h1>Admin Users</h1>
-      {loading ? (
-        <p>Loading...</p>
-      ) : users.length > 0 ? (
-        <ul>
-          {users.map(user => (
-            <li key={user.id}>
-              {user.name} ({user.email})
-            </li>
-          ))}
-        </ul>
-      ) : (
-        <p>No users found.</p>
+      {loading && <p>Loading...</p>}
+      {error && <p style={{ color: 'red' }}>{error}</p>}
+      {!loading && !error && (
+        <>
+          {users.length > 0 ? (
+            <ul>
+              {users.map(user => (
+                <li key={user.id}>
+                  {user.name} ({user.email})
+                </li>
+              ))}
+            </ul>
+          ) : (
+            <p>No users found.</p>
+          )}
+        </>
       )}
     </div>
   );
