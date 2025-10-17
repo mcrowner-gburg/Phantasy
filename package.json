@@ -2,6 +2,11 @@
   "name": "phantasy",
   "private": true,
   "scripts": {
+    "check:duplicates": "node -e \"let s=require('fs').readFileSync('package.json','utf8'); let keys=[]; JSON.parse(s,(k,v)=>{if(k){if(keys.includes(k)){throw new Error('Duplicate key: '+k)}; keys.push(k)} return v}); console.log('No duplicate keys found!')\"",
+    "build": "npm run check:duplicates && esbuild index.tsx --platform=node --bundle --format=esm --outdir=dist",
+    "dev": "tsx index.tsx",
+    "start": "NODE_ENV=production node dist/index.js",
+    "check": "tsc"
     "install:all": "npm --prefix client install && npm --prefix server install",
     "build": "npm --prefix client run build && npm --prefix server run build",
     "start": "npm --prefix server start"
