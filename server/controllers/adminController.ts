@@ -1,57 +1,62 @@
-import { Request, Response } from 'express';
-import { storage } from '../storage';
-import { z } from 'zod';
+import { Router } from "express";
+import { z } from "zod";
+import { createInsertSchema } from "drizzle-zod";
+import bcrypt from "bcrypt";
+import { nanoid } from "nanoid";
+import { Pool } from "@neondatabase/serverless";
+import Twilio from "twilio";
+import ws from "ws";
 
-// --- CREATE USER ---
-export const createUser = async (req: Request, res: Response) => {
-  const userSchema = z.object({
-    name: z.string(),
-    email: z.string().email(),
-  });
+const pool = new Pool(); // Make sure DATABASE_URL is set in Render
+const router = Router();
 
+// --- Example Zod schema ---
+const insertUserSchema = z.object({
+  username: z.string().min(3),
+  email: z.string().email(),
+  password: z.string().min(6),
+});
+
+// --- POST /api/admin/users ---
+router.post("/users", async (req, res) => {
   try {
-    const data = userSchema.parse(req.body);
-    const user = await storage.createUser(data); // your storage logic
-    res.status(201).json(user);
+    const userData = insertUserSchema.parse(req.body);
+
+    // Hash password
+    const hashedPassword = await bcrypt.hash(userData.password, 10);
+
+    // Example: insert into DB (replace with your Drizzle logic)
+    await pool.query(
+      "INSERT INTO users (id, username, email, password) VALUES ($1, $2, $3, $4)",
+      [nanoid(), userData.username, userData.email, hashedPassword]
+    );
+
+    res.status(201).json({ message: "User created" });
   } catch (err: any) {
     res.status(400).json({ error: err.message });
   }
-};
+});
 
-// --- READ ALL USERS ---
-export const getUsers = async (_req: Request, res: Response) => {
+// --- Example Twilio SMS route ---
+router.post("/sms", async (req, res) => {
   try {
-    const users = await storage.getUsers();
-    res.json(users);
-  } catch (err) {
-    res.status(500).json({ error: 'Failed to fetch users' });
-  }
-};
+    const { to, message } = req.body;
 
-// --- UPDATE USER ---
-export const updateUser = async (req: Request, res: Response) => {
-  const updateSchema = z.object({
-    name: z.string().optional(),
-    email: z.string().email().optional(),
-  });
+    const client = new Twilio(
+      process.env.TWILIO_SID,
+      process.env.TWILIO_AUTH_TOKEN
+    );
 
-  try {
-    const { id } = req.params;
-    const data = updateSchema.parse(req.body);
-    const user = await storage.updateUser(parseInt(id), data);
-    res.json(user);
+    await client.messages.create({
+      to,
+      from: process.env.TWILIO_PHONE_NUMBER,
+      body: message,
+    });
+
+    res.json({ success: true });
   } catch (err: any) {
     res.status(400).json({ error: err.message });
   }
-};
+});
 
-// --- DELETE USER ---
-export const deleteUser = async (req: Request, res: Response) => {
-  try {
-    const { id } = req.params;
-    await storage.deleteUser(parseInt(id));
-    res.status(204).send();
-  } catch (err: any) {
-    res.status(500).json({ error: err.message });
-  }
-};
+export { router };
