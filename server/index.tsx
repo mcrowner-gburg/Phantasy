@@ -6,7 +6,7 @@ const app = express();
 app.use(express.json());
 app.use(express.urlencoded({ extended: false }));
 
-// Optional logging middleware
+// Logging middleware
 app.use((req, res, next) => {
   const start = Date.now();
   const path = req.path;
@@ -38,7 +38,6 @@ app.use((req, res, next) => {
     throw err;
   });
 
-  // Only setup Vite dev server in development
   if (app.get("env") === "development") {
     await setupVite(app, server);
   } else {
