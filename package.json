@@ -6,11 +6,11 @@
     "dev:client": "cd client && vite",
     "dev:server": "tsx server/index.ts",
 
-    "build": "npm run build:client",
-    "build:client": "cd client && vite build",
-    "build:server": "esbuild server/index.ts --bundle --platform=node --format=esm --outdir=dist --external:express --external:express-session --external:@sendgrid/mail --external:connect-pg-simple --external:nanoid --external:drizzle-orm --external:bcrypt --external:@neondatabase/serverless --external:ws --external:twilio --external:zod --external:drizzle-zod --external:vite"
+    "build": "npm run build:client && npm run build:server",
+    "build:client": "cd client && npm install && vite build",
+    "build:server": "npm install && esbuild server/index.ts --bundle --platform=node --format=esm --outdir=dist --external:express --external:express-session --external:@sendgrid/mail --external:connect-pg-simple --external:nanoid --external:drizzle-orm --external:bcrypt --external:@neondatabase/serverless --external:ws --external:twilio --external:zod --external:drizzle-zod --external:vite",
 
-    "start": "tsx server/index.ts",
+    "start": "node dist/index.js",
     "check": "tsc",
     "db:push": "drizzle-kit push"
   },
@@ -21,15 +21,16 @@
     "twilio": "^4.23.0",
     "zod": "^3.22.0",
     "drizzle-zod": "^0.2.0",
+    "bcrypt": "^5.1.1",
+    "drizzle-orm": "^0.21.0",
+    "nanoid": "^4.0.0",
     "express": "^4.18.2",
     "express-session": "^1.17.3",
-    "connect-pg-simple": "^8.0.0",
-    "nanoid": "^4.0.0",
-    "drizzle-orm": "^0.23.0",
-    "bcrypt": "^5.1.0"
+    "connect-pg-simple": "^8.0.0"
   },
   "devDependencies": {
     "concurrently": "^8.2.2",
+    "esbuild": "^0.21.10",
     "tsx": "^3.12.7",
     "vite": "^5.4.19",
     "@vitejs/plugin-react": "^4.0.0"
