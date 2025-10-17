@@ -1,12 +1,16 @@
-{
-  "name": "phantasy",
-  "version": "1.0.0",
-  "private": true,
-  "scripts": {
-    "build": "npm --prefix client run build && npm --prefix server run build:server",
-    "dev": "concurrently \"npm --prefix client run dev\" \"npm --prefix server run dev\""
-  },
-  "devDependencies": {
-    "concurrently": "^8.0.0"
-  }
+"scripts": {
+  "dev:client": "cd client && npm install && npm run dev",
+  "dev:server": "cd server && npm install && npm run dev",
+  "dev": "concurrently \"npm run dev:client\" \"npm run dev:server\"",
+
+  "build:client": "cd client && npm install && npm run build",
+  "build:server": "cd server && npm install && npm run build",
+  "build": "npm run build:client && npm run build:server",
+
+  "start:server": "cd server && npm install && npm start",
+  "start": "npm run start:server",
+
+  "check": "tsc",
+  "lint": "eslint . --ext .ts,.tsx,.js,.jsx",
+  "db:push": "cd server && npm run db:push"
 }
