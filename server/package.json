@@ -1,17 +1,17 @@
 {
-  "name": "server",
+  "name": "phantasy-server",
   "version": "1.0.0",
-  "private": true,
   "scripts": {
-    "dev": "tsx index.tsx",
-    "build": "esbuild index.tsx --loader=tsx --platform=node --bundle --format=esm --outdir=dist",
-    "start": "NODE_ENV=production node dist/index.js"
+    "dev": "tsx index.ts",
+    "build": "esbuild index.ts --platform=node --bundle --format=esm --outdir=dist",
+    "start": "node dist/index.js"
   },
   "dependencies": {
     "express": "^4.18.2"
   },
   "devDependencies": {
-    "esbuild": "^0.18.21",
-    "tsx": "^3.12.7"
+    "esbuild": "^0.18.20",
+    "tsx": "^3.12.7",
+    "typescript": "^5.1.3"
   }
 }
