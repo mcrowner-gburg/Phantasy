@@ -1,43 +1,33 @@
+// server/index.ts
 import express from "express";
-import path from "path";
 import session from "express-session";
-import connectPgSimple from "connect-pg-simple";
-import { Pool } from "@neondatabase/serverless";
-import { json } from "body-parser";
-import { router as adminRouter } from "./controllers/adminController"; // example import
+import { Pool } from "@neondatabase/serverless"; // external
+import connectPgSimple from "connect-pg-simple"; // external
+import { json } from "express";
 
-// --- PostgreSQL session store ---
-const PgSession = connectPgSimple(session);
-const pool = new Pool(); // reads from DATABASE_URL by default
+// Mark your DB pool as external; esbuild won't bundle it
+const pool = new Pool({
+  connectionString: process.env.DATABASE_URL,
+});
 
-// --- Express App ---
 const app = express();
-const PORT = process.env.PORT || 3000;
-
 app.use(json());
+
+// Example session setup
+const PgSession = connectPgSimple(session);
 app.use(
   session({
     store: new PgSession({ pool }),
     secret: process.env.SESSION_SECRET || "secret",
     resave: false,
     saveUninitialized: false,
-    cookie: { secure: false } // set true if using HTTPS
   })
 );
 
-// --- API routes ---
-app.use("/api/admin", adminRouter);
-
-// --- Serve Vite client build ---
-const clientDistPath = path.join(__dirname, "../client/dist");
-app.use(express.static(clientDistPath));
-
-// Send index.html for any other route (SPA support)
-app.get("*", (_req, res) => {
-  res.sendFile(path.join(clientDistPath, "index.html"));
+// Example route
+app.get("/health", (req, res) => {
+  res.json({ status: "ok" });
 });
 
-// --- Start server ---
-app.listen(PORT, () => {
-  console.log(`Server listening on port ${PORT}`);
-});
+const PORT = process.env.PORT || 3000;
+app.listen(PORT, () => console.log(`Server running on port ${PORT}`));
