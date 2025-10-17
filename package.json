@@ -8,7 +8,7 @@
 
     "build": "npm run build:client",
     "build:client": "cd client && vite build",
-    "build:server": "echo 'No build needed for server when using tsx'",
+    "build:server": "esbuild server/index.ts --bundle --platform=node --format=esm --outdir=dist --external:express --external:express-session --external:@sendgrid/mail --external:connect-pg-simple --external:nanoid --external:drizzle-orm --external:bcrypt --external:@neondatabase/serverless --external:ws --external:twilio --external:zod --external:drizzle-zod --external:vite"
 
     "start": "tsx server/index.ts",
     "check": "tsc",
