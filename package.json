@@ -1,31 +1,18 @@
 {
   "name": "phantasy-app",
-  "version": "1.0.01",
+  "version": "1.0.0",
+  "private": true,
   "scripts": {
-    "dev": "concurrently \"npm run dev:client\" \"npm run dev:server\"",
-    "dev:client": "cd client && npm run dev",
-    "dev:server": "ts-node server/index.ts",
-
+    "dev": "concurrently \"npm:dev:client\" \"npm:dev:server\"",
+    "dev:client": "cd client && npm install && vite",
+    "dev:server": "cd server && npm install && tsx index.ts",
     "build": "npm run build:client && npm run build:server",
-
-    "build:client": "cd client && npm run build",
-
-    "build:server": "esbuild server/index.ts --bundle --platform=node --format=esm --outdir=dist/server --external:@neondatabase/serverless --external:ws --external:twilio --external:zod --external:drizzle-zod --external:drizzle-orm --external:express --external:express-session --external:@sendgrid/mail --external:connect-pg-simple --external:nanoid --external:bcrypt"
-},
-  "dependencies": {
-    "@sendgrid/mail": "^7.7.0",
-    "@neondatabase/serverless": "^1.2.0",
-    "ws": "^8.13.0",
-    "twilio": "^4.23.0",
-    "zod": "^3.22.0",
-    "drizzle-zod": "^0.2.0",
-    "bcrypt": "^5.1.1",
-    "drizzle-orm": "^0.21.0",
-    "nanoid": "^4.0.0",
-    "express": "^4.18.2",
-    "express-session": "^1.17.3",
-    "connect-pg-simple": "^8.0.0"
+    "build:client": "cd client && npm install && vite build",
+    "build:server": "cd server && npm install && esbuild index.ts --bundle --platform=node --format=esm --outdir=dist --external:@neondatabase/serverless --external:ws --external:twilio --external:zod --external:drizzle-zod --external:drizzle-orm --external:express --external:express-session --external:@sendgrid/mail --external:connect-pg-simple --external:nanoid --external:bcrypt",
+    "start": "node server/dist/index.js",
+    "check": "tsc"
   },
+  "dependencies": {},
   "devDependencies": {
     "concurrently": "^8.2.2",
     "esbuild": "^0.21.10",
