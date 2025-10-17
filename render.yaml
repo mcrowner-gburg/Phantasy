@@ -1,20 +1,17 @@
 services:
   - type: web
-    name: phantasy-backend
+    name: phantasy-app
     env: node
-    plan: free
+    branch: main
     buildCommand: npm install --include=dev && npm run build
-    startCommand: "npm start"
-    rootDirectory: "/"
+    startCommand: npm start
+    plan: free
+    nodeVersion: 22.16.0
     autoDeploy: true
     envVars:
       - key: NODE_ENV
         value: production
-
-  - type: static
-    name: phantasy-frontend
-    env: static
-    plan: free
-    buildCommand: "cd client && npm install && npm run build"
-    publishDirectory: "client/dist"
-    autoDeploy: true
+      - key: DATABASE_URL
+        fromDatabase:
+          name: neon-db
+          property: connectionString
