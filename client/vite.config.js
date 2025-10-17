@@ -1,22 +1,15 @@
-// client/vite.config.ts
-import { defineConfig } from 'vite';
-import react from '@vitejs/plugin-react';
-import path from 'path';
+import { defineConfig } from "vite";
+import react from "@vitejs/plugin-react";
 
 export default defineConfig({
   plugins: [react()],
-  root: path.resolve(__dirname, 'src'), // source code location
-  base: './', // ensures relative paths work for static serving
+  server: {
+    port: 5173,
+  },
   build: {
-    outDir: path.resolve(__dirname, 'dist'), // output folder
-    emptyOutDir: true,
-    rollupOptions: {
-      input: path.resolve(__dirname, 'src', 'main.tsx'), // your main entry point
-    },
+    outDir: "dist",
   },
   resolve: {
-    alias: {
-      '@': path.resolve(__dirname, 'src'),
-    },
+    alias: [{ find: "@", replacement: "/src" }],
   },
 });
