@@ -1,62 +1,34 @@
-import { Router } from "express";
-import { z } from "zod";
-import { createInsertSchema } from "drizzle-zod";
-import bcrypt from "bcrypt";
-import { nanoid } from "nanoid";
-import { Pool } from "@neondatabase/serverless";
-import Twilio from "twilio";
-import ws from "ws";
+// controllers/adminController.ts
+import { z } from "zod";               // external
+import { Pool } from "@neondatabase/serverless"; // external
+import Twilio from "twilio";           // external
 
-const pool = new Pool(); // Make sure DATABASE_URL is set in Render
-const router = Router();
-
-// --- Example Zod schema ---
-const insertUserSchema = z.object({
-  username: z.string().min(3),
-  email: z.string().email(),
-  password: z.string().min(6),
+const pool = new Pool({
+  connectionString: process.env.DATABASE_URL,
 });
 
-// --- POST /api/admin/users ---
-router.post("/users", async (req, res) => {
-  try {
-    const userData = insertUserSchema.parse(req.body);
+// Example: create a new user
+export const createUser = async (userData: any) => {
+  const schema = z.object({
+    email: z.string().email(),
+    password: z.string().min(6),
+  });
 
-    // Hash password
-    const hashedPassword = await bcrypt.hash(userData.password, 10);
+  const parsed = schema.parse(userData);
 
-    // Example: insert into DB (replace with your Drizzle logic)
-    await pool.query(
-      "INSERT INTO users (id, username, email, password) VALUES ($1, $2, $3, $4)",
-      [nanoid(), userData.username, userData.email, hashedPassword]
-    );
+  // Twilio example (sending SMS)
+  const client = new Twilio(process.env.TWILIO_SID, process.env.TWILIO_TOKEN);
+  await client.messages.create({
+    to: "+1234567890",
+    from: process.env.TWILIO_FROM,
+    body: `User ${parsed.email} created!`,
+  });
 
-    res.status(201).json({ message: "User created" });
-  } catch (err: any) {
-    res.status(400).json({ error: err.message });
-  }
-});
+  // DB insert example
+  await pool.query("INSERT INTO users (email, password) VALUES ($1, $2)", [
+    parsed.email,
+    parsed.password,
+  ]);
 
-// --- Example Twilio SMS route ---
-router.post("/sms", async (req, res) => {
-  try {
-    const { to, message } = req.body;
-
-    const client = new Twilio(
-      process.env.TWILIO_SID,
-      process.env.TWILIO_AUTH_TOKEN
-    );
-
-    await client.messages.create({
-      to,
-      from: process.env.TWILIO_PHONE_NUMBER,
-      body: message,
-    });
-
-    res.json({ success: true });
-  } catch (err: any) {
-    res.status(400).json({ error: err.message });
-  }
-});
-
-export { router };
+  return { success: true };
+};
