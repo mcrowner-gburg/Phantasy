@@ -1,4 +1,4 @@
-import { createServer as createViteServer } from "vite";
+import { createServer as createViteServer } from "./vite";
 import path from "path";
 import express from "express";
 
