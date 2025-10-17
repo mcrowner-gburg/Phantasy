@@ -15,7 +15,7 @@
     "drizzle-zod": "^0.2.1",
     "zod": "^3.22.2",
     "ws": "^8.13.0",
-    "twilio": "^8.0.0",
+    "twilio": "^5.10.3",
     "@sendgrid/mail": "^8.1.6",
     "connect-pg-simple": "^8.0.0",
     "nanoid": "^4.0.0",
