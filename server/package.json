@@ -23,7 +23,7 @@
     "esbuild": "*"
   },
   "devDependencies": {
-    "tsx": "^3.12.7"
+    "tsx": "^3.12.7",
     "esbuild": "*"
   }
 }
