@@ -1,0 +1,8 @@
+{
+  "name": "phantasy",
+  "private": true,
+  "scripts": {
+    "build": "npm --prefix client install && npm --prefix client run build && npm run build:server",
+    "build:server": "esbuild server/index.ts --platform=node --bundle --format=esm --outdir=dist"
+  }
+}
