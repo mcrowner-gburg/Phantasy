@@ -3,7 +3,6 @@ import session from "express-session";
 import { Pool } from "@neondatabase/serverless";
 import connectPgSimple from "connect-pg-simple";
 import path from "path";
-import fs from "fs";
 import { fileURLToPath } from "url";
 
 // ---------- ESM __dirname ----------
@@ -13,6 +12,8 @@ const __dirname = path.dirname(__filename);
 // ---------- DATABASE POOL ----------
 const pool = new Pool({
   connectionString: process.env.DATABASE_URL,
+  // Provide a fetch implementation to fix WebSocket issues in serverless environments
+  fetch: globalThis.fetch.bind(globalThis),
 });
 
 // ---------- EXPRESS APP ----------
@@ -30,7 +31,7 @@ app.use(
     saveUninitialized: false,
     cookie: {
       secure: process.env.NODE_ENV === "production",
-      maxAge: 1000 * 60 * 60 * 24,
+      maxAge: 1000 * 60 * 60 * 24, // 1 day
       sameSite: "lax",
     },
   })
@@ -43,17 +44,13 @@ app.get("/health", (_req, res) => {
 
 // ---------- SERVE FRONTEND ----------
 const PORT = process.env.PORT || 10000;
-const clientDistPath = path.join(__dirname, "../client/dist");
-const indexPath = path.join(clientDistPath, "index.html");
 
-app.use(express.static(clientDistPath));
+// Serve the client build
+const clientBuildPath = path.join(__dirname, "../client/dist");
+app.use(express.static(clientBuildPath));
 
 app.get("*", (_req, res) => {
-  if (fs.existsSync(indexPath)) {
-    res.sendFile(indexPath);
-  } else {
-    res.status(404).send("Frontend not built yet. Please build your client first.");
-  }
+  res.sendFile(path.join(clientBuildPath, "index.html"));
 });
 
 // ---------- START SERVER ----------
