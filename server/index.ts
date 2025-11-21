@@ -36,24 +36,21 @@ app.use(
 );
 
 // ---------- API ROUTES ----------
-app.get("/health", (req, res) => {
+app.get("/health", (_req, res) => {
   res.json({ status: "ok" });
 });
 
 // ---------- SERVE FRONTEND ----------
-import express from "express";
-import path from "path";
-
 const PORT = process.env.PORT || 10000;
 
-// Serve the client build
+// Serve the client build from the correct path
 app.use(express.static(path.join(__dirname, "../client/dist")));
 
-app.get("*", (req, res) => {
+app.get("*", (_req, res) => {
   res.sendFile(path.join(__dirname, "../client/dist/index.html"));
 });
 
+// ---------- START SERVER ----------
 app.listen(PORT, () => {
   console.log(`Server running on port ${PORT}`);
 });
-
