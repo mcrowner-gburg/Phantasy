@@ -2,9 +2,9 @@ import express, { json, urlencoded } from "express";
 import session from "express-session";
 import { Pool } from "@neondatabase/serverless";
 import connectPgSimple from "connect-pg-simple";
-import path, { resolve, join } from "path";
-import { fileURLToPath } from "url";
+import path from "path";
 import fs from "fs";
+import { fileURLToPath } from "url";
 
 // ---------- ESM __dirname ----------
 const __filename = fileURLToPath(import.meta.url);
@@ -30,7 +30,7 @@ app.use(
     saveUninitialized: false,
     cookie: {
       secure: process.env.NODE_ENV === "production",
-      maxAge: 1000 * 60 * 60 * 24, // 1 day
+      maxAge: 1000 * 60 * 60 * 24,
       sameSite: "lax",
     },
   })
@@ -43,15 +43,12 @@ app.get("/health", (_req, res) => {
 
 // ---------- SERVE FRONTEND ----------
 const PORT = process.env.PORT || 10000;
-const clientDistPath = resolve(process.cwd(), "client/dist");
+const clientDistPath = path.join(__dirname, "../client/dist");
+const indexPath = path.join(clientDistPath, "index.html");
 
-// Serve static files from client dist
 app.use(express.static(clientDistPath));
 
-// Catch-all route for SPA
 app.get("*", (_req, res) => {
-  const indexPath = join(clientDistPath, "index.html");
-
   if (fs.existsSync(indexPath)) {
     res.sendFile(indexPath);
   } else {
