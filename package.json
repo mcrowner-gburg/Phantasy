@@ -2,8 +2,10 @@
   "name": "phantasy-root",
   "version": "1.0.0",
   "scripts": {
-    "install-all": "cd client && npm install && cd ../server && npm install",
-    "build-all": "cd client && npm run build && cd ../server && npm run build:server",
+    "build:client": "cd client && npm install && npm run build",
+    "build:server": "cd server && npm install && npm run build:server",
+    "build:all": "npm run build:client && npm run build:server",
     "start": "cd server && npm start"
   }
+
 }
