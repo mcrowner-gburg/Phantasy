@@ -45,11 +45,11 @@ app.get("/health", (_req, res) => {
 const PORT = process.env.PORT || 10000;
 
 // Serve static files from the built client
-app.use(express.static(path.join(__dirname, "../client/dist")));
+app.use(express.static(path.join(__dirname, "../../client/dist")));
 
 // Fallback to index.html for SPA routing
 app.get("*", (_req, res) => {
-  res.sendFile(path.join(__dirname, "../client/dist/index.html"));
+  res.sendFile(path.join(__dirname, "../../client/dist/index.html"));
 });
 
 // ---------- START SERVER ----------
