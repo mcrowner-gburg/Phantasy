@@ -1,7 +1,8 @@
 // server/index.ts
 import express, { json, urlencoded } from "express";
 import session from "express-session";
-import { Pool } from "@neondatabase/serverless"; // external
+import pkg from "@neondatabase/serverless";
+const { Pool } = pkg;
 import connectPgSimple from "connect-pg-simple";
 import path from "path";
 import { fileURLToPath } from "url";
