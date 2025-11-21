@@ -1,24 +1,15 @@
 {
   "compilerOptions": {
-    "target": "ES2020",
-    "module": "ESNext",
-    "lib": ["DOM", "ESNext"],
-    "jsx": "react-jsx",
-    "moduleResolution": "Node",
-    "esModuleInterop": true,
+    "target": "ES2022",             // Modern JS output for Node 20+
+    "module": "ESNext",             // Keep ESM syntax
+    "moduleResolution": "node",     
+    "outDir": "./dist",             
+    "rootDir": "./server",          
+    "strict": true,                 
+    "esModuleInterop": true,        
     "forceConsistentCasingInFileNames": true,
-    "strict": true,
-    "skipLibCheck": true,
-    "incremental": true,
-    "noEmit": true,
-    "allowImportingTsExtensions": true,
-    "baseUrl": ".",
-    "paths": {
-      "@/*": ["./client/src/*"],
-      "@shared/*": ["./shared/*"]
-    },
-    "types": ["node", "vite/client"]
+    "skipLibCheck": true            
   },
-  "include": ["client/src/**/*", "shared/**/*", "server/**/*"],
-  "exclude": ["node_modules", "build", "dist", "**/*.test.ts"]
+  "include": ["server/**/*"],
+  "exclude": ["node_modules", "dist"]
 }
