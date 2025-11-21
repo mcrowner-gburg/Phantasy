@@ -43,11 +43,14 @@ app.get("/health", (_req, res) => {
 // ---------- SERVE FRONTEND ----------
 const PORT = process.env.PORT || 10000;
 
-// Serve static files from client/dist
-const clientDistPath = path.join(__dirname, "../../client/dist");
+// Use environment variable if provided, else default relative path
+const clientDistPath =
+  process.env.CLIENT_DIST || path.resolve(__dirname, "../../client/dist");
+
+// Serve static files (JS, CSS, images)
 app.use(express.static(clientDistPath));
 
-// All other routes serve index.html
+// All other routes serve index.html for React Router
 app.get("*", (_req, res) => {
   res.sendFile(path.join(clientDistPath, "index.html"));
 });
