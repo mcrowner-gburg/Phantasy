@@ -43,9 +43,9 @@ app.get("/health", (_req, res) => {
 
 // ---------- SERVE FRONTEND ----------
 const PORT = process.env.PORT || 10000;
-const clientDistPath = resolve(__dirname, "../client/dist");
+const clientDistPath = resolve(process.cwd(), "client/dist");
 
-// Serve static files
+// Serve static files from client dist
 app.use(express.static(clientDistPath));
 
 // Catch-all route for SPA
