@@ -3,12 +3,10 @@
   "version": "1.0.0",
   "private": true,
   "scripts": {
-    "build:all": "cd server/client && npm install && npm run build && cd ../.. && npm install --include=dev && npm run build:server"
-    "build:client": "cd client && npm install && npm run build",
+    "build:client": "cd ../client && npm install && npm run build",
     "build:server": "cd server && npm install && npm run build:server",
     "build:all": "npm run build:client && npm run build:server",
-    "start": "cd server && npm start",
-    "dev": "concurrently \"cd client && npm run dev\" \"cd server && npm run dev\""
+    "start": "cd server && node dist/index.js"
   },
   "devDependencies": {
     "concurrently": "^8.2.0"
