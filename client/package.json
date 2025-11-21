@@ -26,7 +26,8 @@
     "zod": "^3.22.4",
     "class-variance-authority": "^0.6.1",
     "tailwind-merge": "^2.5.0",
-    "@radix-ui/react-switch": "^1.0.7"
+    "@radix-ui/react-switch": "^1.0.7",
+    "@radix-ui/react-toast": "^1.0.7"
   },
   "devDependencies": {
     "vite": "^5.1.0",
