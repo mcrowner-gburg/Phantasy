@@ -2,8 +2,9 @@ import express, { json, urlencoded } from "express";
 import session from "express-session";
 import { Pool } from "@neondatabase/serverless";
 import connectPgSimple from "connect-pg-simple";
-import path from "path";
+import path, { resolve, join } from "path";
 import { fileURLToPath } from "url";
+import fs from "fs";
 
 // ---------- ESM __dirname ----------
 const __filename = fileURLToPath(import.meta.url);
@@ -29,7 +30,7 @@ app.use(
     saveUninitialized: false,
     cookie: {
       secure: process.env.NODE_ENV === "production",
-      maxAge: 1000 * 60 * 60 * 24,
+      maxAge: 1000 * 60 * 60 * 24, // 1 day
       sameSite: "lax",
     },
   })
@@ -42,12 +43,20 @@ app.get("/health", (_req, res) => {
 
 // ---------- SERVE FRONTEND ----------
 const PORT = process.env.PORT || 10000;
+const clientDistPath = resolve(__dirname, "../client/dist");
 
-// Serve the client build from the correct path
-app.use(express.static(path.join(__dirname, "../client/dist")));
+// Serve static files
+app.use(express.static(clientDistPath));
 
+// Catch-all route for SPA
 app.get("*", (_req, res) => {
-  res.sendFile(path.join(__dirname, "../client/dist/index.html"));
+  const indexPath = join(clientDistPath, "index.html");
+
+  if (fs.existsSync(indexPath)) {
+    res.sendFile(indexPath);
+  } else {
+    res.status(404).send("Frontend not built yet. Please build your client first.");
+  }
 });
 
 // ---------- START SERVER ----------
