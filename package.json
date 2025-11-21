@@ -21,7 +21,7 @@
     "zod": "^3.23.0"
   },
   "devDependencies": {
-    "esbuild": "^0.19.5",
+    "esbuild": "^0.18.32",
     "@types/express": "^4.17.19",
     "@types/express-session": "^1.17.6",
     "@types/node": "^20.5.1",
