@@ -5,11 +5,9 @@ import path from "path";
 export default defineConfig({
   plugins: [react()],
   build: {
-    // Output folder relative to server
-    outDir: path.resolve(__dirname, "dist"),
-    // Base path for assets (important for Express serving)
+    // Output folder where server expects it
+    outDir: path.resolve(__dirname, "../server/client/dist"),
     assetsDir: "assets",
-    // Ensure absolute paths in built HTML
     rollupOptions: {
       output: {
         entryFileNames: "assets/[name]-[hash].js",
