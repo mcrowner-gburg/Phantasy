@@ -1,16 +1,24 @@
 import { defineConfig } from "vite";
 import react from "@vitejs/plugin-react";
+import path from "path";
 
 export default defineConfig({
   plugins: [react()],
-  base: "./", // IMPORTANT: makes CSS/JS references relative
   build: {
-    outDir: "dist",
+    // Output folder relative to server
+    outDir: path.resolve(__dirname, "dist"),
+    // Base path for assets (important for Express serving)
+    assetsDir: "assets",
+    // Ensure absolute paths in built HTML
+    rollupOptions: {
+      output: {
+        entryFileNames: "assets/[name]-[hash].js",
+        chunkFileNames: "assets/[name]-[hash].js",
+        assetFileNames: "assets/[name]-[hash].[ext]",
+      },
+    },
   },
   resolve: {
     alias: [{ find: "@", replacement: "/src" }],
-  },
-  server: {
-    port: 5173,
   },
 });
