@@ -8,6 +8,8 @@ export default defineConfig({
   },
   build: {
     outDir: "dist",
+    // Use relative paths so assets work when served from Express
+    base: "./",
   },
   resolve: {
     alias: [{ find: "@", replacement: "/src" }],
