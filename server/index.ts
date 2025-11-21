@@ -44,8 +44,6 @@ app.get("/health", (req, res) => {
 import path from "path";
 import express from "express";
 
-const app = express();
-
 // Serve frontend in production
 if (process.env.NODE_ENV === "production") {
   const clientBuildPath = path.join(__dirname, "../client/dist");
