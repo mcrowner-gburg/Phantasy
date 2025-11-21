@@ -12,18 +12,15 @@
     "react": "^18.2.0",
     "react-dom": "^18.2.0",
     "react-router-dom": "^6.14.1",
-    "wouter": "^2.8.0",
     "clsx": "^2.0.0",
-    "axios": "^1.5.0",
     "@tanstack/react-query": "^4.35.1",
     "@tanstack/react-query-devtools": "^4.35.1",
-    "@radix-ui/react-tooltip": "^1.0.0",
-    "@radix-ui/react-popover": "^1.0.0",
-    "@radix-ui/react-dialog": "^1.0.0",
-    "@radix-ui/react-slot": "^1.0.0",
-    "@radix-ui/react-primitive": "^1.0.0",
+    "axios": "^1.5.0",
+    "wouter": "^2.8.0",
+    "date-fns": "^2.30.0",
+    "react-hook-form": "^7.49.0",
     "lucide-react": "^0.268.0",
-    "date-fns": "^2.30.0"
+    "@radix-ui/react-tooltip": "^1.0.4"
   },
   "devDependencies": {
     "vite": "^5.1.0",
