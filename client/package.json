@@ -15,7 +15,7 @@
     "clsx": "^2.0.0",
     "@tanstack/react-query": "^4.35.1",
     "@tanstack/react-query-devtools": "^4.35.1",
-    "axios": "^1.5.0"
+    "axios": "^1.5.0",
     "wouter": "^2.8.0" // or whatever latest
   },
   "devDependencies": {
