@@ -4,6 +4,7 @@ import { Pool } from "@neondatabase/serverless";
 import connectPgSimple from "connect-pg-simple";
 import path from "path";
 import { fileURLToPath } from "url";
+import fetch from "node-fetch"; // For Neon WebSocket in serverless envs
 
 // ---------- ESM __dirname ----------
 const __filename = fileURLToPath(import.meta.url);
@@ -12,8 +13,8 @@ const __dirname = path.dirname(__filename);
 // ---------- DATABASE POOL ----------
 const pool = new Pool({
   connectionString: process.env.DATABASE_URL,
-  // Provide a fetch implementation to fix WebSocket issues in serverless environments
-  fetch: globalThis.fetch.bind(globalThis),
+  // Fix WebSocket constructor error in serverless environments
+  ...(typeof globalThis.WebSocket === "undefined" ? { WebSocket: fetch } : {}),
 });
 
 // ---------- EXPRESS APP ----------
@@ -31,7 +32,7 @@ app.use(
     saveUninitialized: false,
     cookie: {
       secure: process.env.NODE_ENV === "production",
-      maxAge: 1000 * 60 * 60 * 24, // 1 day
+      maxAge: 1000 * 60 * 60 * 24,
       sameSite: "lax",
     },
   })
@@ -45,8 +46,9 @@ app.get("/health", (_req, res) => {
 // ---------- SERVE FRONTEND ----------
 const PORT = process.env.PORT || 10000;
 
-// Serve the client build
-const clientBuildPath = path.join(__dirname, "../client/dist");
+// Correct client build path
+const clientBuildPath = path.resolve(__dirname, "../../client/dist");
+
 app.use(express.static(clientBuildPath));
 
 app.get("*", (_req, res) => {
