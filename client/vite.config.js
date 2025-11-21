@@ -3,15 +3,14 @@ import react from "@vitejs/plugin-react";
 
 export default defineConfig({
   plugins: [react()],
-  server: {
-    port: 5173,
-  },
+  base: "./", // IMPORTANT: makes CSS/JS references relative
   build: {
     outDir: "dist",
-    // Use relative paths so assets work when served from Express
-    base: "./",
   },
   resolve: {
     alias: [{ find: "@", replacement: "/src" }],
+  },
+  server: {
+    port: 5173,
   },
 });
