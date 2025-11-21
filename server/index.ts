@@ -44,7 +44,7 @@ app.get("/health", (_req, res) => {
 const PORT = process.env.PORT || 10000;
 
 // Serve static files from client/dist
-const clientDistPath = path.join(__dirname, "../client/dist");
+const clientDistPath = path.join(__dirname, "client/dist");
 app.use(express.static(clientDistPath));
 
 // All other routes serve index.html
