@@ -21,7 +21,8 @@
     "@radix-ui/react-popover": "^1.0.0",
     "@radix-ui/react-dialog": "^1.0.0",
     "@radix-ui/react-slot": "^1.0.0",
-    "@radix-ui/react-primitive": "^1.0.0"
+    "@radix-ui/react-primitive": "^1.0.0",
+    "lucide-react": "^0.268.0"
   },
   "devDependencies": {
     "vite": "^5.1.0",
