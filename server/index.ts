@@ -12,7 +12,6 @@ const __dirname = path.dirname(__filename);
 // ---------- DATABASE POOL ----------
 const pool = new Pool({
   connectionString: process.env.DATABASE_URL,
-  // Node 20+ has native fetch; no need for node-fetch
 });
 
 // ---------- EXPRESS APP ----------
@@ -44,12 +43,13 @@ app.get("/health", (_req, res) => {
 // ---------- SERVE FRONTEND ----------
 const PORT = process.env.PORT || 10000;
 
-// Serve static files from the built client
-app.use(express.static(path.join(__dirname, "../../client/dist")));
+// Serve static files from client/dist
+const clientDistPath = path.join(__dirname, "../client/dist");
+app.use(express.static(clientDistPath));
 
-// Fallback to index.html for SPA routing
+// All other routes serve index.html
 app.get("*", (_req, res) => {
-  res.sendFile(path.join(__dirname, "../../client/dist/index.html"));
+  res.sendFile(path.join(clientDistPath, "index.html"));
 });
 
 // ---------- START SERVER ----------
