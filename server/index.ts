@@ -1,13 +1,11 @@
-// server/index.ts
 import express, { json, urlencoded } from "express";
 import session from "express-session";
-import pkg from "@neondatabase/serverless";
-const { Pool } = pkg;
+import { Pool } from "@neondatabase/serverless";
 import connectPgSimple from "connect-pg-simple";
 import path from "path";
 import { fileURLToPath } from "url";
 
-// Needed for ES modules to get __dirname
+// ---------- ESM __dirname ----------
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
@@ -18,8 +16,6 @@ const pool = new Pool({
 
 // ---------- EXPRESS APP ----------
 const app = express();
-
-// JSON and URL-encoded body parsing
 app.use(json());
 app.use(urlencoded({ extended: true }));
 
@@ -33,7 +29,7 @@ app.use(
     saveUninitialized: false,
     cookie: {
       secure: process.env.NODE_ENV === "production",
-      maxAge: 1000 * 60 * 60 * 24, // 1 day
+      maxAge: 1000 * 60 * 60 * 24,
       sameSite: "lax",
     },
   })
@@ -44,14 +40,11 @@ app.get("/health", (req, res) => {
   res.json({ status: "ok" });
 });
 
-// Add more API routes here (e.g., /auth, /users, etc.)
-
 // ---------- SERVE FRONTEND ----------
 if (process.env.NODE_ENV === "production") {
   const clientBuildPath = path.join(__dirname, "../client/dist");
   app.use(express.static(clientBuildPath));
 
-  // All other routes serve index.html
   app.get("*", (req, res) => {
     res.sendFile(path.join(clientBuildPath, "index.html"));
   });
