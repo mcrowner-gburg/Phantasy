@@ -1,13 +1,12 @@
-// client/src/App.tsx
 import React from "react";
 
-const App: React.FC = () => {
+function App() {
   return (
     <div>
-      <h1>Welcome to Phantasy!</h1>
-      <p>Your site is running and styled correctly.</p>
+      <h1>Phantasy</h1>
+      <p>Your app is running!</p>
     </div>
   );
-};
+}
 
 export default App;
