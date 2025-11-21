@@ -41,8 +41,14 @@ app.get("/health", (req, res) => {
 });
 
 // ---------- SERVE FRONTEND ----------
+import path from "path";
+import express from "express";
+
+const app = express();
+
+// Serve frontend in production
 if (process.env.NODE_ENV === "production") {
-  const clientBuildPath = path.join(__dirname, "../../client/dist");
+  const clientBuildPath = path.join(__dirname, "../client/dist");
   app.use(express.static(clientBuildPath));
 
   app.get("*", (req, res) => {
@@ -50,6 +56,6 @@ if (process.env.NODE_ENV === "production") {
   });
 }
 
-// ---------- START SERVER ----------
-const PORT = process.env.PORT || 3000;
-app.listen(PORT, () => console.log(`Server running on port ${PORT}`));
+app.listen(process.env.PORT || 10000, () => {
+  console.log(`Server running on port ${process.env.PORT || 10000}`);
+});
