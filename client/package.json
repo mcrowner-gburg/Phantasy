@@ -27,7 +27,6 @@
   "class-variance-authority": "^0.6.1",
   "tailwind-merge": "^2.5.0"
 }
-  },
   "devDependencies": {
     "vite": "^5.1.0",
     "@vitejs/plugin-react": "^4.0.0",
