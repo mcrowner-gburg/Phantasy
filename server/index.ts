@@ -29,7 +29,7 @@ app.use(
     saveUninitialized: false,
     cookie: {
       secure: process.env.NODE_ENV === "production",
-      maxAge: 1000 * 60 * 60 * 24,
+      maxAge: 1000 * 60 * 60 * 24, // 1 day
       sameSite: "lax",
     },
   })
@@ -41,21 +41,20 @@ app.get("/health", (_req, res) => {
 });
 
 // ---------- SERVE FRONTEND ----------
-const PORT = process.env.PORT || 10000;
 
-// Use environment variable if provided, else default relative path
-const clientDistPath =
-  process.env.CLIENT_DIST || path.resolve(__dirname, "../../client/dist");
+// Ensure the client dist path is correct for Render deployment
+const clientDistPath = path.resolve(__dirname, "../client/dist");
 
-// Serve static files (JS, CSS, images)
+// Serve all static assets from frontend build
 app.use(express.static(clientDistPath));
 
-// All other routes serve index.html for React Router
+// Catch-all route for React Router
 app.get("*", (_req, res) => {
   res.sendFile(path.join(clientDistPath, "index.html"));
 });
 
 // ---------- START SERVER ----------
+const PORT = process.env.PORT || 10000;
 app.listen(PORT, () => {
   console.log(`Server running on port ${PORT}`);
 });
