@@ -5,13 +5,12 @@
   "scripts": {
     "build:frontend": "cd client && npm install && npm run build",
     "copy:frontend": "rm -rf server/dist/client && cp -r client/dist server/dist/client",
-    "build:server": "cd server && npm install --omit=dev && npm run build:server",
+    "build:server": "(cd server && npm install --omit=dev && npm run build:server)",
     "build": "npm run build:frontend && npm run copy:frontend && npm run build:server",
     "start": "node server/dist/index.js",
     "dev": "concurrently \"cd client && npm run dev\" \"cd server && npm run dev\""
   },
   "dependencies": {
-    "esbuild": "^0.19.5",
     "@neondatabase/serverless": "^1.0.0",
     "bcrypt": "^5.1.1",
     "connect-pg-simple": "^8.0.0",
