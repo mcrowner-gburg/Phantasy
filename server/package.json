@@ -23,7 +23,7 @@
     "twilio": "^4.15.0",
     "ws": "^8.15.0",
     "zod": "^3.23.0",
-    "@sendgrid/mail": "^7.9.0"
+    "@sendgrid/mail": "^8.1.6"
   },
   "devDependencies": {
     "concurrently": "^8.2.0",
