@@ -6,7 +6,8 @@ export default defineConfig({
   base: "./", // Make assets load relative to index.html
   plugins: [react()],
   build: {
-    outDir: path.resolve(__dirname, "dist"), // Build into client/dist
+    // Output directly to server/dist/client
+    outDir: path.resolve(__dirname, "../server/dist/client"),
     assetsDir: "assets",
     rollupOptions: {
       output: {
