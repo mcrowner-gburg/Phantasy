@@ -1,11 +1,14 @@
 {
-  "name": "phantasy-server",
+  "name": "phantasy-full",
   "version": "1.0.0",
-  "type": "module",
+  "private": true,
   "scripts": {
-    "build:server": "esbuild index.ts --bundle --platform=node --format=esm --outdir=dist --external:@neondatabase/serverless --external:ws --external:twilio --external:zod --external:drizzle-zod --external:drizzle-orm --external:express --external:express-session --external:@sendgrid/mail --external:connect-pg-simple --external:nanoid --external:bcrypt",
-    "start": "node dist/index.js",
-    "dev": "nodemon index.ts"
+    "build:frontend": "cd client && npm install && npm run build",
+    "copy:frontend": "rm -rf server/dist/client && cp -r client/dist server/dist/client",
+    "build:server": "cd server && npm install --omit=dev && npm run build:server",
+    "build": "npm run build:frontend && npm run copy:frontend && npm run build:server",
+    "start": "node server/dist/index.js",
+    "dev": "concurrently \"cd client && npm run dev\" \"cd server && npm run dev\""
   },
   "dependencies": {
     "@neondatabase/serverless": "^1.0.0",
@@ -22,6 +25,7 @@
     "@sendgrid/mail": "^7.9.0"
   },
   "devDependencies": {
+    "concurrently": "^8.2.0",
     "esbuild": "^0.19.5",
     "@types/express": "^4.17.19",
     "@types/express-session": "^1.17.6",
