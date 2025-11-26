@@ -3,13 +3,13 @@
   "version": "1.0.0",
   "private": true,
   "scripts": {
-    "build:client": "cd client && npm install && npm run build",
+    "build:client": "npm install --prefix client && npm run build --prefix client",
     "copy:client": "mkdir -p server/dist && rm -rf server/dist/client && cp -r client/dist server/dist/client",
     "build:server": "npm install --prefix server --omit=dev && npm run build:server --prefix server",
     "build": "npm run build:client && npm run copy:client && npm run build:server",
     "start": "node server/dist/index.js",
     "dev": "concurrently \"npm run dev:client\" \"npm run dev:server\"",
-    "dev:client": "cd client && npm run dev",
+    "dev:client": "npm run dev --prefix client",
     "dev:server": "nodemon --watch server --ext ts --exec \"ts-node server/index.ts\""
   },
   "dependencies": {
