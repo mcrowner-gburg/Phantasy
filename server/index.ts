@@ -3,11 +3,6 @@ import session from "express-session";
 import { Pool } from "@neondatabase/serverless";
 import connectPgSimple from "connect-pg-simple";
 import path from "path";
-import { fileURLToPath } from "url";
-
-// ---------- ESM __dirname ----------
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = path.dirname(__filename);
 
 // ---------- DATABASE POOL ----------
 const pool = new Pool({
@@ -43,8 +38,9 @@ app.get("/health", (_req, res) => {
 // ---------- SERVE FRONTEND ----------
 const PORT = process.env.PORT || 10000;
 
+// Use path.resolve to get absolute path (esbuild compatible)
 const clientDistPath =
-  process.env.CLIENT_DIST || path.resolve(__dirname, "dist/client");
+  process.env.CLIENT_DIST || path.resolve(process.cwd(), "server/dist/client");
 
 // Serve static files (JS, CSS, images)
 app.use(express.static(clientDistPath));
