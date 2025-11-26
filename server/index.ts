@@ -43,7 +43,7 @@ app.get("/health", (_req, res) => {
 // ---------- SERVE FRONTEND ----------
 
 // Ensure the client dist path is correct for Render deployment
-const clientDistPath = path.resolve(__dirname, "../client/dist");
+const clientDistPath = path.join(__dirname, "client");
 
 // Serve all static assets from frontend build
 app.use(express.static(clientDistPath));
