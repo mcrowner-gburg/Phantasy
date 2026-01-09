@@ -35,17 +35,20 @@ app.get("/health", (_req, res) => {
   res.json({ status: "ok" });
 });
 
+// Add your additional API routes here
+// Example:
+// app.use("/api/users", usersRouter);
+
 // ---------- SERVE FRONTEND ----------
 const PORT = process.env.PORT || 10000;
 
-// Use path.resolve to get absolute path (esbuild compatible)
-const clientDistPath =
-  process.env.CLIENT_DIST || path.resolve(process.cwd(), "server/dist/client");
+// Path to the client build (copied during root build)
+const clientDistPath = path.resolve(__dirname, "client");
 
 // Serve static files (JS, CSS, images)
 app.use(express.static(clientDistPath));
 
-// All other routes serve index.html (React Router)
+// SPA fallback: serve index.html for all unmatched routes
 app.get("*", (_req, res) => {
   res.sendFile(path.join(clientDistPath, "index.html"));
 });
