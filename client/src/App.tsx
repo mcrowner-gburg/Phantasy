@@ -5,7 +5,6 @@ function App() {
     <div>
       <h1>Welcome to Phantasy!</h1>
       <p>Draft your favorite Phish songs and score points!</p>
-      <h1>Hello Phantasy!</h1>
     </div>
   );
 }
