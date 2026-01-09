@@ -8,8 +8,8 @@ services:
     startCommand: npm start
     envVars:
       - key: DATABASE_URL
-        fromDatabase: neon-db # if using Render database, otherwise fill manually
+        fromDatabase: "postgresql://neondb_owner:npg_zYpMJdEB4T1X@ep-bitter-mode-adjkge9f.c-2.us-east-1.aws.neon.tech/neondb?sslmode=require" # if using Render database, otherwise fill manually
       - key: SESSION_SECRET
-        value: "IVqgmQdqjqGqyQsyWGs48tfhXxApJSSp+WAlDLTrmQI3WZx1Z3ldDcBpRBSoUydLlGR+7hIJ7Y3165wMqUVp8Q=="
+        value: "supersecretkey12345"
       - key: NODE_ENV
         value: "production"
