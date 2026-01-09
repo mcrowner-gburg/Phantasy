@@ -1,18 +1,56 @@
-import express from "express";
+import express, { json, urlencoded } from "express";
+import session from "express-session";
+import { Pool } from "@neondatabase/serverless";
+import connectPgSimple from "connect-pg-simple";
 import path from "path";
 
-const app = express();
-const PORT = process.env.PORT || 10000;
-
-// Serve static files from the Vite build
-app.use(express.static(path.resolve(__dirname, "../../client/dist")));
-
-// For all other routes, serve index.html (SPA fallback)
-app.get("*", (req, res) => {
-  res.sendFile(path.resolve(__dirname, "../../client/dist/index.html"));
+// ---------- DATABASE POOL ----------
+const pool = new Pool({
+  connectionString: process.env.DATABASE_URL,
 });
 
+// ---------- EXPRESS APP ----------
+const app = express();
+app.use(json());
+app.use(urlencoded({ extended: true }));
+
+// ---------- SESSION SETUP ----------
+const PgSession = connectPgSimple(session);
+app.use(
+  session({
+    store: new PgSession({ pool }),
+    secret: process.env.SESSION_SECRET || "secret",
+    resave: false,
+    saveUninitialized: false,
+    cookie: {
+      secure: process.env.NODE_ENV === "production",
+      maxAge: 1000 * 60 * 60 * 24,
+      sameSite: "lax",
+    },
+  })
+);
+
+// ---------- API ROUTES ----------
+app.get("/health", (_req, res) => {
+  res.json({ status: "ok" });
+});
+
+// ---------- SERVE FRONTEND ----------
+const PORT = process.env.PORT || 10000;
+
+// Use path.resolve to get absolute path (esbuild compatible)
+const clientDistPath =
+  process.env.CLIENT_DIST || path.resolve(process.cwd(), "server/dist/client");
+
+// Serve static files (JS, CSS, images)
+app.use(express.static(clientDistPath));
+
+// All other routes serve index.html (React Router)
+app.get("*", (_req, res) => {
+  res.sendFile(path.join(clientDistPath, "index.html"));
+});
+
+// ---------- START SERVER ----------
 app.listen(PORT, () => {
   console.log(`Server running on port ${PORT}`);
 });
-
