@@ -68,13 +68,11 @@ function App() {
   return (
     <QueryClientProvider client={queryClient}>
       <TooltipProvider>
-        <div className="dark">
           <Toaster />
           <Router />
-        </div>
       </TooltipProvider>
     </QueryClientProvider>
   );
 }
 
-export default App;
+export default App; 
