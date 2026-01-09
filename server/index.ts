@@ -54,3 +54,11 @@ app.get("*", (_req, res) => {
 app.listen(PORT, () => {
   console.log(`Server running on port ${PORT}`);
 });
+// Test endpoint
+app.get('/api/hello', (req, res) => {
+  res.json({ message: 'Hello from the server!' });
+});
+
+app.listen(PORT, () => {
+  console.log(`Server running on port ${PORT}`);
+});
