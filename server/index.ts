@@ -10,6 +10,7 @@ const pool = new Pool({
 });
 
 // ---------- EXPRESS APP ----------
+app.set("trust proxy", 1);
 const app = express();
 app.use(json());
 app.use(urlencoded({ extended: true }));
