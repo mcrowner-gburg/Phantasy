@@ -37,7 +37,9 @@ app.get("/health", (_req, res) => {
 
 // ---------- SERVE FRONTEND ----------
 const PORT = process.env.PORT || 10000;
-
+app.listen(PORT, () => {
+  console.log(`Server running on port ${PORT}`);
+});
 // Use path.resolve to get absolute path (esbuild compatible)
 const clientDistPath =
   process.env.CLIENT_DIST || path.resolve(process.cwd(), "server/dist/client");
