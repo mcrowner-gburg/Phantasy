@@ -18,7 +18,10 @@ app.use(urlencoded({ extended: true }));
 const PgSession = connectPgSimple(session);
 app.use(
   session({
-    store: new PgSession({ pool }),
+    store: new PgSession({
+      pool,
+      pruneSessionInterval: 0, // disables WebSocket pruning (avoids Neon error)
+    }),
     secret: process.env.SESSION_SECRET || "secret",
     resave: false,
     saveUninitialized: false,
@@ -35,20 +38,17 @@ app.get("/health", (_req, res) => {
   res.json({ status: "ok" });
 });
 
-// Add your additional API routes here
-// Example:
+// Add your API routes here, for example:
 // app.use("/api/users", usersRouter);
 
 // ---------- SERVE FRONTEND ----------
 const PORT = process.env.PORT || 10000;
+const clientDistPath =
+  process.env.CLIENT_DIST || path.resolve(__dirname, "client"); // server/dist/client
 
-// Path to the client build (copied during root build)
-const clientDistPath = path.resolve(__dirname, "client");
-
-// Serve static files (JS, CSS, images)
 app.use(express.static(clientDistPath));
 
-// SPA fallback: serve index.html for all unmatched routes
+// SPA fallback: serve index.html for all other routes
 app.get("*", (_req, res) => {
   res.sendFile(path.join(clientDistPath, "index.html"));
 });
