@@ -23,10 +23,11 @@ export function setupAuth(app: express.Application) {
     resave: false,
     saveUninitialized: false,
     cookie: {
-      httpOnly: true,
-      secure: false, // Set to true in production with HTTPS
-      maxAge: sessionTtl,
-    },
+    httpOnly: true,
+    secure: process.env.NODE_ENV === "production",
+    sameSite: "lax",
+    maxAge: sessionTtl,
+  },
   }));
 
   // Authentication routes
