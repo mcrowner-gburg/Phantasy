@@ -1,19 +1,15 @@
 services:
   - type: web
-    name: phantasy
+    name: phantasy-app
     env: node
-    plan: free  # change to 'starter' or 'standard' if you need more resources
+    plan: free
     branch: main
-    buildCommand: |
-      npm run install-all
-      npm run build-all
-    startCommand: npm run start
+    buildCommand: npm install && npm run build
+    startCommand: npm start
     envVars:
-      - key: NODE_ENV
-        value: production
       - key: DATABASE_URL
-        value: <YOUR_DATABASE_URL>
+        fromDatabase: neon-db # if using Render database, otherwise fill manually
       - key: SESSION_SECRET
-        value: <YOUR_SESSION_SECRET>
-      - key: PORT
-        value: 10000
+        value: "supersecretkey"
+      - key: NODE_ENV
+        value: "production"
