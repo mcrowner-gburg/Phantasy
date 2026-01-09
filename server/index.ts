@@ -35,12 +35,11 @@ app.get("/health", (_req, res) => {
   res.json({ status: "ok" });
 });
 
-// ---------- SERVE FRONTEND ----------
-const PORT = process.env.PORT || 10000;
-app.listen(PORT, () => {
-  console.log(`Server running on port ${PORT}`);
+app.get('/api/hello', (_req, res) => {
+  res.json({ message: 'Hello from the server!' });
 });
-// Use path.resolve to get absolute path (esbuild compatible)
+
+// ---------- SERVE FRONTEND ----------
 const clientDistPath =
   process.env.CLIENT_DIST || path.resolve(process.cwd(), "server/dist/client");
 
@@ -53,14 +52,7 @@ app.get("*", (_req, res) => {
 });
 
 // ---------- START SERVER ----------
-app.listen(PORT, () => {
-  console.log(`Server running on port ${PORT}`);
-});
-// Test endpoint
-app.get('/api/hello', (req, res) => {
-  res.json({ message: 'Hello from the server!' });
-});
-
+const PORT = process.env.PORT || 10000;
 app.listen(PORT, () => {
   console.log(`Server running on port ${PORT}`);
 });
