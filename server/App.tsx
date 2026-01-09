@@ -55,3 +55,20 @@ const App: React.FC = () => {
 };
 
 export default App;
+export default function App() {
+  const [serverMessage, setServerMessage] = useState('');
+
+  useEffect(() => {
+    fetch('/api/hello')
+      .then(res => res.json())
+      .then(data => setServerMessage(data.message))
+      .catch(err => setServerMessage('Error connecting to server'));
+  }, []);
+
+  return (
+    <div>
+      <h1>Hello Phantasy!</h1>
+      <p>{serverMessage}</p>
+    </div>
+  );
+}
