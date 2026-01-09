@@ -1,14 +1,15 @@
 {
   "compilerOptions": {
     "target": "ES2020",
-    "module": "ESNext",
+    "module": "CommonJS",           // Use CommonJS for Node runtime
     "moduleResolution": "Node",
     "outDir": "dist",
+    "rootDir": "src",               // Make sure only src/ compiles
     "strict": true,
     "esModuleInterop": true,
     "skipLibCheck": true,
     "forceConsistentCasingInFileNames": true
   },
-  "include": ["**/*.ts"],
+  "include": ["src/**/*.ts"],
   "exclude": ["node_modules"]
 }
