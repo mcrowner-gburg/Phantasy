@@ -56,3 +56,18 @@ const PORT = process.env.PORT || 10000;
 app.listen(PORT, () => {
   console.log(`Server running on port ${PORT}`);
 });
+import fs from 'fs';
+
+const clientDistPath =
+  process.env.CLIENT_DIST || path.resolve(process.cwd(), "server/dist/client");
+
+console.log('=== STATIC FILE SERVING DEBUG ===');
+console.log('Current working directory:', process.cwd());
+console.log('Client dist path:', clientDistPath);
+console.log('Path exists:', fs.existsSync(clientDistPath));
+console.log('index.html exists:', fs.existsSync(path.join(clientDistPath, 'index.html')));
+
+// List files in the directory
+if (fs.existsSync(clientDistPath)) {
+  console.log('Files in client dist:', fs.readdirSync(clientDistPath));
+}
