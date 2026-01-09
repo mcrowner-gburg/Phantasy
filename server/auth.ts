@@ -18,7 +18,10 @@ export function setupAuth(app: express.Application) {
   });
 
   app.use(session({
-    secret: process.env.SESSION_SECRET || 'your-secret-key-here',
+    if (!process.env.SESSION_SECRET) {
+    throw new Error("SESSION_SECRET not set");
+  }
+    secret: process.env.SESSION_SECRET,
     store: sessionStore,
     resave: false,
     saveUninitialized: false,
