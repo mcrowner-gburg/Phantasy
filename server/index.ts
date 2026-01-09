@@ -58,8 +58,6 @@ app.listen(PORT, () => {
 });
 import fs from 'fs';
 
-const clientDistPath =
-  process.env.CLIENT_DIST || path.resolve(process.cwd(), "server/dist/client");
 
 console.log('=== STATIC FILE SERVING DEBUG ===');
 console.log('Current working directory:', process.cwd());
