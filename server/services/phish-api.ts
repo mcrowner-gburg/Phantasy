@@ -68,7 +68,7 @@ export class PhishNetService {
       );
       if (!response.ok) throw new Error(`Phish.in API error: ${response.statusText}`);
       const data = await response.json();
-      const shows = data.data || [];
+      const shows = data.shows || data.data || [];
       return shows.map((show: any) => ({
         showid: show.id,
         showdate: show.date,
@@ -97,7 +97,7 @@ export class PhishNetService {
           );
           if (response.ok) {
             const data = await response.json();
-            const shows = (data.data || []).map((show: any) => ({
+            const shows = (data.shows || data.data || []).map((show: any) => ({
               showid: show.id,
               showdate: show.date,
               venue: show.venue?.name || "Unknown Venue",
@@ -134,20 +134,16 @@ export class PhishNetService {
       if (!response.ok) throw new Error(`Phish.in API error: ${response.statusText}`);
       const data = await response.json();
       
-      // Flatten tracks from all sets
+      // Flatten tracks — phish.in v2 returns tracks directly on the show with set_name per track
       const tracks: any[] = [];
-      if (data.sets) {
-        for (const set of data.sets) {
-          for (const track of set.tracks || []) {
-            tracks.push({
-              song: track.title,
-              duration: track.duration, // duration in seconds!
-              position: track.position,
-              set: set.label,
-              isEncore: set.label?.toLowerCase().includes('encore'),
-            });
-          }
-        }
+      for (const track of data.tracks || []) {
+        tracks.push({
+          song: track.title,
+          duration: track.duration, // duration in seconds
+          position: track.position,
+          set: track.set_name,
+          isEncore: track.set_name?.toLowerCase().includes('encore'),
+        });
       }
       return tracks;
     } catch (error) {
