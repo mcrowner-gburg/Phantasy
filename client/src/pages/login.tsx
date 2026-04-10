@@ -69,7 +69,7 @@ export default function Login() {
                 value={usernameOrEmail}
                 onChange={(e) => setUsernameOrEmail(e.target.value)}
                 placeholder="Enter your username or email"
-                className="text-gray-900 dark:text-white"
+                className="text-gray-900"
                 required
               />
             </div>
@@ -81,7 +81,8 @@ export default function Login() {
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 placeholder="Enter your password"
-                className="text-gray-900 dark:text-white"required
+                className="text-gray-900"
+                required
               />
             </div>
             <Button

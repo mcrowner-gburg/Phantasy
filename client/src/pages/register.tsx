@@ -108,7 +108,7 @@ export default function Register() {
                 value={username}
                 onChange={(e) => setUsername(e.target.value)}
                 placeholder="Choose a username"
-                className="text-gray-900 dark:text-white"
+                className="text-gray-900"
                 required
               />
             </div>
@@ -120,6 +120,7 @@ export default function Register() {
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 placeholder="Enter your email address"
+                className="text-gray-900"
                 required
               />
             </div>
@@ -131,7 +132,7 @@ export default function Register() {
                 value={phoneNumber}
                 onChange={(e) => setPhoneNumber(e.target.value)}
                 placeholder="+1 (555) 123-4567"
-                className="text-gray-900 dark:text-white"
+                className="text-gray-900"
               />
               <p className="text-xs text-gray-500 mt-1">
                 For SMS notifications and invite links
@@ -145,7 +146,7 @@ export default function Register() {
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 placeholder="Create a password"
-                className="text-gray-900 dark:text-white"
+                className="text-gray-900"
                 required
               />
             </div>
@@ -157,7 +158,7 @@ export default function Register() {
                 value={confirmPassword}
                 onChange={(e) => setConfirmPassword(e.target.value)}
                 placeholder="Confirm your password"
-                className="text-gray-900 dark:text-white"
+                className="text-gray-900"
                 required
               />
             </div>
