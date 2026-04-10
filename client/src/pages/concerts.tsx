@@ -58,11 +58,11 @@ export default function Concerts() {
           <Card className="glassmorphism border-gray-600">
             <CardContent className="p-4">
               <div className="flex items-center justify-between">
-                <h3 className="text-lg font-bold">Live Data from Phish.net</h3>
+                <h3 className="text-lg font-bold">Live Data from Phish.in</h3>
                 <Badge className="bg-green-500 text-black">Connected</Badge>
               </div>
               <p className="text-sm phish-text mt-2">
-                Showing live concert data and setlists from the official Phish.net API
+                Showing live concert data and setlists from the official Phish.in API
               </p>
             </CardContent>
           </Card>
