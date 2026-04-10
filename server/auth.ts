@@ -2,7 +2,7 @@ import express from "express";
 import session from "express-session";
 import connectPg from "connect-pg-simple";
 import bcrypt from "bcrypt";
-import { storage } from "./storage";
+import { storage } from "./storage-db";
 import { smsService } from "./services/sms";
 import { nanoid } from "nanoid";
 
