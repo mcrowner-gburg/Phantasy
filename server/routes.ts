@@ -106,7 +106,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.post("/api/leagues", async (req, res) => {
     try {
-      const leagueData = insertLeagueSchema.parse(req.body);
+      const leagueData = insertLeagueSchema.partial({ tourId: true }).parse(req.body);
       const { ownerId } = req.body;
       
       if (!ownerId) {
