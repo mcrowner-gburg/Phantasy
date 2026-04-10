@@ -10,8 +10,8 @@ const pool = new Pool({
 });
 
 // ---------- EXPRESS APP ----------
-app.set("trust proxy", 1);
 const app = express();
+app.set("trust proxy", 1);
 app.use(json());
 app.use(urlencoded({ extended: true }));
 
@@ -36,18 +36,16 @@ app.get("/health", (_req, res) => {
   res.json({ status: "ok" });
 });
 
-app.get('/api/hello', (_req, res) => {
-  res.json({ message: 'Hello from the server!' });
+app.get("/api/hello", (_req, res) => {
+  res.json({ message: "Hello from the server!" });
 });
 
 // ---------- SERVE FRONTEND ----------
 const clientDistPath =
   process.env.CLIENT_DIST || path.resolve(process.cwd(), "server/dist/client");
 
-// Serve static files (JS, CSS, images)
 app.use(express.static(clientDistPath));
 
-// All other routes serve index.html (React Router)
 app.get("*", (_req, res) => {
   res.sendFile(path.join(clientDistPath, "index.html"));
 });
