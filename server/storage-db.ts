@@ -9,7 +9,12 @@ import {
   type Activity, type LeagueMember, type SongPerformance, type InsertSongPerformance,
   type PasswordResetToken, type InsertPasswordResetToken, type PhoneVerificationCode,
   type InsertPhoneVerificationCode, type CachedShow, type CachedSong, type CachedSetlist,
-  type LeagueInvite, type DraftPick,
+  type LeagueInvite, type DraftPick,} 
+import {
+  users, tours, leagues, leagueMembers, leagueInvites, songs, draftedSongs,
+  concerts, activities, songPerformances, passwordResetTokens, phoneVerificationCodes,
+  cachedShows, cachedSongs, cachedSetlists, draftPicks, pointAdjustments,
+  ...
 } from "@shared/schema";
 
 export const storage = {
@@ -258,41 +263,61 @@ export const storage = {
   },
 
   async makeDraftPick(leagueId: number, userId: number, songId: number, timeUsed: number): Promise<DraftPick> {
-    const league = await this.getLeague(leagueId);
-    if (!league) throw new Error("League not found");
+  const league = await this.getLeague(leagueId);
+  if (!league) throw new Error("League not found");
 
-    const pick = await db.insert(draftPicks).values({
-      leagueId,
-      userId,
-      songId,
-      pickNumber: league.currentPick ?? 1,
-      round: league.currentRound ?? 1,
-      timeUsed,
-    }).returning();
+  // First ensure the song exists in the songs table
+  // (songs come from cached_songs but draft_picks references songs table)
+  const cachedSong = await db.select().from(cachedSongs).where(eq(cachedSongs.id, songId)).limit(1);
+  if (cachedSong[0]) {
+    await db.insert(songs).values({
+      title: cachedSong[0].title,
+      category: cachedSong[0].category,
+      rarityScore: cachedSong[0].rarityScore ?? 0,
+      totalPlays: cachedSong[0].timesPlayed ?? 0,
+      plays24Months: cachedSong[0].plays24Months ?? 0,
+    }).onConflictDoNothing();
+  }
 
-    await db.insert(draftedSongs).values({
-      userId,
-      leagueId,
-      songId,
-      draftRound: league.currentRound ?? 1,
-      draftPick: league.currentPick ?? 1,
-    });
+  // Get the actual song id from songs table
+  const songInDb = await db.select().from(songs)
+    .where(eq(songs.title, cachedSong[0]?.title ?? ""))
+    .limit(1);
+  
+  const realSongId = songInDb[0]?.id ?? songId;
 
-    const members = await this.getDraftOrder(leagueId);
-    const currentIdx = members.findIndex(m => m.userId === userId);
-    const nextIdx = (currentIdx + 1) % members.length;
-    const nextPlayer = members[nextIdx]?.userId ?? null;
-    const newPick = (league.currentPick ?? 1) + 1;
-    const newRound = Math.ceil(newPick / members.length);
+  const pick = await db.insert(draftPicks).values({
+    leagueId,
+    userId,
+    songId: realSongId,
+    pickNumber: league.currentPick ?? 1,
+    round: league.currentRound ?? 1,
+    timeUsed,
+  }).returning();
 
-    await db.update(leagues).set({
-      currentPick: newPick,
-      currentRound: newRound,
-      currentPlayer: nextPlayer,
-    }).where(eq(leagues.id, leagueId));
+  await db.insert(draftedSongs).values({
+    userId,
+    leagueId,
+    songId: realSongId,
+    draftRound: league.currentRound ?? 1,
+    draftPick: league.currentPick ?? 1,
+  });
 
-    return pick[0];
-  },
+  const members = await this.getDraftOrder(leagueId);
+  const currentIdx = members.findIndex(m => m.userId === userId);
+  const nextIdx = (currentIdx + 1) % members.length;
+  const nextPlayer = members[nextIdx]?.userId ?? null;
+  const newPick = (league.currentPick ?? 1) + 1;
+  const newRound = Math.ceil(newPick / members.length);
+
+  await db.update(leagues).set({
+    currentPick: newPick,
+    currentRound: newRound,
+    currentPlayer: nextPlayer,
+  }).where(eq(leagues.id, leagueId));
+
+  return pick[0];
+},
 
   async isSongDraftedInLeague(songId: number, leagueId: number): Promise<boolean> {
     const result = await db.select().from(draftedSongs).where(
