@@ -1,34 +1,54 @@
-// controllers/adminController.ts
-import { z } from "zod";               // external
-import { Pool } from "@neondatabase/serverless"; // external
-import Twilio from "twilio";           // external
+import { Request, Response } from "express";
+import { storage } from "../storage-db";
+import bcrypt from "bcrypt";
 
-const pool = new Pool({
-  connectionString: process.env.DATABASE_URL,
-});
+export const createUser = async (req: Request, res: Response) => {
+  try {
+    const { username, email, password, role } = req.body;
+    if (!username || !email || !password) {
+      return res.status(400).json({ message: "Username, email, and password are required" });
+    }
+    const hashedPassword = await bcrypt.hash(password, 10);
+    const user = await storage.createUser({ username, email, password: hashedPassword, role: role || "user" });
+    res.json({ user: { id: user.id, username: user.username, email: user.email, role: user.role } });
+  } catch (error: any) {
+    console.error("Admin createUser error:", error);
+    res.status(500).json({ message: error.message || "Failed to create user" });
+  }
+};
 
-// Example: create a new user
-export const createUser = async (userData: any) => {
-  const schema = z.object({
-    email: z.string().email(),
-    password: z.string().min(6),
-  });
+export const getUsers = async (req: Request, res: Response) => {
+  try {
+    const users = await storage.getAllUsers();
+    res.json(users.map(u => ({ id: u.id, username: u.username, email: u.email, role: u.role, totalPoints: u.totalPoints, createdAt: u.createdAt })));
+  } catch (error: any) {
+    console.error("Admin getUsers error:", error);
+    res.status(500).json({ message: "Failed to fetch users" });
+  }
+};
 
-  const parsed = schema.parse(userData);
+export const updateUser = async (req: Request, res: Response) => {
+  try {
+    const userId = parseInt(req.params.id);
+    const { role } = req.body;
+    if (!role) {
+      return res.status(400).json({ message: "Role is required" });
+    }
+    const user = await storage.updateUserRole(userId, role);
+    res.json({ id: user.id, username: user.username, email: user.email, role: user.role });
+  } catch (error: any) {
+    console.error("Admin updateUser error:", error);
+    res.status(500).json({ message: "Failed to update user" });
+  }
+};
 
-  // Twilio example (sending SMS)
-  const client = new Twilio(process.env.TWILIO_SID, process.env.TWILIO_TOKEN);
-  await client.messages.create({
-    to: "+1234567890",
-    from: process.env.TWILIO_FROM,
-    body: `User ${parsed.email} created!`,
-  });
-
-  // DB insert example
-  await pool.query("INSERT INTO users (email, password) VALUES ($1, $2)", [
-    parsed.email,
-    parsed.password,
-  ]);
-
-  return { success: true };
+export const deleteUser = async (req: Request, res: Response) => {
+  try {
+    const userId = parseInt(req.params.id);
+    await storage.deleteUser(userId);
+    res.json({ message: "User deleted successfully" });
+  } catch (error: any) {
+    console.error("Admin deleteUser error:", error);
+    res.status(500).json({ message: "Failed to delete user" });
+  }
 };
