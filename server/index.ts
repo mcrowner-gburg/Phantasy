@@ -3,6 +3,7 @@ import session from "express-session";
 import { Pool } from "@neondatabase/serverless";
 import connectPgSimple from "connect-pg-simple";
 import path from "path";
+import adminRouter from "./routes/admin";
 
 // ---------- DATABASE POOL ----------
 const pool = new Pool({
@@ -32,6 +33,8 @@ app.use(
 );
 
 // ---------- API ROUTES ----------
+app.use("/api/admin", adminRouter);
+
 app.get("/health", (_req, res) => {
   res.json({ status: "ok" });
 });
