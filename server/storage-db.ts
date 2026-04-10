@@ -9,12 +9,7 @@ import {
   type Activity, type LeagueMember, type SongPerformance, type InsertSongPerformance,
   type PasswordResetToken, type InsertPasswordResetToken, type PhoneVerificationCode,
   type InsertPhoneVerificationCode, type CachedShow, type CachedSong, type CachedSetlist,
-  type LeagueInvite, type DraftPick,} 
-import {
-  users, tours, leagues, leagueMembers, leagueInvites, songs, draftedSongs,
-  concerts, activities, songPerformances, passwordResetTokens, phoneVerificationCodes,
-  cachedShows, cachedSongs, cachedSetlists, draftPicks, pointAdjustments,
-  ...
+  type LeagueInvite, type DraftPick,
 } from "@shared/schema";
 
 export const storage = {
