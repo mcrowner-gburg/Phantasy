@@ -29,7 +29,7 @@ export default function Dashboard() {
   if (isLoading) {
     return (
       <div className="flex">
-        <NavigationSidebar />
+        <NavigationSidebar user={authUser} />
         <div className="flex-1 lg:ml-64 pt-16 lg:pt-0">
           <div className="p-4 lg:p-8">
             <div className="animate-pulse">
@@ -55,7 +55,7 @@ export default function Dashboard() {
 
   return (
     <div className="flex min-h-screen">
-      <NavigationSidebar user={user || authUser?.user} />
+      <NavigationSidebar user={user || authUser} />
       
       {/* Main Content */}
       <div className="flex-1 lg:ml-64 pt-16 lg:pt-0">
