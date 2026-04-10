@@ -3,7 +3,7 @@
   "version": "1.0.0",
   "private": true,
   "scripts": {
-    "build": "esbuild index.ts --bundle --platform=node --outfile=dist/index.js --external:@neondatabase/serverless --external:ws --external:twilio --external:zod --external:drizzle-zod --external:drizzle-orm --external:express --external:express-session --external:@sendgrid/mail --external:connect-pg-simple --external:nanoid --external:bcrypt",
+    "build": "esbuild index.ts --bundle --platform=node --outfile=dist/index.js --alias:@shared=../shared --external:@neondatabase/serverless --external:ws --external:twilio --external:zod --external:drizzle-zod --external:drizzle-orm --external:express --external:express-session --external:@sendgrid/mail --external:connect-pg-simple --external:nanoid --external:bcrypt",
     "dev": "nodemon --watch index.ts --exec \"ts-node index.ts\"",
     "start": "node dist/index.js"
   },
