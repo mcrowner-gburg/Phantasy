@@ -9,6 +9,11 @@ import { nanoid } from "nanoid";
 export function setupAuth(app: express.Application) {
   // Session configuration
   const sessionTtl = 7 * 24 * 60 * 60 * 1000; // 1 week
+
+  if (!process.env.SESSION_SECRET) {
+    throw new Error("SESSION_SECRET not set");
+  }
+
   const pgStore = connectPg(session);
   const sessionStore = new pgStore({
     conString: process.env.DATABASE_URL,
@@ -18,19 +23,16 @@ export function setupAuth(app: express.Application) {
   });
 
   app.use(session({
-    if (!process.env.SESSION_SECRET) {
-    throw new Error("SESSION_SECRET not set");
-  }
     secret: process.env.SESSION_SECRET,
     store: sessionStore,
     resave: false,
     saveUninitialized: false,
     cookie: {
-    httpOnly: true,
-    secure: process.env.NODE_ENV === "production",
-    sameSite: "lax",
-    maxAge: sessionTtl,
-  },
+      httpOnly: true,
+      secure: process.env.NODE_ENV === "production",
+      sameSite: "lax",
+      maxAge: sessionTtl,
+    },
   }));
 
   // Authentication routes
@@ -42,13 +44,11 @@ export function setupAuth(app: express.Application) {
         return res.status(400).json({ message: 'Username, email, and password are required' });
       }
 
-      // Basic email validation
       const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
       if (!emailRegex.test(email)) {
         return res.status(400).json({ message: 'Invalid email format' });
       }
 
-      // Phone number validation (if provided)
       if (phoneNumber) {
         const phoneRegex = /^\+?[\d\s\-\(\)]+$/;
         if (!phoneRegex.test(phoneNumber)) {
@@ -56,7 +56,6 @@ export function setupAuth(app: express.Application) {
         }
       }
 
-      // Check if user already exists (by username, email, or phone)
       const existingUser = await storage.getUserByUsername(username);
       if (existingUser) {
         return res.status(409).json({ message: 'Username already exists' });
@@ -74,10 +73,8 @@ export function setupAuth(app: express.Application) {
         }
       }
 
-      // Hash password
       const hashedPassword = await bcrypt.hash(password, 10);
 
-      // Create user
       const user = await storage.createUser({
         username,
         email,
@@ -86,7 +83,6 @@ export function setupAuth(app: express.Application) {
         totalPoints: 0,
       });
 
-      // Set session
       (req.session as any).userId = user.id;
 
       res.json({ user: { id: user.id, username: user.username, email: user.email, phoneNumber: user.phoneNumber, totalPoints: user.totalPoints } });
@@ -104,7 +100,6 @@ export function setupAuth(app: express.Application) {
         return res.status(400).json({ message: 'Username/email and password are required' });
       }
 
-      // Find user by username or email
       let user = await storage.getUserByUsername(usernameOrEmail);
       if (!user) {
         user = await storage.getUserByEmail(usernameOrEmail);
@@ -114,13 +109,11 @@ export function setupAuth(app: express.Application) {
         return res.status(401).json({ message: 'Invalid credentials' });
       }
 
-      // Check password
       const isValidPassword = await bcrypt.compare(password, user.password);
       if (!isValidPassword) {
         return res.status(401).json({ message: 'Invalid credentials' });
       }
 
-      // Set session with both userId and user object for compatibility
       (req.session as any).userId = user.id;
       (req.session as any).user = { 
         id: user.id, 
@@ -150,7 +143,6 @@ export function setupAuth(app: express.Application) {
       const userId = (req.session as any).userId;
       const { email, phoneNumber } = req.body;
 
-      // Basic validation
       if (email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
         return res.status(400).json({ message: 'Please enter a valid email address' });
       }
@@ -159,7 +151,6 @@ export function setupAuth(app: express.Application) {
         return res.status(400).json({ message: 'Please enter a valid phone number' });
       }
 
-      // Update the user profile
       const updatedUser = await storage.updateUserProfile(userId, {
         email: email || undefined,
         phoneNumber: phoneNumber && phoneNumber.trim() !== '' ? phoneNumber : null
@@ -200,7 +191,6 @@ export function setupAuth(app: express.Application) {
     }
   });
 
-  // Phone-based authentication endpoints
   app.post('/api/auth/request-phone-code', async (req, res) => {
     try {
       const { phoneNumber } = req.body;
@@ -209,33 +199,28 @@ export function setupAuth(app: express.Application) {
         return res.status(400).json({ message: 'Phone number is required' });
       }
 
-      // Check if phone number exists in system
       const user = await storage.getUserByPhone(phoneNumber);
       if (!user) {
         return res.status(404).json({ message: 'Phone number not registered' });
       }
 
-      // Generate 6-digit verification code
       const code = Math.floor(100000 + Math.random() * 900000).toString();
-      const expiresAt = new Date(Date.now() + 10 * 60 * 1000); // 10 minutes
+      const expiresAt = new Date(Date.now() + 10 * 60 * 1000);
 
-      // Save verification code to database
       await storage.createPhoneVerificationCode({
         phoneNumber,
         code,
         expiresAt,
       });
 
-      // Send SMS if service is available
       if (smsService.isAvailable()) {
         const sent = await smsService.sendAuthCode(phoneNumber, code);
         if (sent) {
           res.json({ message: 'Verification code sent to your phone' });
         } else {
-          res.json({ message: 'Code generated but SMS failed. Check console for code.', code }); // For development
+          res.json({ message: 'Code generated but SMS failed. Check console for code.', code });
         }
       } else {
-        // For development - return code in response
         res.json({ message: 'SMS service unavailable. Your code is:', code });
       }
     } catch (error) {
@@ -252,22 +237,18 @@ export function setupAuth(app: express.Application) {
         return res.status(400).json({ message: 'Phone number and code are required' });
       }
 
-      // Verify the code
       const verificationCode = await storage.getValidPhoneVerificationCode(phoneNumber, code);
       if (!verificationCode) {
         return res.status(400).json({ message: 'Invalid or expired verification code' });
       }
 
-      // Mark code as used
       await storage.markPhoneVerificationCodeUsed(verificationCode.id);
 
-      // Get user and set session
       const user = await storage.getUserByPhone(phoneNumber);
       if (!user) {
         return res.status(404).json({ message: 'User not found' });
       }
 
-      // Set session
       (req.session as any).userId = user.id;
 
       res.json({ 
@@ -285,7 +266,6 @@ export function setupAuth(app: express.Application) {
     }
   });
 
-  // SMS League Invite endpoint
   app.post('/api/auth/send-sms-invite', async (req, res) => {
     try {
       const { phoneNumber, leagueName, inviteCode } = req.body;
@@ -311,7 +291,6 @@ export function setupAuth(app: express.Application) {
   });
 }
 
-// Middleware to check authentication
 export function requireAuth(req: express.Request, res: express.Response, next: express.NextFunction) {
   const userId = (req.session as any)?.userId;
   if (!userId) {
