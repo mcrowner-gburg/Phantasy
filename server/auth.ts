@@ -5,6 +5,7 @@ import bcrypt from "bcrypt";
 import { storage } from "./storage-db";
 import { smsService } from "./services/sms";
 import { nanoid } from "nanoid";
+import { pool } from "./db";
 
 export function setupAuth(app: express.Application) {
   // Session configuration
@@ -16,11 +17,11 @@ export function setupAuth(app: express.Application) {
 
   const pgStore = connectPg(session);
   const sessionStore = new pgStore({
-    conString: process.env.DATABASE_URL,
-    createTableIfMissing: false,
-    ttl: sessionTtl,
-    tableName: "sessions",
-  });
+  pool,
+  createTableIfMissing: false,
+  ttl: sessionTtl,
+  tableName: "sessions",
+});
 
   app.use(session({
     secret: process.env.SESSION_SECRET,
