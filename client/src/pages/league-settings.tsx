@@ -184,6 +184,7 @@ export default function LeagueSettings() {
                     value={formData.name}
                     onChange={(e) => setFormData({ ...formData, name: e.target.value })}
                     placeholder="Enter league name"
+                    className="text-gray-900"
                     required
                   />
                 </div>
@@ -195,6 +196,7 @@ export default function LeagueSettings() {
                     value={formData.description}
                     onChange={(e) => setFormData({ ...formData, description: e.target.value })}
                     placeholder="Describe your league (optional)"
+                    className="text-gray-900"
                     rows={3}
                   />
                 </div>
@@ -251,6 +253,7 @@ export default function LeagueSettings() {
                       type="date"
                       value={formData.seasonStartDate}
                       onChange={(e) => setFormData({ ...formData, seasonStartDate: e.target.value })}
+                      className="text-gray-900"
                     />
                   </div>
 
@@ -261,6 +264,7 @@ export default function LeagueSettings() {
                       type="date"
                       value={formData.seasonEndDate}
                       onChange={(e) => setFormData({ ...formData, seasonEndDate: e.target.value })}
+                      className="text-gray-900"
                     />
                   </div>
                 </div>
