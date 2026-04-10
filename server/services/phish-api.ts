@@ -39,32 +39,7 @@ export class PhishNetService {
   }
 
   async getUpcomingShows(): Promise<any[]> {
-    try {
-      const response = await fetch(
-        `${this.phishInUrl}/shows?include_next=true`,
-        { headers: { "Accept": "application/json" } }
-      );
-
-      if (!response.ok) throw new Error(`Phish.in API error: ${response.statusText}`);
-
-      const data = await response.json();
-      const shows = data.data || [];
-      const today = new Date();
-
-      return shows
-        .filter((show: any) => new Date(show.date) > today)
-        .map((show: any) => ({
-          showid: show.id,
-          showdate: show.date,
-          venue: show.venue?.name || "Unknown Venue",
-          city: show.venue?.city || "Unknown City",
-          state: show.venue?.state || null,
-          country: show.venue?.country || "USA",
-        }));
-    } catch (error) {
-      console.error("Error fetching upcoming shows from Phish.in, falling back to Phish.net:", error);
-      return this.getUpcomingShowsPhishNet();
-    }
+    return this.getUpcomingShowsPhishNet();
   }
 
   private async getUpcomingShowsPhishNet(): Promise<any[]> {
