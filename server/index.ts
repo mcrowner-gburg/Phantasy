@@ -1,9 +1,14 @@
 import express, { json, urlencoded } from "express";
 import session from "express-session";
-import { Pool } from "@neondatabase/serverless";
+import { Pool, neonConfig } from "@neondatabase/serverless";
+import ws from "ws";
 import connectPgSimple from "connect-pg-simple";
 import path from "path";
-import adminRouter from "./routes/admin";
+import { createServer } from "http";
+import { registerRoutes } from "./routes";
+
+// ---------- NEON WEBSOCKET CONFIG ----------
+neonConfig.webSocketConstructor = ws;
 
 // ---------- DATABASE POOL ----------
 const pool = new Pool({
@@ -20,7 +25,10 @@ app.use(urlencoded({ extended: true }));
 const PgSession = connectPgSimple(session);
 app.use(
   session({
-    store: new PgSession({ pool }),
+    store: new PgSession({
+      pool,
+      pruneSessionInterval: 0,
+    }),
     secret: process.env.SESSION_SECRET || "secret",
     resave: false,
     saveUninitialized: false,
@@ -32,15 +40,9 @@ app.use(
   })
 );
 
-// ---------- API ROUTES ----------
-app.use("/api/admin", adminRouter);
-
+// ---------- HEALTH CHECK ----------
 app.get("/health", (_req, res) => {
   res.json({ status: "ok" });
-});
-
-app.get("/api/hello", (_req, res) => {
-  res.json({ message: "Hello from the server!" });
 });
 
 // ---------- SERVE FRONTEND ----------
@@ -49,12 +51,20 @@ const clientDistPath =
 
 app.use(express.static(clientDistPath));
 
-app.get("*", (_req, res) => {
-  res.sendFile(path.join(clientDistPath, "index.html"));
-});
+// ---------- REGISTER ALL API ROUTES ----------
+const httpServer = createServer(app);
+registerRoutes(app).then(() => {
+  // ---------- SPA FALLBACK ----------
+  app.get("*", (_req, res) => {
+    res.sendFile(path.join(clientDistPath, "index.html"));
+  });
 
-// ---------- START SERVER ----------
-const PORT = process.env.PORT || 10000;
-app.listen(PORT, () => {
-  console.log(`Server running on port ${PORT}`);
+  // ---------- START SERVER ----------
+  const PORT = process.env.PORT || 10000;
+  httpServer.listen(PORT, () => {
+    console.log(`Server running on port ${PORT}`);
+  });
+}).catch((err) => {
+  console.error("Failed to start server:", err);
+  process.exit(1);
 });

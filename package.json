@@ -13,8 +13,11 @@
     "dev:client": "cd client && npm run dev",
     "dev:server": "cd server && nodemon --watch index.ts --exec \"ts-node index.ts\""
   },
-  "dependencies": {},
+  "dependencies": {
+    "ws": "^8.20.0"
+  },
   "devDependencies": {
+    "@types/ws": "^8.18.1",
     "concurrently": "^8.2.0"
   }
 }
