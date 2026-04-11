@@ -51,9 +51,22 @@ const clientDistPath =
 
 app.use(express.static(clientDistPath));
 
+// ---------- STARTUP MIGRATIONS ----------
+async function runMigrations() {
+  const client = await pool.connect();
+  try {
+    await client.query(`
+      ALTER TABLE users ADD COLUMN IF NOT EXISTS phone_number text UNIQUE;
+    `);
+    console.log("Migrations complete");
+  } finally {
+    client.release();
+  }
+}
+
 // ---------- REGISTER ALL API ROUTES ----------
 const httpServer = createServer(app);
-registerRoutes(app).then(() => {
+runMigrations().then(() => registerRoutes(app)).then(() => {
   // ---------- SPA FALLBACK ----------
   app.get("*", (_req, res) => {
     res.sendFile(path.join(clientDistPath, "index.html"));
