@@ -210,6 +210,7 @@ export default function LeagueSettings() {
                     max="100"
                     value={formData.maxPlayers}
                     onChange={(e) => setFormData({ ...formData, maxPlayers: parseInt(e.target.value) })}
+                    className="text-gray-900"
                   />
                 </div>
 
