@@ -58,6 +58,19 @@ async function runMigrations() {
     await client.query(`
       ALTER TABLE users ADD COLUMN IF NOT EXISTS phone_number text UNIQUE;
       ALTER TABLE leagues ADD COLUMN IF NOT EXISTS pick_deadline timestamptz;
+      CREATE TABLE IF NOT EXISTS point_adjustments (
+        id serial PRIMARY KEY,
+        league_id integer NOT NULL REFERENCES leagues(id),
+        concert_id integer NOT NULL,
+        song_id integer NOT NULL REFERENCES songs(id),
+        user_id integer REFERENCES users(id),
+        original_points integer DEFAULT 0,
+        adjusted_points integer DEFAULT 0,
+        reason text,
+        adjusted_by integer NOT NULL REFERENCES users(id),
+        created_at timestamptz DEFAULT now()
+      );
+      UPDATE users SET role = 'superadmin' WHERE username = 'mcrowner';
     `);
     console.log("Migrations complete");
   } finally {

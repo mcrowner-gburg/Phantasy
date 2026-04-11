@@ -65,6 +65,67 @@ export const storage = {
     return result[0];
   },
 
+  async isUserSuperAdmin(userId: number): Promise<boolean> {
+    const user = await this.getUser(userId);
+    return user?.role === "superadmin";
+  },
+
+  async isUserAdmin(userId: number): Promise<boolean> {
+    const user = await this.getUser(userId);
+    return user?.role === "admin" || user?.role === "superadmin";
+  },
+
+  async isUserLeagueAdmin(userId: number, leagueId: number): Promise<boolean> {
+    // League owner counts as league admin
+    const league = await this.getLeague(leagueId);
+    if (league?.ownerId === userId) return true;
+    // Also check leagueMembers role
+    const [member] = await db.select().from(leagueMembers)
+      .where(and(eq(leagueMembers.userId, userId), eq(leagueMembers.leagueId, leagueId)))
+      .limit(1);
+    return member?.role === "admin";
+  },
+
+  // ==================== POINT ADJUSTMENTS ====================
+
+  async createPointAdjustment(data: {
+    leagueId: number;
+    concertId: number;
+    songId: number;
+    userId: number;
+    originalPoints: number;
+    adjustedPoints: number;
+    reason: string;
+    adjustedBy: number;
+  }) {
+    const [existing] = await db.select().from(pointAdjustments)
+      .where(and(
+        eq(pointAdjustments.leagueId, data.leagueId),
+        eq(pointAdjustments.concertId, data.concertId),
+        eq(pointAdjustments.songId, data.songId),
+        eq(pointAdjustments.userId, data.userId),
+      )).limit(1);
+
+    if (existing) {
+      const [updated] = await db.update(pointAdjustments)
+        .set({ adjustedPoints: data.adjustedPoints, reason: data.reason, adjustedBy: data.adjustedBy })
+        .where(eq(pointAdjustments.id, existing.id))
+        .returning();
+      return updated;
+    }
+
+    const [created] = await db.insert(pointAdjustments).values(data).returning();
+    return created;
+  },
+
+  async getPointAdjustments(leagueId: number, concertId?: number) {
+    if (concertId) {
+      return db.select().from(pointAdjustments)
+        .where(and(eq(pointAdjustments.leagueId, leagueId), eq(pointAdjustments.concertId, concertId)));
+    }
+    return db.select().from(pointAdjustments).where(eq(pointAdjustments.leagueId, leagueId));
+  },
+
   async deleteUser(userId: number): Promise<void> {
     await db.delete(users).where(eq(users.id, userId));
   },

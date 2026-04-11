@@ -10,6 +10,7 @@ import { phishApi } from "../services/phish-api";
 import { db } from "../db";
 import { draftedSongs, songs } from "../../shared/schema";
 import { eq } from "drizzle-orm";
+import { requireLeagueAdmin, requireSuperAdmin } from "../middleware/admin";
 
 const router = Router();
 
@@ -124,6 +125,82 @@ router.get("/shows/:concertId/league/:leagueId", async (req, res) => {
   } catch (e: any) {
     console.error("Error fetching admin show data:", e);
     res.status(500).json({ message: e.message || "Failed to fetch show data" });
+  }
+});
+
+// POST /api/admin/adjustments — create or update a point adjustment
+// Requires the caller to be superadmin, global admin, or owner/admin of the league
+router.post("/adjustments", requireLeagueAdmin, async (req: any, res: any) => {
+  try {
+    const { leagueId, concertId, songId, userId, originalPoints, adjustedPoints, reason } = req.body;
+    if (!leagueId || !concertId || !songId || !userId) {
+      return res.status(400).json({ message: "leagueId, concertId, songId, userId are required" });
+    }
+    const adjustment = await storage.createPointAdjustment({
+      leagueId, concertId, songId, userId,
+      originalPoints: originalPoints ?? 0,
+      adjustedPoints: adjustedPoints ?? 0,
+      reason: reason || "",
+      adjustedBy: req.session.user.id,
+    });
+    res.json(adjustment);
+  } catch (e: any) {
+    console.error("Error saving adjustment:", e);
+    res.status(500).json({ message: e.message || "Failed to save adjustment" });
+  }
+});
+
+// GET /api/admin/adjustments/league/:leagueId?concertId=X
+router.get("/adjustments/league/:leagueId", async (req: any, res: any) => {
+  try {
+    const leagueId = parseInt(req.params.leagueId);
+    const concertId = req.query.concertId ? parseInt(req.query.concertId) : undefined;
+
+    // Must be superadmin, global admin, or league owner/admin
+    const userId = req.session?.user?.id || req.session?.userId;
+    if (!userId) return res.status(401).json({ message: "Not authenticated" });
+    const canAccess = await storage.isUserAdmin(userId) || await storage.isUserLeagueAdmin(userId, leagueId);
+    if (!canAccess) return res.status(403).json({ message: "Not authorized" });
+
+    const adjustments = await storage.getPointAdjustments(leagueId, concertId);
+    res.json(adjustments);
+  } catch (e: any) {
+    res.status(500).json({ message: e.message || "Failed to fetch adjustments" });
+  }
+});
+
+// GET /api/admin/my-leagues — leagues where the current user is owner or league admin
+// Used to show the point management section to league owners (not just global admins)
+router.get("/my-leagues", async (req: any, res: any) => {
+  try {
+    const userId = req.session?.user?.id || req.session?.userId;
+    if (!userId) return res.status(401).json({ message: "Not authenticated" });
+
+    const allLeagues = await storage.getAllLeagues();
+    const accessible = await Promise.all(
+      allLeagues.map(async (l: any) => {
+        const canManage = await storage.isUserAdmin(userId) || await storage.isUserLeagueAdmin(userId, l.id);
+        return canManage ? l : null;
+      })
+    );
+    res.json(accessible.filter(Boolean));
+  } catch (e: any) {
+    res.status(500).json({ message: e.message || "Failed to fetch leagues" });
+  }
+});
+
+// PUT /api/admin/users/:id/role — superadmin only
+router.put("/users/:id/role", requireSuperAdmin, async (req: any, res: any) => {
+  try {
+    const userId = parseInt(req.params.id);
+    const { role } = req.body;
+    if (!["user", "admin", "superadmin"].includes(role)) {
+      return res.status(400).json({ message: "Invalid role" });
+    }
+    const updated = await storage.updateUserRole(userId, role);
+    res.json(updated);
+  } catch (e: any) {
+    res.status(500).json({ message: e.message || "Failed to update role" });
   }
 });
 

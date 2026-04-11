@@ -65,10 +65,10 @@ export default function Admin() {
     enabled: isAdmin,
   });
 
-  // Get all leagues for admin
+  // Leagues where current user can manage points (owner, league admin, or global admin)
   const { data: leagues } = useQuery({
-    queryKey: ["/api/admin/leagues"],
-    enabled: isAdmin,
+    queryKey: ["/api/admin/my-leagues"],
+    enabled: !!currentUser,
   });
 
   // Get all users for super admin only
@@ -325,7 +325,9 @@ export default function Admin() {
     );
   }
 
-  if (!isAdmin) {
+  // Allow access if global admin OR if they have at least one manageable league
+  const hasLeagueAccess = leagues && (leagues as any[]).length > 0;
+  if (!isAdmin && !hasLeagueAccess) {
     return (
       <div className="flex min-h-screen">
         <NavigationSidebar />
@@ -335,7 +337,7 @@ export default function Admin() {
               <CardContent className="p-8 text-center">
                 <AlertCircle className="mx-auto mb-4 text-red-500" size={64} />
                 <h2 className="text-xl font-bold text-white mb-2">Access Denied</h2>
-                <p className="text-gray-400">You need administrator privileges to access this page.</p>
+                <p className="text-gray-400">You need administrator privileges or league ownership to access this page.</p>
               </CardContent>
             </Card>
           </div>

@@ -1,5 +1,5 @@
 import { Request, Response, NextFunction } from 'express';
-import { storage } from '../storage';
+import { storage } from '../storage-db';
 
 declare module 'express-session' {
   interface SessionData {
@@ -21,19 +21,19 @@ export interface AuthenticatedRequest extends Request {
   };
 }
 
+const getSessionUserId = (req: AuthenticatedRequest): number | null => {
+  return (req.session as any)?.user?.id || (req.session as any)?.userId || null;
+};
+
 // Superadmin only - can manage all users and assign admins
 export const requireSuperAdmin = async (req: AuthenticatedRequest, res: Response, next: NextFunction) => {
   try {
-    if (!req.session?.user?.id) {
-      return res.status(401).json({ message: 'Not authenticated' });
-    }
+    const userId = getSessionUserId(req);
+    if (!userId) return res.status(401).json({ message: 'Not authenticated' });
 
-    const isSuperAdmin = await storage.isUserSuperAdmin(req.session.user.id);
-    if (!isSuperAdmin) {
-      return res.status(403).json({ message: 'Super admin access required' });
-    }
+    const isSuperAdmin = await storage.isUserSuperAdmin(userId);
+    if (!isSuperAdmin) return res.status(403).json({ message: 'Super admin access required' });
 
-    req.user = req.session.user;
     next();
   } catch (error) {
     console.error('Super admin middleware error:', error);
@@ -41,21 +41,15 @@ export const requireSuperAdmin = async (req: AuthenticatedRequest, res: Response
   }
 };
 
-// Admin or Superadmin - legacy admin routes
+// Admin or Superadmin
 export const requireAdmin = async (req: AuthenticatedRequest, res: Response, next: NextFunction) => {
   try {
-    if (!req.session?.user?.id) {
-      return res.status(401).json({ message: 'Not authenticated' });
-    }
+    const userId = getSessionUserId(req);
+    if (!userId) return res.status(401).json({ message: 'Not authenticated' });
 
-    const isSuperAdmin = await storage.isUserSuperAdmin(req.session.user.id);
-    const isAdmin = await storage.isUserAdmin(req.session.user.id);
-    
-    if (!isSuperAdmin && !isAdmin) {
-      return res.status(403).json({ message: 'Admin access required' });
-    }
+    const isAdmin = await storage.isUserAdmin(userId);
+    if (!isAdmin) return res.status(403).json({ message: 'Admin access required' });
 
-    req.user = req.session.user;
     next();
   } catch (error) {
     console.error('Admin middleware error:', error);
@@ -63,35 +57,20 @@ export const requireAdmin = async (req: AuthenticatedRequest, res: Response, nex
   }
 };
 
+// Superadmin, global admin, or owner/admin of the specific league
 export const requireLeagueAdmin = async (req: AuthenticatedRequest, res: Response, next: NextFunction) => {
   try {
-    if (!req.session?.user?.id) {
-      return res.status(401).json({ message: 'Not authenticated' });
-    }
+    const userId = getSessionUserId(req);
+    if (!userId) return res.status(401).json({ message: 'Not authenticated' });
 
-    // Super admins and global admins can manage any league
-    const isSuperAdmin = await storage.isUserSuperAdmin(req.session.user.id);
-    const isGlobalAdmin = await storage.isUserAdmin(req.session.user.id);
-    
-    if (isSuperAdmin || isGlobalAdmin) {
-      req.user = req.session.user;
-      return next();
-    }
+    if (await storage.isUserAdmin(userId)) return next();
 
-    // Extract league ID from params or body
     const leagueId = req.params.leagueId || req.body.leagueId;
-    if (!leagueId) {
-      return res.status(400).json({ message: 'League ID required' });
-    }
+    if (!leagueId) return res.status(400).json({ message: 'League ID required' });
 
-    // Check if user is league admin or league owner
-    const isLeagueAdmin = await storage.isUserLeagueAdmin(req.session.user.id, parseInt(leagueId));
-    
-    if (!isLeagueAdmin) {
-      return res.status(403).json({ message: 'League admin access required' });
-    }
+    const isLeagueAdmin = await storage.isUserLeagueAdmin(userId, parseInt(leagueId));
+    if (!isLeagueAdmin) return res.status(403).json({ message: 'League admin access required' });
 
-    req.user = req.session.user;
     next();
   } catch (error) {
     console.error('League admin middleware error:', error);
