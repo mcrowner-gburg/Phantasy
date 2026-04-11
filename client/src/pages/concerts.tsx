@@ -100,7 +100,7 @@ export default function Concerts() {
                       <Card 
                         key={concert.id} 
                         className="bg-black bg-opacity-30 border border-gray-600 hover:border-green-500 transition-colors cursor-pointer"
-                        onClick={() => window.open(`https://phish.net/setlists/phish-${format(new Date(concert.date), "MMMM-dd-yyyy").toLowerCase()}-${concert.venue.toLowerCase().replace(/\s+/g, '-').replace(/[^a-z0-9-]/g, '')}-${concert.city.toLowerCase().replace(/\s+/g, '-')}-${concert.state.toLowerCase()}-usa.html`, '_blank')}
+                        onClick={() => window.open(`https://phish.in/${format(new Date(concert.date), "yyyy-MM-dd")}`, '_blank')}
                       >
                         <CardContent className="p-4">
                           <div className="flex items-center justify-between">
