@@ -16,6 +16,7 @@ export default function DraftRoom() {
   const { id: leagueId } = useParams<{ id: string }>();
   const [searchQuery, setSearchQuery] = useState("");
   const [timeRemaining, setTimeRemaining] = useState(0);
+  const [startCountdown, setStartCountdown] = useState(0);
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const { user } = useAuth();
@@ -93,25 +94,39 @@ export default function DraftRoom() {
     },
   });
 
-  // Timer effect for pick countdown
+  // Countdown to scheduled draft start
   useEffect(() => {
-    if (league && league.draftStatus === "active" && league.currentPlayer === user?.id) {
-      setTimeRemaining(league.pickTimeLimit || 90);
-      
-      const timer = setInterval(() => {
-        setTimeRemaining(prev => {
-          if (prev <= 1) {
-            clearInterval(timer);
-            // Auto-pick logic could go here
-            return 0;
-          }
-          return prev - 1;
-        });
-      }, 1000);
+    if (league?.draftStatus !== "scheduled" || !league?.draftDate) return;
+    const update = () => {
+      const secs = Math.max(0, Math.floor((new Date(league.draftDate).getTime() - Date.now()) / 1000));
+      setStartCountdown(secs);
+    };
+    update();
+    const t = setInterval(update, 1000);
+    return () => clearInterval(t);
+  }, [league?.draftStatus, league?.draftDate]);
 
-      return () => clearInterval(timer);
-    }
-  }, [league?.currentPlayer, league?.draftStatus, league?.pickTimeLimit, user?.id]);
+  // Pick timer — resets each time the current player changes
+  useEffect(() => {
+    if (league?.draftStatus !== "active" || !league?.pickDeadline) return;
+
+    const update = () => {
+      const secs = Math.max(0, Math.floor((new Date(league.pickDeadline).getTime() - Date.now()) / 1000));
+      setTimeRemaining(secs);
+
+      // When it's our turn and the clock hits 0, trigger server auto-pick
+      if (secs === 0 && league.currentPlayer === user?.id) {
+        apiRequest("POST", `/api/leagues/${leagueId}/auto-pick`, { userId: user?.id }).then(() => {
+          queryClient.invalidateQueries({ queryKey: [`/api/leagues/${leagueId}/draft-status`] });
+          queryClient.invalidateQueries({ queryKey: [`/api/leagues/${leagueId}/draft-picks`] });
+          queryClient.invalidateQueries({ queryKey: ["/api/songs"] });
+        }).catch(() => {});
+      }
+    };
+    update();
+    const t = setInterval(update, 1000);
+    return () => clearInterval(t);
+  }, [league?.currentPlayer, league?.draftStatus, league?.pickDeadline, user?.id]);
 
   const filteredSongs = songs?.filter((song: any) =>
     song.title.toLowerCase().includes(searchQuery.toLowerCase())
@@ -186,15 +201,37 @@ export default function DraftRoom() {
                 </div>
               </div>
 
-              {league && league.draftStatus === "scheduled" && isOwner && (
-                <div className="mt-4 text-center">
-                  <Button 
-                    onClick={() => startDraftMutation.mutate()}
-                    disabled={startDraftMutation.isPending}
-                    size="lg"
-                  >
-                    Start Draft Now
-                  </Button>
+              {league && league.draftStatus === "scheduled" && (
+                <div className="mt-4 text-center space-y-3">
+                  {league.draftDate && (
+                    <div>
+                      <p className="text-sm text-gray-600 mb-1">
+                        Draft starts {new Date(league.draftDate).toLocaleString()}
+                      </p>
+                      {startCountdown > 0 && (
+                        <div className="flex items-center justify-center gap-2">
+                          <Timer className="h-4 w-4 text-blue-600" />
+                          <span className="font-mono text-lg text-blue-600">
+                            {startCountdown >= 3600
+                              ? `${Math.floor(startCountdown / 3600)}h ${Math.floor((startCountdown % 3600) / 60)}m`
+                              : startCountdown >= 60
+                              ? `${Math.floor(startCountdown / 60)}m ${startCountdown % 60}s`
+                              : `${startCountdown}s`}
+                          </span>
+                        </div>
+                      )}
+                    </div>
+                  )}
+                  {isOwner && (
+                    <Button
+                      onClick={() => startDraftMutation.mutate()}
+                      disabled={startDraftMutation.isPending}
+                      size="lg"
+                      variant="outline"
+                    >
+                      Start Draft Now
+                    </Button>
+                  )}
                 </div>
               )}
 
@@ -204,14 +241,15 @@ export default function DraftRoom() {
                     <div className="text-lg font-semibold">
                       {isMyTurn ? "Your Turn!" : `${currentPlayer?.user?.username || currentPlayer?.username || 'Unknown Player'}'s Turn`}
                     </div>
-                    {isMyTurn && (
-                      <div className="flex items-center justify-center gap-2 mt-2">
-                        <Timer className="h-4 w-4" />
-                        <span className={`font-mono text-lg ${timeRemaining <= 10 ? 'text-red-600' : 'text-blue-600'}`}>
-                          {Math.floor(timeRemaining / 60)}:{(timeRemaining % 60).toString().padStart(2, '0')}
-                        </span>
-                      </div>
-                    )}
+                    <div className="flex items-center justify-center gap-2 mt-2">
+                      <Timer className="h-4 w-4" />
+                      <span className={`font-mono text-lg ${timeRemaining <= 10 ? 'text-red-600' : 'text-blue-600'}`}>
+                        {Math.floor(timeRemaining / 60)}:{(timeRemaining % 60).toString().padStart(2, '0')}
+                      </span>
+                      {!isMyTurn && (
+                        <span className="text-xs text-gray-500">until auto-pick</span>
+                      )}
+                    </div>
                   </div>
                 </div>
               )}

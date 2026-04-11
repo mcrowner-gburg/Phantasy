@@ -1,4 +1,4 @@
-import { eq, and, desc, asc, sql, inArray } from "drizzle-orm";
+import { eq, and, desc, asc, sql, inArray, gte, isNotNull } from "drizzle-orm";
 import { db } from "./db";
 import {
   users, tours, leagues, leagueMembers, leagueInvites, songs, draftedSongs,
@@ -217,18 +217,60 @@ export const storage = {
   },
 
   async startDraft(leagueId: number): Promise<void> {
+    const league = await this.getLeague(leagueId);
     const members = await this.getLeagueMembers(leagueId);
     const firstPlayer = members[0]?.userId ?? null;
+    const pickDeadline = firstPlayer
+      ? new Date(Date.now() + (league?.pickTimeLimit ?? 90) * 1000)
+      : null;
     await db.update(leagues).set({
       draftStatus: "active",
       currentPick: 1,
       currentRound: 1,
       currentPlayer: firstPlayer,
+      pickDeadline,
     }).where(eq(leagues.id, leagueId));
   },
 
   async getDraftStatus(leagueId: number): Promise<League | undefined> {
     return await this.getLeague(leagueId);
+  },
+
+  // Songs played in the last year that are not yet drafted in this league,
+  // ordered by times played descending (most popular first for a fair auto-pick).
+  async getAvailableSongsPlayedLastYear(leagueId: number): Promise<{ id: number; title: string }[]> {
+    const oneYearAgo = new Date();
+    oneYearAgo.setFullYear(oneYearAgo.getFullYear() - 1);
+    const cutoff = oneYearAgo.toISOString().split("T")[0]; // "YYYY-MM-DD"
+
+    const draftedIds = await this.getDraftedSongIdsForLeague(leagueId);
+
+    // Fetch cached songs played within the last year
+    const candidates = await db
+      .select()
+      .from(cachedSongs)
+      .where(and(isNotNull(cachedSongs.lastPlayed), gte(cachedSongs.lastPlayed, cutoff)))
+      .orderBy(desc(cachedSongs.timesPlayed));
+
+    // Filter out already-drafted songs (by title match against songs table)
+    // We need the songs-table id for makeDraftPick, so upsert each candidate first.
+    const available: { id: number; title: string }[] = [];
+    for (const cs of candidates) {
+      // Upsert into songs table so we have a stable id
+      await db.insert(songs).values({
+        title: cs.title,
+        category: cs.category,
+        rarityScore: cs.rarityScore ?? 0,
+        totalPlays: cs.timesPlayed ?? 0,
+        plays24Months: cs.plays24Months ?? 0,
+      }).onConflictDoNothing();
+
+      const [song] = await db.select().from(songs).where(eq(songs.title, cs.title)).limit(1);
+      if (!song) continue;
+      if (draftedIds.includes(song.id)) continue;
+      available.push({ id: song.id, title: song.title });
+    }
+    return available;
   },
 
   async getDraftOrder(leagueId: number): Promise<(LeagueMember & { user: User })[]> {
@@ -305,10 +347,15 @@ export const storage = {
   const newPick = (league.currentPick ?? 1) + 1;
   const newRound = Math.ceil(newPick / members.length);
 
+  const newPickDeadline = nextPlayer
+    ? new Date(Date.now() + (league.pickTimeLimit ?? 90) * 1000)
+    : null;
+
   await db.update(leagues).set({
     currentPick: newPick,
     currentRound: newRound,
     currentPlayer: nextPlayer,
+    pickDeadline: newPickDeadline,
   }).where(eq(leagues.id, leagueId));
 
   return pick[0];

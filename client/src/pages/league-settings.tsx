@@ -11,7 +11,7 @@ import { Switch } from "@/components/ui/switch";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/hooks/useAuth";
 import { apiRequest } from "@/lib/queryClient";
-import { Settings, Calendar, Users, Lock, Shield } from "lucide-react";
+import { Settings, Calendar, Users, Lock, Shield, Clock } from "lucide-react";
 
 export default function LeagueSettings() {
   const { id: leagueId } = useParams<{ id: string }>();
@@ -32,6 +32,9 @@ export default function LeagueSettings() {
     description: "",
     isPublic: true,
     maxPlayers: 24,
+    draftDate: "",
+    draftTime: "",
+    pickTimeLimit: 90,
     seasonStartDate: "",
     seasonEndDate: "",
   });
@@ -39,11 +42,15 @@ export default function LeagueSettings() {
   // Initialize form when league loads
   React.useEffect(() => {
     if (league) {
+      const draftDt = league.draftDate ? new Date(league.draftDate) : null;
       setFormData({
         name: league.name || "",
         description: league.description || "",
         isPublic: league.isPublic ?? true,
         maxPlayers: league.maxPlayers || 24,
+        draftDate: draftDt ? draftDt.toISOString().split('T')[0] : "",
+        draftTime: draftDt ? draftDt.toTimeString().slice(0, 5) : "",
+        pickTimeLimit: league.pickTimeLimit || 90,
         seasonStartDate: league.seasonStartDate ? new Date(league.seasonStartDate).toISOString().split('T')[0] : "",
         seasonEndDate: league.seasonEndDate ? new Date(league.seasonEndDate).toISOString().split('T')[0] : "",
       });
@@ -53,8 +60,19 @@ export default function LeagueSettings() {
   // Update league mutation
   const updateLeagueMutation = useMutation({
     mutationFn: async (data: typeof formData) => {
+      // Combine draftDate + draftTime into a single ISO timestamp
+      let draftDateIso: string | null = null;
+      if (data.draftDate) {
+        const time = data.draftTime || "00:00";
+        draftDateIso = new Date(`${data.draftDate}T${time}`).toISOString();
+      }
       return apiRequest("PATCH", `/api/leagues/${leagueId}`, {
-        ...data,
+        name: data.name,
+        description: data.description,
+        isPublic: data.isPublic,
+        maxPlayers: data.maxPlayers,
+        pickTimeLimit: data.pickTimeLimit,
+        draftDate: draftDateIso,
         seasonStartDate: data.seasonStartDate ? new Date(data.seasonStartDate).toISOString() : null,
         seasonEndDate: data.seasonEndDate ? new Date(data.seasonEndDate).toISOString() : null,
       });
@@ -230,6 +248,68 @@ export default function LeagueSettings() {
                     ? "Anyone can discover and join this league" 
                     : "Only users with an invite link can join"}
                 </p>
+              </CardContent>
+            </Card>
+
+            {/* Draft Schedule */}
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <Clock className="h-5 w-5" />
+                  Draft Schedule
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <p className="text-sm text-gray-600">
+                  Set a start date and time for the draft. It will begin automatically — players who miss their turn will have a song auto-picked for them from songs played in the last year.
+                </p>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div>
+                    <Label htmlFor="draftDate">Draft Start Date</Label>
+                    <Input
+                      id="draftDate"
+                      type="date"
+                      value={formData.draftDate}
+                      onChange={(e) => setFormData({ ...formData, draftDate: e.target.value })}
+                      className="text-gray-900"
+                    />
+                  </div>
+                  <div>
+                    <Label htmlFor="draftTime">Draft Start Time</Label>
+                    <Input
+                      id="draftTime"
+                      type="time"
+                      value={formData.draftTime}
+                      onChange={(e) => setFormData({ ...formData, draftTime: e.target.value })}
+                      className="text-gray-900"
+                    />
+                  </div>
+                </div>
+
+                <div>
+                  <Label htmlFor="pickTimeLimit">Seconds Per Pick</Label>
+                  <Input
+                    id="pickTimeLimit"
+                    type="number"
+                    min="30"
+                    max="300"
+                    value={formData.pickTimeLimit}
+                    onChange={(e) => setFormData({ ...formData, pickTimeLimit: parseInt(e.target.value) })}
+                    className="text-gray-900"
+                  />
+                  <p className="text-xs text-gray-500 mt-1">
+                    If a player doesn't pick within this time, a song is auto-selected for them.
+                  </p>
+                </div>
+
+                {formData.draftDate && (
+                  <div className="p-3 bg-blue-50 dark:bg-blue-900/20 rounded-lg">
+                    <p className="text-sm text-blue-700 dark:text-blue-300">
+                      <strong>Draft starts:</strong> {new Date(`${formData.draftDate}T${formData.draftTime || "00:00"}`).toLocaleString()}
+                    </p>
+                  </div>
+                )}
               </CardContent>
             </Card>
 

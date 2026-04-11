@@ -656,6 +656,31 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  app.post("/api/leagues/:id/auto-pick", async (req, res) => {
+    try {
+      const leagueId = parseInt(req.params.id);
+      const { userId } = req.body;
+
+      const league = await storage.getDraftStatus(leagueId);
+      if (!league || league.draftStatus !== "active") {
+        return res.status(400).json({ message: "Draft is not active" });
+      }
+      if (league.currentPlayer !== userId) {
+        return res.status(400).json({ message: "Not this player's turn" });
+      }
+
+      const available = await storage.getAvailableSongsPlayedLastYear(leagueId);
+      if (available.length === 0) {
+        return res.status(400).json({ message: "No available songs to auto-pick" });
+      }
+
+      const pick = await storage.makeDraftPick(leagueId, userId, available[0].id, league.pickTimeLimit ?? 90);
+      res.json({ ...pick, autoPicked: true, songTitle: available[0].title });
+    } catch (error: any) {
+      res.status(500).json({ message: error.message || "Failed to auto-pick" });
+    }
+  });
+
   app.get("/api/leagues/:id/draft-status", async (req, res) => {
     try {
       const leagueId = parseInt(req.params.id);

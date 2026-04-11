@@ -60,6 +60,7 @@ export const leagues = pgTable("leagues", {
   currentRound: integer("current_round").default(1), // Current round
   currentPlayer: integer("current_player"), // User ID of whose turn it is
   pickTimeLimit: integer("pick_time_limit").default(90), // Seconds per pick
+  pickDeadline: timestamp("pick_deadline"), // When the current player's turn expires
   seasonStartDate: timestamp("season_start_date"), // Start of scoring period
   seasonEndDate: timestamp("season_end_date"), // End of scoring period
   createdAt: timestamp("created_at").defaultNow(),
