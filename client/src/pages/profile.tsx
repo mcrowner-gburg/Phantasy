@@ -1,5 +1,5 @@
-import { useState } from "react";
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useEffect } from "react";
+import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { NavigationSidebar } from "@/components/navigation-sidebar";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -28,7 +28,6 @@ export default function Profile() {
   const { user } = useAuth();
   const { toast } = useToast();
   const queryClient = useQueryClient();
-  const [isEditing, setIsEditing] = useState(false);
 
   const form = useForm<ProfileUpdateForm>({
     resolver: zodResolver(profileUpdateSchema),
@@ -37,6 +36,16 @@ export default function Profile() {
       phoneNumber: user?.phoneNumber || "",
     },
   });
+
+  // Sync form values when user data loads (handles async auth)
+  useEffect(() => {
+    if (user) {
+      form.reset({
+        email: user.email || "",
+        phoneNumber: user.phoneNumber || "",
+      });
+    }
+  }, [user?.email, user?.phoneNumber]);
 
   const updateProfileMutation = useMutation({
     mutationFn: async (data: ProfileUpdateForm) => {
@@ -49,7 +58,6 @@ export default function Profile() {
     },
     onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: ["/api/auth/user"] });
-      setIsEditing(false);
       toast({
         title: "Profile Updated",
         description: "Your profile information has been successfully updated.",
@@ -66,14 +74,6 @@ export default function Profile() {
 
   const onSubmit = (data: ProfileUpdateForm) => {
     updateProfileMutation.mutate(data);
-  };
-
-  const cancelEdit = () => {
-    form.reset({
-      email: user?.email || "",
-      phoneNumber: user?.phoneNumber || "",
-    });
-    setIsEditing(false);
   };
 
   if (!user) {
@@ -145,8 +145,7 @@ export default function Profile() {
                           <Input
                             {...field}
                             type="email"
-                            disabled={!isEditing}
-                            className={`${!isEditing ? 'bg-gray-800 border-gray-600' : 'bg-transparent border-gray-600'}`}
+                            className="bg-transparent border-gray-600"
                           />
                         </FormControl>
                         <FormMessage />
@@ -169,8 +168,7 @@ export default function Profile() {
                             {...field}
                             type="tel"
                             placeholder="+1-555-123-4567"
-                            disabled={!isEditing}
-                            className={`${!isEditing ? 'bg-gray-800 border-gray-600' : 'bg-transparent border-gray-600'}`}
+                            className="bg-transparent border-gray-600"
                           />
                         </FormControl>
                         <FormMessage />
@@ -185,34 +183,14 @@ export default function Profile() {
 
                   {/* Action Buttons */}
                   <div className="flex space-x-3 pt-4">
-                    {!isEditing ? (
-                      <Button
-                        type="button"
-                        onClick={() => setIsEditing(true)}
-                        className="gradient-button"
-                      >
-                        Edit Profile
-                      </Button>
-                    ) : (
-                      <>
-                        <Button
-                          type="submit"
-                          disabled={updateProfileMutation.isPending}
-                          className="gradient-button"
-                        >
-                          <Save className="mr-2" size={16} />
-                          {updateProfileMutation.isPending ? "Saving..." : "Save Changes"}
-                        </Button>
-                        <Button
-                          type="button"
-                          variant="outline"
-                          onClick={cancelEdit}
-                          className="border-gray-600 hover:border-green-500"
-                        >
-                          Cancel
-                        </Button>
-                      </>
-                    )}
+                    <Button
+                      type="submit"
+                      disabled={updateProfileMutation.isPending}
+                      className="gradient-button"
+                    >
+                      <Save className="mr-2" size={16} />
+                      {updateProfileMutation.isPending ? "Saving..." : "Save Changes"}
+                    </Button>
                   </div>
                 </form>
               </Form>
