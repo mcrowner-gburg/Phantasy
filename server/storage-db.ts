@@ -140,6 +140,10 @@ export const storage = {
     return result[0];
   },
 
+  async getAllLeagues(): Promise<League[]> {
+    return await db.select().from(leagues).orderBy(desc(leagues.createdAt));
+  },
+
   async createLeague(league: InsertLeague & { ownerId: number }): Promise<League> {
     const result = await db.insert(leagues).values(league).returning();
     const newLeague = result[0];
