@@ -293,10 +293,18 @@ export const storage = {
     }
   },
 
-  async getDraftPicks(leagueId: number): Promise<DraftPick[]> {
-    return await db.select().from(draftPicks)
+  async getDraftPicks(leagueId: number): Promise<any[]> {
+    const picks = await db.select().from(draftPicks)
       .where(eq(draftPicks.leagueId, leagueId))
       .orderBy(asc(draftPicks.pickNumber));
+
+    return Promise.all(picks.map(async (pick) => {
+      const [song] = pick.songId
+        ? await db.select().from(songs).where(eq(songs.id, pick.songId)).limit(1)
+        : [];
+      const user = pick.userId ? await this.getUser(pick.userId) : null;
+      return { ...pick, song: song ?? null, user: user ?? null };
+    }));
   },
 
   async makeDraftPick(leagueId: number, userId: number, songId: number, timeUsed: number): Promise<DraftPick> {
