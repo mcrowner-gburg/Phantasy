@@ -264,8 +264,12 @@ export default function Admin() {
 
   const calculateOriginalPoints = (performance: any) => {
     let points = 1; // Base point for being played
-    if (performance.isOpener) points += 1;
-    if (performance.isEncore) points += 1;
+    if (performance.isSetOpener) points += 1; // First song of any set
+    if (performance.isEncore) points += 1;    // Encore song
+    const mins = (performance.durationSeconds || 0) / 60;
+    if (mins >= 20) points += 1; // 20+ min bonus
+    if (mins >= 30) points += 1; // 30+ min bonus
+    if (mins >= 40) points += 1; // 40+ min bonus
     return points;
   }
 
@@ -899,14 +903,19 @@ export default function Admin() {
                                 Set {performance.setNumber}
                               </TableCell>
                               <TableCell className="text-gray-300">
-                                <div className="flex gap-2">
-                                  {performance.isOpener && (
-                                    <Badge className="bg-orange-500 text-white text-xs">Opener</Badge>
+                                <div className="flex flex-wrap gap-1">
+                                  {performance.isSetOpener && (
+                                    <Badge className="bg-orange-500 text-white text-xs">Set Opener</Badge>
                                   )}
                                   {performance.isEncore && (
                                     <Badge className="bg-purple-500 text-white text-xs">Encore</Badge>
                                   )}
-                                  {!performance.isOpener && !performance.isEncore && (
+                                  {performance.durationSeconds >= 1200 && (
+                                    <Badge className="bg-blue-500 text-white text-xs">
+                                      {Math.floor(performance.durationSeconds / 60)}m
+                                    </Badge>
+                                  )}
+                                  {!performance.isSetOpener && !performance.isEncore && (
                                     <span className="text-gray-400">#{performance.position}</span>
                                   )}
                                 </div>

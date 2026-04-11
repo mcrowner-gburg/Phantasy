@@ -86,17 +86,33 @@ router.get("/shows/:concertId/league/:leagueId", async (req, res) => {
       draftersByTitle[title].push({ userId: user.id, username: user.username });
     }
 
+    // Determine the first position in each set so we can flag set openers
+    const firstPositionBySet: Record<string, number> = {};
+    for (const track of tracks) {
+      const setKey = track.set || "Set 1";
+      const pos = track.position || 0;
+      if (!(setKey in firstPositionBySet) || pos < firstPositionBySet[setKey]) {
+        firstPositionBySet[setKey] = pos;
+      }
+    }
+
     // Build song performances from tracks
     const songPerformances = tracks.map((track: any, idx: number) => {
       const title = track.song || track.title || "";
       const draftedBy = draftersByTitle[title.toLowerCase()] || [];
+      const setKey = track.set || "Set 1";
+      const isEncore = track.isEncore || setKey.toLowerCase().includes("encore");
+      const isSetOpener = !isEncore && track.position === firstPositionBySet[setKey];
+      // duration from phish.in is in milliseconds
+      const durationSeconds = track.duration ? Math.round(track.duration / 1000) : 0;
       return {
         id: idx,
         song: { title },
-        setNumber: track.set,
+        setNumber: setKey,
         position: track.position || idx + 1,
-        isOpener: track.position === 1,
-        isEncore: track.isEncore || track.set?.toLowerCase().includes("encore"),
+        isSetOpener,
+        isEncore,
+        durationSeconds,
         draftedBy,
       };
     });
