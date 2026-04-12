@@ -105,6 +105,18 @@ export default function Dashboard() {
                   <div className="font-bold text-orange-400 text-lg">+1</div>
                   <div className="phish-text">Encore</div>
                 </div>
+                <div className="text-center">
+                  <div className="font-bold text-blue-400 text-lg">+1</div>
+                  <div className="phish-text">20+ min song</div>
+                </div>
+                <div className="text-center">
+                  <div className="font-bold text-blue-400 text-lg">+1</div>
+                  <div className="phish-text">30+ min song</div>
+                </div>
+                <div className="text-center">
+                  <div className="font-bold text-blue-400 text-lg">+1</div>
+                  <div className="phish-text">40+ min song</div>
+                </div>
               </div>
             </CardContent>
           </Card>
