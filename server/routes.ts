@@ -6,7 +6,6 @@ import { z } from "zod";
 import { phishApi } from "./services/phish-api";
 import { setupAuth, requireAuth } from "./auth";
 import { sendPasswordResetEmail } from "./services/email";
-import { smsService } from "./services/sms";
 import { nanoid } from "nanoid";
 import bcrypt from "bcrypt";
 import adminRoutes from "./routes/admin";
@@ -1216,20 +1215,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
       });
       
       const baseUrl = req.protocol + "://" + req.get("host");
-      let sent = false;
-
-      // Try SMS first if user has a phone number and Twilio is configured
-      if (user.phoneNumber && smsService.isAvailable()) {
-        sent = await smsService.sendPasswordReset(user.phoneNumber, resetToken, baseUrl);
-      }
-
-      // Fall back to email
-      if (!sent) {
-        sent = await sendPasswordResetEmail(email, resetToken, baseUrl);
-      }
+      const sent = await sendPasswordResetEmail(email, resetToken, baseUrl);
 
       if (!sent) {
-        return res.status(500).json({ message: "Failed to send reset link — please contact support" });
+        return res.status(500).json({ message: "Failed to send reset email — please contact support" });
       }
 
       res.json({ message: "If this email is registered, you will receive a password reset link." });

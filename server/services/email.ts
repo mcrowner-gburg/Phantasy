@@ -1,40 +1,12 @@
-import { MailService } from '@sendgrid/mail';
+import { Resend } from "resend";
 
-let mailService: MailService | null = null;
+let resend: Resend | null = null;
+const FROM_ADDRESS = process.env.RESEND_FROM || "PhishDraft <noreply@phishdraft.com>";
 
-if (process.env.SENDGRID_API_KEY) {
-  mailService = new MailService();
-  mailService.setApiKey(process.env.SENDGRID_API_KEY);
+if (process.env.RESEND_API_KEY) {
+  resend = new Resend(process.env.RESEND_API_KEY);
 } else {
-  console.warn("SENDGRID_API_KEY not set — email sending disabled");
-}
-
-interface EmailParams {
-  to: string;
-  from: string;
-  subject: string;
-  text?: string;
-  html?: string;
-}
-
-export async function sendEmail(params: EmailParams): Promise<boolean> {
-  if (!mailService) {
-    console.warn("sendEmail: SENDGRID_API_KEY not configured, skipping");
-    return false;
-  }
-  try {
-    await mailService.send({
-      to: params.to,
-      from: params.from,
-      subject: params.subject,
-      text: params.text,
-      html: params.html,
-    });
-    return true;
-  } catch (error) {
-    console.error('SendGrid email error:', error);
-    return false;
-  }
+  console.warn("RESEND_API_KEY not set — email sending disabled");
 }
 
 export async function sendPasswordResetEmail(
@@ -42,60 +14,45 @@ export async function sendPasswordResetEmail(
   resetToken: string,
   baseUrl: string
 ): Promise<boolean> {
+  if (!resend) {
+    console.warn("sendPasswordResetEmail: Resend not configured, skipping");
+    return false;
+  }
+
   const resetUrl = `${baseUrl}/reset-password?token=${resetToken}`;
-  
-  return sendEmail({
-    to: email,
-    from: 'noreply@phishdraft.com', // You can customize this
-    subject: 'PhishDraft - Password Reset Request',
-    text: `
-Hello,
 
-You requested a password reset for your PhishDraft account.
-
-Click the link below to reset your password:
-${resetUrl}
-
-This link will expire in 1 hour.
-
-If you didn't request this reset, please ignore this email.
-
-Thanks,
-The PhishDraft Team
-    `,
-    html: `
-<div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
-  <h2 style="color: #333;">Password Reset Request</h2>
-  
-  <p>Hello,</p>
-  
+  try {
+    const { error } = await resend.emails.send({
+      from: FROM_ADDRESS,
+      to: email,
+      subject: "PhishDraft — Password Reset",
+      html: `
+<div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; background: #0a0a0a; color: #fff; padding: 32px; border-radius: 8px;">
+  <h2 style="color: #22c55e; margin-top: 0;">Password Reset</h2>
   <p>You requested a password reset for your PhishDraft account.</p>
-  
-  <p>
-    <a href="${resetUrl}" 
-       style="background-color: #007cba; color: white; padding: 12px 24px; text-decoration: none; border-radius: 4px; display: inline-block;">
-      Reset Password
+  <p style="margin: 24px 0;">
+    <a href="${resetUrl}"
+       style="background: #22c55e; color: #000; padding: 12px 24px; text-decoration: none; border-radius: 6px; font-weight: bold; display: inline-block;">
+      Reset My Password
     </a>
   </p>
-  
-  <p>Or copy and paste this link: <br>
-     <a href="${resetUrl}">${resetUrl}</a>
+  <p style="color: #aaa; font-size: 13px;">Or paste this link in your browser:<br>
+    <a href="${resetUrl}" style="color: #22c55e;">${resetUrl}</a>
   </p>
-  
-  <p style="color: #666; font-size: 14px;">
-    This link will expire in 1 hour.
-  </p>
-  
-  <p style="color: #666; font-size: 14px;">
-    If you didn't request this reset, please ignore this email.
-  </p>
-  
-  <hr style="border: none; border-top: 1px solid #eee; margin: 20px 0;">
-  <p style="color: #999; font-size: 12px;">
-    Thanks,<br>
-    The PhishDraft Team
+  <p style="color: #666; font-size: 12px; margin-top: 24px; border-top: 1px solid #222; padding-top: 16px;">
+    This link expires in 1 hour. If you didn't request a reset, ignore this email.
   </p>
 </div>
-    `
-  });
+      `,
+    });
+
+    if (error) {
+      console.error("Resend email error:", error);
+      return false;
+    }
+    return true;
+  } catch (error) {
+    console.error("Resend email exception:", error);
+    return false;
+  }
 }
