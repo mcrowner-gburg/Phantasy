@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { Link, useLocation } from "wouter";
+import { Link, useLocation, useParams } from "wouter";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -9,21 +9,17 @@ import { CheckCircle, ArrowLeft, Eye, EyeOff } from "lucide-react";
 
 export default function ResetPassword() {
   const [, setLocation] = useLocation();
+  const params = useParams<{ token?: string }>();
   const [newPassword, setNewPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
   const [isLoading, setIsLoading] = useState(false);
   const [isSuccess, setIsSuccess] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
-  const [token, setToken] = useState<string | null>(null);
   const { toast } = useToast();
 
-  useEffect(() => {
-    // Extract token from URL query parameters
-    const urlParams = new URLSearchParams(window.location.search);
-    const tokenParam = urlParams.get('token');
-    setToken(tokenParam);
-  }, []);
+  // Support both /reset-password/:token (path) and ?token= (query)
+  const token = params?.token || new URLSearchParams(window.location.search).get("token");
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();

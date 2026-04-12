@@ -22,7 +22,7 @@ export async function sendPasswordResetEmail(
     return false;
   }
 
-  const resetUrl = `${baseUrl}/reset-password?token=${resetToken}`;
+  const resetUrl = `${baseUrl}/reset-password/${resetToken}`;
 
   console.log(`Sending password reset to ${email} from ${FROM_ADDRESS}`);
   try {
