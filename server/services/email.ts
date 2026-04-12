@@ -47,12 +47,12 @@ export async function sendPasswordResetEmail(
     });
 
     if (error) {
-      console.error("Resend email error:", error);
-      return false;
+      console.error("Resend email error:", JSON.stringify(error));
+      throw new Error(JSON.stringify(error));
     }
     return true;
-  } catch (error) {
-    console.error("Resend email exception:", error);
-    return false;
+  } catch (error: any) {
+    console.error("Resend email exception:", error?.message ?? error);
+    throw error;
   }
 }
