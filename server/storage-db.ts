@@ -723,6 +723,8 @@ export const storage = {
       const drafts = await db.select().from(draftedSongs).where(
         and(eq(draftedSongs.userId, member.userId!), eq(draftedSongs.leagueId, leagueId))
       );
+      // Exclude members who never made a draft pick (e.g. league owner who didn't play)
+      if (drafts.length === 0) continue;
       const totalPoints = drafts.reduce((sum, d) => sum + (d.points ?? 0), 0);
       standings.push({
         ...member.user,
