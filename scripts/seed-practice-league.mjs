@@ -354,8 +354,18 @@ async function main() {
 
   console.log(`\n   ✓ Draft complete — ${picks.length} total picks`);
 
-  // ── 11. Score against actual phish.in shows ────────────────────────────────
-  console.log("\n11. Scoring against phish.in shows (Jun 20 – Sep 21, 2025)...");
+  // ── 11. Persist scores to the database ────────────────────────────────────
+  console.log("\n11. Persisting scores to database via /api/leagues/:id/score...");
+  try {
+    const { data } = await api("POST", `/api/leagues/${league.id}/score`, {}, adminCookie);
+    console.log(`   ✓ ${data.shows} shows scored, ${data.points} total points written to DB`);
+  } catch (e) {
+    console.warn(`   ⚠ DB scoring failed: ${e.message}`);
+    console.log("   (local scoring summary below will still print)");
+  }
+
+  // ── 12. Also compute local summary for the printed report ─────────────────
+  console.log("\n12. Scoring against phish.in shows (Jun 20 – Sep 21, 2025) for report...");
 
   let shows = [];
   try {
@@ -441,7 +451,7 @@ async function main() {
   }
   console.log(`   ✓ scored ${showsScored}/${shows.length} shows`);
 
-  // ── 12. Results ────────────────────────────────────────────────────────────
+  // ── 13. Results ──────────────────────────���───────────────────────────────���─
   const W = 72;
   console.log("\n" + "═".repeat(W));
   console.log("  PRACTICE LEAGUE RESULTS — Summer 2025");

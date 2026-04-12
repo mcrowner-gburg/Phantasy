@@ -605,6 +605,98 @@ export const storage = {
     }
   },
 
+  // Score every phish.in show in the league's season window against
+  // drafted songs, and persist the totals to draftedSongs.points.
+  // Safe to call multiple times — resets then recalculates each run.
+  async scoreLeague(leagueId: number): Promise<{ shows: number; points: number }> {
+    const league = await this.getLeague(leagueId);
+    if (!league) throw new Error("League not found");
+
+    const seasonStart = league.seasonStartDate ? new Date(league.seasonStartDate) : null;
+    const seasonEnd   = league.seasonEndDate   ? new Date(league.seasonEndDate)   : null;
+
+    // All shows in our cache
+    const allShows = await this.getCachedShows();
+    const shows = allShows.filter((s: any) => {
+      const d = new Date(s.showDate);
+      if (seasonStart && d < seasonStart) return false;
+      if (seasonEnd   && d > seasonEnd)   return false;
+      return true;
+    });
+
+    // All drafted songs for this league
+    const drafted = await db.select().from(draftedSongs).where(eq(draftedSongs.leagueId, leagueId));
+
+    // Reset points for this league to zero before recomputing
+    await db.update(draftedSongs).set({ points: 0 }).where(eq(draftedSongs.leagueId, leagueId));
+
+    // Build title → draftedSong[] map (using songs table for title lookup)
+    const titleMap: Record<string, typeof drafted> = {};
+    for (const d of drafted) {
+      if (!d.songId) continue;
+      const [song] = await db.select({ title: songs.title }).from(songs).where(eq(songs.id, d.songId)).limit(1);
+      if (!song) continue;
+      const key = song.title.toLowerCase();
+      if (!titleMap[key]) titleMap[key] = [];
+      titleMap[key].push(d);
+    }
+
+    let totalPoints = 0;
+    let showsScored = 0;
+
+    for (const show of shows) {
+      const showDate = new Date(show.showDate).toISOString().split("T")[0];
+      try {
+        const res = await fetch(`https://phish.in/api/v2/shows/${showDate}`, {
+          headers: { Accept: "application/json" },
+        });
+        if (!res.ok) continue;
+        const data = await res.json();
+        const rawTracks: any[] = data.tracks || [];
+        if (rawTracks.length === 0) continue;
+
+        // Detect first position per set
+        const firstPosBySet: Record<string, number> = {};
+        for (const t of rawTracks) {
+          const s = t.set_name || "Set 1";
+          if (!(s in firstPosBySet) || t.position < firstPosBySet[s]) firstPosBySet[s] = t.position;
+        }
+
+        for (const t of rawTracks) {
+          const title = (t.title || "").toLowerCase();
+          const entries = titleMap[title];
+          if (!entries || entries.length === 0) continue;
+
+          const setKey = t.set_name || "Set 1";
+          const isEncore = setKey.toLowerCase().includes("encore");
+          const isSetOpener = !isEncore && t.position === firstPosBySet[setKey];
+          const durationSecs = t.duration ? Math.round(t.duration / 1000) : 0;
+          const mins = durationSecs / 60;
+
+          let pts = 1;
+          if (isSetOpener) pts += 1;
+          if (isEncore)    pts += 1;
+          if (mins >= 20)  pts += 1;
+          if (mins >= 30)  pts += 1;
+          if (mins >= 40)  pts += 1;
+
+          for (const entry of entries) {
+            await db.update(draftedSongs)
+              .set({ points: sql`${draftedSongs.points} + ${pts}` })
+              .where(eq(draftedSongs.id, entry.id));
+            totalPoints += pts;
+          }
+        }
+        showsScored++;
+      } catch { /* skip shows that fail */ }
+
+      // Brief pause to avoid hammering phish.in
+      await new Promise(r => setTimeout(r, 200));
+    }
+
+    return { shows: showsScored, points: totalPoints };
+  },
+
   // ==================== ACTIVITIES ====================
 
   async getUserActivities(userId: number, leagueId?: number): Promise<Activity[]> {

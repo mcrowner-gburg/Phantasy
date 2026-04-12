@@ -705,6 +705,42 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // GET /api/leagues/:id/player/:userId/songs
+  // Returns drafted songs for a specific player in a league, with points,
+  // ordered by points descending so top earners appear first.
+  app.get("/api/leagues/:id/player/:userId/songs", async (req: any, res: any) => {
+    try {
+      const leagueId = parseInt(req.params.id);
+      const userId = parseInt(req.params.userId);
+      const drafts = await storage.getDraftedSongs(userId, leagueId);
+      const sorted = drafts
+        .map((d: any) => ({
+          songTitle: d.song?.title || "Unknown",
+          points: d.points ?? 0,
+          draftRound: d.draftRound,
+          draftPick: d.draftPick,
+        }))
+        .sort((a: any, b: any) => b.points - a.points);
+      res.json(sorted);
+    } catch (error: any) {
+      res.status(500).json({ message: error.message || "Failed to fetch player songs" });
+    }
+  });
+
+  // POST /api/leagues/:id/score
+  // Fetches every phish.in show in the league's season window, calculates
+  // points for all drafted songs, and persists the totals to the database.
+  app.post("/api/leagues/:id/score", async (req: any, res: any) => {
+    try {
+      const leagueId = parseInt(req.params.id);
+      const result = await storage.scoreLeague(leagueId);
+      res.json({ message: "Scoring complete", ...result });
+    } catch (error: any) {
+      console.error("Score league error:", error);
+      res.status(500).json({ message: error.message || "Failed to score league" });
+    }
+  });
+
   app.get("/api/leagues/:id/draft-status", async (req, res) => {
     try {
       const leagueId = parseInt(req.params.id);
