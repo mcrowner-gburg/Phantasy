@@ -936,6 +936,55 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Proxy a single show's setlist from phish.in (has duration data for scoring)
+  app.get("/api/shows/:date/setlist", async (req, res) => {
+    const { date } = req.params; // YYYY-MM-DD
+    try {
+      const r = await fetch(`https://phish.in/api/v2/shows/${date}`, {
+        headers: { Accept: "application/json" },
+      });
+      if (!r.ok) return res.status(r.status).json({ message: "Show not found on phish.in" });
+      const data = await r.json();
+      const rawTracks: any[] = data.tracks ?? [];
+
+      // Group by set_name, compute opener/encore flags
+      const setMap: Record<string, any[]> = {};
+      for (const t of rawTracks) {
+        const key = t.set_name ?? "Set 1";
+        if (!setMap[key]) setMap[key] = [];
+        setMap[key].push(t);
+      }
+
+      const sets = Object.entries(setMap).map(([setName, tracks]) => {
+        const isEncore = setName.toLowerCase().includes("encore");
+        const firstPos = Math.min(...tracks.map((t: any) => t.position ?? 99));
+        return {
+          setName,
+          isEncore,
+          songs: tracks.map((t: any) => ({
+            title: t.title,
+            position: t.position,
+            durationSecs: t.duration ? Math.round(t.duration / 1000) : 0,
+            isOpener: !isEncore && t.position === firstPos,
+            isEncore,
+          })),
+        };
+      });
+
+      // Sort sets: Set 1, Set 2, ..., Encore, Encore 2
+      sets.sort((a, b) => {
+        if (a.isEncore && !b.isEncore) return 1;
+        if (!a.isEncore && b.isEncore) return -1;
+        return a.setName.localeCompare(b.setName);
+      });
+
+      res.json({ date, sets });
+    } catch (err) {
+      console.error("phish.in setlist error:", err);
+      res.status(500).json({ message: "Failed to fetch setlist" });
+    }
+  });
+
   app.get("/api/concerts/upcoming", async (req, res) => {
     try {
       // Use same logic as dashboard to get upcoming shows from Phish.net API
