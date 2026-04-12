@@ -512,7 +512,7 @@ async function main() {
   }
 
   console.log("\n" + "═".repeat(W));
-  console.log(`\n✅  Done!  View league at ${BASE_URL}/leagues/${league.id}\n`);
+  console.log(`\n✅  Done!  View results at ${BASE_URL}/leaderboard?league=${league.id}\n`);
 }
 
 main().catch(e => { console.error(e); process.exit(1); });
