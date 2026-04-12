@@ -187,8 +187,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const userId = (req as any).userId;
       const user = await storage.getUser(userId);
       const userRole = user?.role;
-      
-      if (league.ownerId !== userId && userRole !== "admin") {
+
+      if (league.ownerId !== userId && userRole !== "admin" && userRole !== "superadmin") {
         return res.status(403).json({ message: "Not authorized to delete this league" });
       }
       
@@ -227,15 +227,37 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const leagueId = parseInt(req.params.id);
       const { userId } = req.body;
-      
+
       if (!userId) {
         return res.status(400).json({ message: "User ID required" });
       }
-      
+
       await storage.joinLeague(userId, leagueId);
       res.json({ message: "Successfully joined league" });
     } catch (error: any) {
       res.status(400).json({ message: error.message || "Failed to join league" });
+    }
+  });
+
+  // Create an invite code for a league
+  app.post("/api/leagues/:id/invite", async (req: any, res: any) => {
+    try {
+      const leagueId = parseInt(req.params.id);
+      const createdBy = req.session?.user?.id || req.session?.userId || req.body?.createdBy;
+      if (!createdBy) return res.status(401).json({ message: "Not authenticated" });
+
+      const inviteCode = nanoid(10);
+      const { leagueInvites } = await import("../shared/schema");
+      await db.insert(leagueInvites).values({
+        leagueId,
+        inviteCode,
+        createdBy,
+        maxUses: req.body?.maxUses ?? null,
+        isActive: true,
+      });
+      res.json({ inviteCode, joinUrl: `/join/${inviteCode}` });
+    } catch (error: any) {
+      res.status(500).json({ message: error.message || "Failed to create invite" });
     }
   });
 

@@ -127,6 +127,14 @@ export const storage = {
   },
 
   async deleteUser(userId: number): Promise<void> {
+    // Clean up all user-referencing rows before deleting the user
+    await db.delete(activities).where(eq(activities.userId, userId));
+    await db.delete(passwordResetTokens).where(eq(passwordResetTokens.userId, userId));
+    await db.delete(leagueMembers).where(eq(leagueMembers.userId, userId));
+    await db.delete(draftedSongs).where(eq(draftedSongs.userId, userId));
+    await db.delete(draftPicks).where(eq(draftPicks.userId, userId));
+    // leagueInvites.createdBy — set to null not possible without nullable, just delete them
+    await db.delete(leagueInvites).where(eq(leagueInvites.createdBy, userId));
     await db.delete(users).where(eq(users.id, userId));
   },
 
@@ -218,8 +226,11 @@ export const storage = {
   },
 
   async deleteLeague(id: number): Promise<void> {
-    await db.delete(leagueMembers).where(eq(leagueMembers.leagueId, id));
+    await db.delete(leagueInvites).where(eq(leagueInvites.leagueId, id));
+    await db.delete(draftPicks).where(eq(draftPicks.leagueId, id));
     await db.delete(draftedSongs).where(eq(draftedSongs.leagueId, id));
+    await db.delete(leagueMembers).where(eq(leagueMembers.leagueId, id));
+    await db.delete(pointAdjustments).where(eq(pointAdjustments.leagueId, id));
     await db.delete(leagues).where(eq(leagues.id, id));
   },
 
@@ -283,7 +294,7 @@ export const storage = {
 
   async startDraft(leagueId: number): Promise<void> {
     const league = await this.getLeague(leagueId);
-    const members = await this.getLeagueMembers(leagueId);
+    const members = await this.getDraftOrder(leagueId);
     const firstPlayer = members[0]?.userId ?? null;
     const pickDeadline = firstPlayer
       ? new Date(Date.now() + (league?.pickTimeLimit ?? 90) * 1000)
@@ -339,11 +350,21 @@ export const storage = {
   },
 
   async getDraftOrder(leagueId: number): Promise<(LeagueMember & { user: User })[]> {
-    const members = await db.select().from(leagueMembers)
+    // Only include members who have been explicitly assigned a draft position.
+    // This keeps league owners (who auto-join on creation) out of the draft
+    // unless they are explicitly given a position via setDraftOrder.
+    const allMembers = await db.select().from(leagueMembers)
       .where(eq(leagueMembers.leagueId, leagueId))
       .orderBy(asc(leagueMembers.draftPosition));
+
+    // If nobody has a position yet, fall back to all members (first-come order)
+    const hasPositions = allMembers.some(m => m.draftPosition !== null);
+    const ordered = hasPositions
+      ? allMembers.filter(m => m.draftPosition !== null)
+      : allMembers;
+
     const result = [];
-    for (const member of members) {
+    for (const member of ordered) {
       const user = await this.getUser(member.userId!);
       if (user) result.push({ ...member, user });
     }
@@ -414,11 +435,15 @@ export const storage = {
   });
 
   const members = await this.getDraftOrder(leagueId);
-  const currentIdx = members.findIndex(m => m.userId === userId);
-  const nextIdx = (currentIdx + 1) % members.length;
-  const nextPlayer = members[nextIdx]?.userId ?? null;
+  const N = members.length;
   const newPick = (league.currentPick ?? 1) + 1;
-  const newRound = Math.ceil(newPick / members.length);
+  const newRound = Math.ceil(newPick / N);
+  const posWithinRound = (newPick - 1) % N;
+  // Snake draft: odd rounds go forward (idx 0→N-1), even rounds go backward (idx N-1→0)
+  const nextIdx = newRound % 2 === 1 ? posWithinRound : N - 1 - posWithinRound;
+  const totalPicks = N * (league.draftRounds ?? 10);
+  const nextPlayer = newPick > totalPicks ? null : (members[nextIdx]?.userId ?? null);
+  const isDraftComplete = !nextPlayer;
 
   const newPickDeadline = nextPlayer
     ? new Date(Date.now() + (league.pickTimeLimit ?? 90) * 1000)
@@ -429,6 +454,7 @@ export const storage = {
     currentRound: newRound,
     currentPlayer: nextPlayer,
     pickDeadline: newPickDeadline,
+    ...(isDraftComplete ? { draftStatus: "completed" } : {}),
   }).where(eq(leagues.id, leagueId));
 
   return pick[0];

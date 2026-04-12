@@ -136,6 +136,21 @@ export default function DraftRoom() {
   const isOwner = league && league.ownerId === user?.id;
   const currentPlayer = draftOrder?.find((member: any) => member.userId === league?.currentPlayer);
 
+  // Build the snake pick order for the current and next round
+  const buildSnakeRoundOrder = (members: any[], round: number) => {
+    if (!members || members.length === 0) return [];
+    // odd rounds: forward (0→N-1), even rounds: backward (N-1→0)
+    return round % 2 === 1 ? [...members] : [...members].reverse();
+  };
+
+  const currentRound = league?.currentRound ?? 1;
+  const currentRoundOrder = buildSnakeRoundOrder(draftOrder || [], currentRound);
+  const nextRoundOrder = buildSnakeRoundOrder(draftOrder || [], currentRound + 1);
+  // Picks already made in the current round
+  const picksInCurrentRound = ((league?.currentPick ?? 1) - 1) % (draftOrder?.length || 1);
+  // Remaining picks in this round = players after the current position
+  const remainingThisRound = currentRoundOrder.slice(picksInCurrentRound);
+
   // Loading and error handling
   if (leagueLoading || draftOrderLoading || !user) {
     return (
@@ -314,37 +329,87 @@ export default function DraftRoom() {
                 <CardHeader>
                   <CardTitle className="flex items-center gap-2">
                     <Users className="h-5 w-5" />
-                    Draft Order
+                    {league?.draftStatus === "active" ? `Round ${currentRound} Order` : "Draft Order"}
                   </CardTitle>
                 </CardHeader>
                 <CardContent>
-                  <div className="space-y-2">
-                    {draftOrder && Array.isArray(draftOrder) ? draftOrder.map((member: any, index: number) => (
-                      <div
-                        key={member.userId}
-                        className={`flex items-center gap-2 p-2 rounded ${
-                          member.userId === league?.currentPlayer 
-                            ? 'bg-blue-100 dark:bg-blue-900' 
-                            : 'bg-gray-50 dark:bg-gray-800'
-                        }`}
-                      >
-                        <div className="w-6 h-6 rounded-full bg-blue-600 text-white text-xs flex items-center justify-center">
-                          {index + 1}
+                  {league?.draftStatus === "active" && draftOrder && draftOrder.length > 0 ? (
+                    <div className="space-y-3">
+                      {/* Remaining picks this round */}
+                      <div>
+                        <div className="text-xs font-semibold text-gray-500 uppercase mb-1">
+                          Round {currentRound} {currentRound % 2 === 1 ? "→" : "←"}
                         </div>
-                        <div className="flex-1">
-                          <div className="font-medium">{member.user?.username || member.username || 'Unknown User'}</div>
-                          {member.userId === user?.id && (
-                            <div className="text-xs text-blue-600">You</div>
-                          )}
+                        <div className="space-y-1">
+                          {remainingThisRound.map((member: any, i: number) => {
+                            const isCurrent = member.userId === league?.currentPlayer;
+                            const isMe = member.userId === user?.id;
+                            return (
+                              <div
+                                key={`curr-${member.userId}-${i}`}
+                                className={`flex items-center gap-2 p-2 rounded ${
+                                  isCurrent
+                                    ? 'bg-blue-100 dark:bg-blue-900 ring-1 ring-blue-400'
+                                    : 'bg-gray-50 dark:bg-gray-800'
+                                }`}
+                              >
+                                <div className={`w-5 h-5 rounded-full text-white text-xs flex items-center justify-center flex-shrink-0 ${isCurrent ? 'bg-blue-600' : 'bg-gray-400'}`}>
+                                  {picksInCurrentRound + i + 1}
+                                </div>
+                                <div className="flex-1 min-w-0">
+                                  <div className="font-medium text-sm truncate">{member.user?.username || member.username || 'Unknown'}</div>
+                                  {isMe && <div className="text-xs text-blue-600">You</div>}
+                                </div>
+                                {isCurrent && <Clock className="h-4 w-4 text-blue-600 flex-shrink-0" />}
+                              </div>
+                            );
+                          })}
                         </div>
-                        {member.userId === league?.currentPlayer && (
-                          <Clock className="h-4 w-4 text-blue-600" />
-                        )}
                       </div>
-                    )) : (
-                      <div className="text-sm text-gray-500">No players in draft order</div>
-                    )}
-                  </div>
+                      {/* Preview of next round */}
+                      {currentRound < (league?.draftRounds ?? 10) && (
+                        <div>
+                          <div className="text-xs font-semibold text-gray-400 uppercase mb-1">
+                            Round {currentRound + 1} {(currentRound + 1) % 2 === 1 ? "→" : "←"}
+                          </div>
+                          <div className="space-y-1">
+                            {nextRoundOrder.map((member: any, i: number) => (
+                              <div
+                                key={`next-${member.userId}-${i}`}
+                                className="flex items-center gap-2 p-1.5 rounded bg-gray-50 dark:bg-gray-800 opacity-50"
+                              >
+                                <div className="w-5 h-5 rounded-full bg-gray-300 text-gray-600 text-xs flex items-center justify-center flex-shrink-0">
+                                  {i + 1}
+                                </div>
+                                <div className="text-sm truncate text-gray-500">{member.user?.username || member.username || 'Unknown'}</div>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  ) : (
+                    <div className="space-y-2">
+                      {draftOrder && Array.isArray(draftOrder) ? draftOrder.map((member: any, index: number) => (
+                        <div
+                          key={member.userId}
+                          className="flex items-center gap-2 p-2 rounded bg-gray-50 dark:bg-gray-800"
+                        >
+                          <div className="w-6 h-6 rounded-full bg-blue-600 text-white text-xs flex items-center justify-center">
+                            {index + 1}
+                          </div>
+                          <div className="flex-1">
+                            <div className="font-medium">{member.user?.username || member.username || 'Unknown User'}</div>
+                            {member.userId === user?.id && (
+                              <div className="text-xs text-blue-600">You</div>
+                            )}
+                          </div>
+                        </div>
+                      )) : (
+                        <div className="text-sm text-gray-500">No players in draft order</div>
+                      )}
+                    </div>
+                  )}
                 </CardContent>
               </Card>
 
