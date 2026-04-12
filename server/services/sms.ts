@@ -61,6 +61,29 @@ export class SMSService {
     }
   }
 
+  async sendPasswordReset(phoneNumber: string, resetToken: string, baseUrl: string): Promise<boolean> {
+    if (!this.client) {
+      console.warn('SMS service not initialized - Twilio credentials missing');
+      return false;
+    }
+
+    try {
+      const resetUrl = `${baseUrl}/reset-password?token=${resetToken}`;
+      const message = `PhishDraft: Reset your password at ${resetUrl}\n\nExpires in 1 hour. Ignore if you didn't request this.`;
+
+      await this.client.messages.create({
+        body: message,
+        from: this.fromNumber,
+        to: phoneNumber,
+      });
+
+      return true;
+    } catch (error) {
+      console.error('SMS password reset error:', error);
+      return false;
+    }
+  }
+
   isAvailable(): boolean {
     return this.client !== null;
   }

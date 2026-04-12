@@ -22,7 +22,7 @@ export function NavigationSidebar({ user }: NavigationSidebarProps) {
 
   const baseNavItems = [
     { path: "/", icon: Home, label: "Dashboard" },
-    { path: "/draft", icon: Music, label: "Song Draft" },
+    { path: "/draft", icon: Music, label: "Draft Research" },
     { path: "/leaderboard", icon: Trophy, label: "Leaderboard" },
     { path: "/concerts", icon: Calendar, label: "Concerts" },
     { path: "/leagues", icon: Users, label: "My Leagues" },
