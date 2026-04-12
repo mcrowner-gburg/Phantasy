@@ -119,8 +119,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       const league = await storage.createLeague({ ...leagueData, ownerId });
       res.json(league);
-    } catch (error) {
-      res.status(400).json({ message: "Invalid league data" });
+    } catch (error: any) {
+      console.error("League creation error:", JSON.stringify(error?.errors ?? error?.message ?? error));
+      res.status(400).json({ message: "Invalid league data", detail: error?.errors ?? error?.message });
     }
   });
 
