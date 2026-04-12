@@ -26,27 +26,11 @@ export default function ForgotPassword() {
         body: JSON.stringify({ email }),
       });
 
-      const data = await response.json();
-
-      if (response.ok) {
-        setIsSubmitted(true);
-        toast({
-          title: "Password reset email sent",
-          description: "Check your email for a password reset link.",
-        });
-      } else {
-        toast({
-          title: "Error",
-          description: data.message || "Failed to send password reset email",
-          variant: "destructive",
-        });
-      }
+      // Always show success — server never reveals if email exists
+      setIsSubmitted(true);
     } catch (error) {
-      toast({
-        title: "Error",
-        description: "Failed to send password reset email",
-        variant: "destructive",
-      });
+      // Even on network error, show success so user checks their inbox
+      setIsSubmitted(true);
     } finally {
       setIsLoading(false);
     }
