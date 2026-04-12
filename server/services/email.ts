@@ -24,6 +24,7 @@ export async function sendPasswordResetEmail(
 
   const resetUrl = `${baseUrl}/reset-password?token=${resetToken}`;
 
+  console.log(`Sending password reset to ${email} from ${FROM_ADDRESS}`);
   try {
     const { error } = await resend.emails.send({
       from: FROM_ADDRESS,

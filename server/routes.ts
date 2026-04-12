@@ -1261,7 +1261,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         expiresAt,
       });
       
-      const baseUrl = req.protocol + "://" + req.get("host");
+      const baseUrl = "https://phishphantasy.live";
       const sent = await sendPasswordResetEmail(email, resetToken, baseUrl);
 
       if (!sent) {
