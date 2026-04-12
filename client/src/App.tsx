@@ -49,6 +49,7 @@ function Router() {
         <Route path="/phone-login" component={PhoneLogin} />
         <Route path="/forgot-password" component={ForgotPassword} />
         <Route path="/reset-password/:token" component={ResetPassword} />
+        <Route path="/reset-password" component={ResetPassword} />
         <Route path="/join/:inviteCode" component={JoinLeague} />
         <Route path="/" component={Login} />
         <Route component={Login} />
