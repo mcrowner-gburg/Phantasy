@@ -101,6 +101,8 @@ export default function Draft() {
   const selectedLeague = leagues?.find((l) => l.id === selectedLeagueId);
   const activeDraft = leagues?.find((l) => l.draftStatus === "active");
 
+  const isDraftActive = activeDraft?.id === selectedLeagueId;
+
   const { data: songs, isLoading: songsLoading } = useQuery<any[]>({
     queryKey: ["/api/songs", selectedLeagueId],
     queryFn: () =>
@@ -108,9 +110,20 @@ export default function Draft() {
         (r) => r.json()
       ),
     enabled: !!selectedLeagueId,
+    // Poll every 5s during an active draft so picked songs disappear in real time
+    refetchInterval: isDraftActive ? 5000 : false,
   });
 
   const { list: wishList, toggle, move, remove } = useWishList(selectedLeagueId);
+
+  // Auto-remove wish-listed songs that got drafted by someone else
+  useEffect(() => {
+    if (!songs || !isDraftActive) return;
+    const availableIds = new Set(songs.map((s: any) => s.id));
+    wishList.forEach((id) => {
+      if (!availableIds.has(id)) remove(id);
+    });
+  }, [songs]);
 
   const filteredSongs =
     songs?.filter((s: any) =>
