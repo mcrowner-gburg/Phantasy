@@ -106,13 +106,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.post("/api/leagues", async (req, res) => {
     try {
-      const leagueData = insertLeagueSchema.partial({ tourId: true }).parse(req.body);
+      const body = { ...req.body };
+      // Coerce date strings to Date objects for Zod timestamp fields
+      if (body.seasonStartDate) body.seasonStartDate = new Date(body.seasonStartDate);
+      if (body.seasonEndDate)   body.seasonEndDate   = new Date(body.seasonEndDate);
+      const leagueData = insertLeagueSchema.partial({ tourId: true, seasonStartDate: true, seasonEndDate: true }).parse(body);
       const { ownerId } = req.body;
-      
+
       if (!ownerId) {
         return res.status(400).json({ message: "Owner ID required" });
       }
-      
+
       const league = await storage.createLeague({ ...leagueData, ownerId });
       res.json(league);
     } catch (error) {
