@@ -902,37 +902,29 @@ export async function registerRoutes(app: Express): Promise<Server> {
         let setlist: string[] = [];
         
         // Fetch setlist for completed shows from cache
+        let setlistData: any[] = [];
         if (isCompleted) {
           try {
             const cachedSetlist = await cacheService.getCachedSetlist(show.showDate.toISOString().split('T')[0]);
-            if (cachedSetlist && cachedSetlist.songs) {
+            if (cachedSetlist) {
               setlist = Array.isArray(cachedSetlist.songs) ? cachedSetlist.songs : [];
-            } else {
-              // Add sample setlists for recent July 2025 shows with authentic Phish show structure
-              const sampleSetlists: Record<string, string[]> = {
-                "2025-07-23": ["Free", "Back on the Train", "Theme From the Bottom", "Cities", "Divided Sky", "Timber (Jerry the Mule)", "Ether Edge", "The Squirming Coil", "Punch You in the Eye", "Ghost", "A Wave of Hope", "What's the Use?", "Ruby Waves", "Backwards Down the Number Line", "Character Zero", "Sneakin' Sally Through the Alley", "Wilson", "Rocky Top"],
-                "2025-07-22": ["The Moma Dance", "Rift", "Sigma Oasis", "Possum", "Wolfman's Brother", "Stash", "Blaze On", "Monsters", "I Am the Walrus", "Carini", "Tweezer", "What's Going Through Your Mind", "A Life Beyond The Dream", "Harry Hood", "Slave to the Traffic Light", "More", "Tweezer Reprise"],
-                "2025-07-20": ["Wilson", "Sample in a Jar", "Maze", "Ghost", "Harry Hood", "Fluffhead", "Backwards Down the Number Line", "Tweezer", "Character Zero", "Free", "You Enjoy Myself"],
-                "2025-07-19": ["Free", "Back on the Train", "Possum", "Ghost", "Divided Sky", "Wilson", "Tweezer", "Ruby Waves", "Character Zero", "Harry Hood"],
-                "2025-07-18": ["Sample in a Jar", "Maze", "The Squirming Coil", "Ghost", "Fluffhead", "Wilson", "Tweezer", "Backwards Down the Number Line", "Rocky Top"]
-              };
-              
-              setlist = sampleSetlists[show.showDate.toISOString().split('T')[0]] || [];
+              setlistData = Array.isArray(cachedSetlist.setlistData) ? cachedSetlist.setlistData : [];
             }
           } catch (error) {
             console.error(`Error fetching setlist for ${show.showDate}:`, error);
           }
         }
-        
+
         return {
           id: show.id,
-          tourId: 1, // Associate with current tour
+          tourId: 1,
           date: new Date(show.showDate),
           venue: show.venue,
           city: show.city,
           state: show.state,
           country: show.country,
           setlist,
+          setlistData,
           isCompleted,
         };
       }));

@@ -3,9 +3,66 @@ import { NavigationSidebar } from "@/components/navigation-sidebar";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Calendar, MapPin, Clock, Music, ExternalLink } from "lucide-react";
+import { Calendar, MapPin, Clock, Music } from "lucide-react";
 import { format, isToday, isFuture } from "date-fns";
 import UpcomingShows from "@/components/dashboard/upcoming-shows";
+
+// Build structured sets from phish.net setlistData (set field: "1","2","e","e2")
+// Falls back to phish.in track data (set_name field) if that's what's stored
+function buildSets(setlistData: any[]): { label: string; songs: { title: string; isOpener: boolean; isEncore: boolean; durationSecs: number }[] }[] {
+  if (!setlistData || setlistData.length === 0) return [];
+
+  // Detect format: phish.net has `song` field, phish.in has `title`
+  const isPhishNet = setlistData[0]?.song !== undefined;
+
+  const groups: Record<string, { title: string; isOpener: boolean; isEncore: boolean; durationSecs: number }[]> = {};
+
+  if (isPhishNet) {
+    for (const track of setlistData) {
+      const setKey = track.set ?? "1";
+      if (!groups[setKey]) groups[setKey] = [];
+      const isEncore = setKey.startsWith("e") || track.is_encore === "1";
+      const isOpener = !isEncore && parseInt(track.position ?? "99") === 1;
+      groups[setKey].push({ title: track.song ?? track.title, isOpener, isEncore, durationSecs: 0 });
+    }
+  } else {
+    // phish.in format
+    for (const track of setlistData) {
+      const setKey = track.set_name ?? "Set 1";
+      if (!groups[setKey]) groups[setKey] = [];
+      const isEncore = (track.set_name ?? "").toLowerCase().includes("encore");
+      const firstPos = Math.min(...setlistData.filter(t => t.set_name === setKey).map((t: any) => t.position ?? 99));
+      const isOpener = !isEncore && (track.position ?? 99) === firstPos;
+      groups[setKey].push({ title: track.title ?? track.song, isOpener, isEncore, durationSecs: track.duration ? Math.round(track.duration / 1000) : 0 });
+    }
+  }
+
+  const setOrder = ["1", "2", "3", "e", "e2", "Set 1", "Set 2", "Set 3", "Encore", "Encore 2"];
+  const sorted = Object.keys(groups).sort((a, b) => {
+    const ai = setOrder.indexOf(a); const bi = setOrder.indexOf(b);
+    if (ai !== -1 && bi !== -1) return ai - bi;
+    return a.localeCompare(b);
+  });
+
+  return sorted.map(key => {
+    const isEncore = key.startsWith("e") || key.toLowerCase().includes("encore");
+    const label = isEncore
+      ? (key === "e" || key === "Encore" ? "Encore" : `Encore ${key.replace("e", "")}`)
+      : `Set ${key.replace("Set ", "")}`;
+    return { label, songs: groups[key] };
+  });
+}
+
+function pointsForSong(s: { isOpener: boolean; isEncore: boolean; durationSecs: number }) {
+  let pts = 1;
+  if (s.isOpener) pts++;
+  if (s.isEncore) pts++;
+  const mins = s.durationSecs / 60;
+  if (mins >= 20) pts++;
+  if (mins >= 30) pts++;
+  if (mins >= 40) pts++;
+  return pts;
+}
 
 export default function Concerts() {
   const { data: concerts, isLoading } = useQuery({
@@ -160,59 +217,59 @@ export default function Concerts() {
                             <div className="mt-4 pt-4 border-t border-gray-700">
                               <h5 className="font-medium mb-3 text-white">Complete Setlist:</h5>
                               {(() => {
-                                // Organize setlist into sets - this is a simplified approach
-                                // In a real app, this data would come structured from the API
-                                const songs = concert.setlist;
-                                const totalSongs = songs.length;
-                                
-                                // Basic set division logic for display purposes
-                                const set1End = Math.ceil(totalSongs * 0.45);
-                                const set2End = totalSongs - Math.min(3, Math.ceil(totalSongs * 0.15));
-                                
-                                const set1 = songs.slice(0, set1End);
-                                const set2 = songs.slice(set1End, set2End);
-                                const encore = songs.slice(set2End);
-                                
+                                const sets = buildSets(concert.setlistData || []);
+                                // Fall back to flat list if no structured data
+                                if (sets.length === 0) {
+                                  return (
+                                    <div className="flex flex-wrap gap-1">
+                                      {concert.setlist.map((song: string, i: number) => (
+                                        <span key={i} className="text-sm bg-gray-700 px-2 py-1 rounded text-green-400">{song}</span>
+                                      ))}
+                                    </div>
+                                  );
+                                }
                                 return (
                                   <div className="space-y-4">
-                                    {set1.length > 0 && (
-                                      <div>
-                                        <h6 className="text-sm font-semibold text-orange-400 mb-2">SET 1:</h6>
-                                        <div className="flex flex-wrap gap-1">
-                                          {set1.map((song: string, index: number) => (
-                                            <span key={`set1-${index}`} className="text-sm bg-gray-700 px-2 py-1 rounded text-green-400">
-                                              {song}
-                                            </span>
-                                          ))}
+                                    {sets.map((set) => {
+                                      const isEncore = set.label.toLowerCase().includes("encore");
+                                      return (
+                                        <div key={set.label}>
+                                          <h6 className={`text-sm font-semibold mb-2 ${isEncore ? "text-yellow-400" : "text-orange-400"}`}>
+                                            {set.label.toUpperCase()}:
+                                          </h6>
+                                          <div className="flex flex-wrap gap-1">
+                                            {set.songs.map((song, i) => {
+                                              const pts = pointsForSong(song);
+                                              const tags = [
+                                                song.isOpener && "opener",
+                                                song.isEncore && "encore",
+                                                song.durationSecs >= 40 * 60 && "40min+",
+                                                song.durationSecs >= 30 * 60 && song.durationSecs < 40 * 60 && "30min+",
+                                                song.durationSecs >= 20 * 60 && song.durationSecs < 30 * 60 && "20min+",
+                                              ].filter(Boolean);
+                                              return (
+                                                <span
+                                                  key={i}
+                                                  title={tags.length ? `${tags.join(", ")} · ${pts} pts` : `${pts} pt`}
+                                                  className={`inline-flex items-center gap-1 text-sm px-2 py-1 rounded ${
+                                                    isEncore
+                                                      ? "bg-yellow-900 bg-opacity-60 text-yellow-300 border border-yellow-700"
+                                                      : song.isOpener
+                                                      ? "bg-green-900 bg-opacity-60 text-green-300 border border-green-700"
+                                                      : "bg-gray-700 text-gray-200"
+                                                  }`}
+                                                >
+                                                  {song.title}
+                                                  {pts > 1 && (
+                                                    <span className="text-xs font-bold text-green-400 ml-0.5">+{pts}</span>
+                                                  )}
+                                                </span>
+                                              );
+                                            })}
+                                          </div>
                                         </div>
-                                      </div>
-                                    )}
-                                    
-                                    {set2.length > 0 && (
-                                      <div>
-                                        <h6 className="text-sm font-semibold text-orange-400 mb-2">SET 2:</h6>
-                                        <div className="flex flex-wrap gap-1">
-                                          {set2.map((song: string, index: number) => (
-                                            <span key={`set2-${index}`} className="text-sm bg-gray-700 px-2 py-1 rounded text-green-400">
-                                              {song}
-                                            </span>
-                                          ))}
-                                        </div>
-                                      </div>
-                                    )}
-                                    
-                                    {encore.length > 0 && (
-                                      <div>
-                                        <h6 className="text-sm font-semibold text-yellow-400 mb-2">ENCORE:</h6>
-                                        <div className="flex flex-wrap gap-1">
-                                          {encore.map((song: string, index: number) => (
-                                            <span key={`encore-${index}`} className="text-sm bg-gray-700 px-2 py-1 rounded text-yellow-300">
-                                              {song}
-                                            </span>
-                                          ))}
-                                        </div>
-                                      </div>
-                                    )}
+                                      );
+                                    })}
                                   </div>
                                 );
                               })()}
