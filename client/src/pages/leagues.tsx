@@ -8,15 +8,17 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
-import { Users, Plus, Trophy, Calendar, Settings, Eye, Clock, Play } from "lucide-react";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter, DialogDescription } from "@/components/ui/dialog";
+import { Users, Plus, Trophy, Calendar, Settings, Eye, Clock, Play, Trash2 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest } from "@/lib/queryClient";
 
 export default function Leagues() {
   const { user } = useAuth();
+  const isSuperAdmin = (user as any)?.role === "superadmin";
   const [isCreateOpen, setIsCreateOpen] = useState(false);
   const [activeTab, setActiveTab] = useState<"my-leagues" | "browse">("my-leagues");
+  const [leagueToDelete, setLeagueToDelete] = useState<{ id: number; name: string } | null>(null);
   const [newLeague, setNewLeague] = useState({
     name: "",
     description: "",
@@ -98,6 +100,24 @@ export default function Leagues() {
   });
 
 
+
+  const deleteLeagueMutation = useMutation({
+    mutationFn: async (leagueId: number) => {
+      return apiRequest("DELETE", `/api/leagues/${leagueId}`, undefined);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/leagues"] });
+      setLeagueToDelete(null);
+      toast({ title: "League deleted" });
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Failed to delete league",
+        description: error.message || "Please try again.",
+        variant: "destructive",
+      });
+    },
+  });
 
   const handleCreateLeague = () => {
     if (!newLeague.name.trim()) {
@@ -271,7 +291,7 @@ export default function Leagues() {
                     </div>
 
                     <div className="flex space-x-2 mt-6">
-                      <Button 
+                      <Button
                         className={`flex-1 text-sm ${league.draftStatus === 'active' ? 'gradient-button' : 'bg-blue-600 hover:bg-blue-700 text-white'}`}
                         onClick={() => setLocation(`/draft-room/${league.id}`)}
                       >
@@ -292,7 +312,7 @@ export default function Leagues() {
                           </>
                         )}
                       </Button>
-                      <Button 
+                      <Button
                         variant="outline"
                         className="flex-1 border-gray-600 text-white text-sm"
                         onClick={() => setLocation(`/leaderboard?league=${league.id}`)}
@@ -301,12 +321,21 @@ export default function Leagues() {
                         View
                       </Button>
                       {user?.id === league.ownerId && (
-                        <Button 
+                        <Button
                           variant="outline"
                           className="border-gray-600 text-white text-sm px-3"
                           onClick={() => setLocation(`/leagues/${league.id}/settings`)}
                         >
                           <Settings className="h-4 w-4" />
+                        </Button>
+                      )}
+                      {isSuperAdmin && (
+                        <Button
+                          variant="outline"
+                          className="border-red-800 text-red-400 hover:bg-red-950 text-sm px-3"
+                          onClick={() => setLeagueToDelete({ id: league.id, name: league.name })}
+                        >
+                          <Trash2 className="h-4 w-4" />
                         </Button>
                       )}
                     </div>
@@ -426,6 +455,36 @@ export default function Leagues() {
           )}
         </main>
       </div>
+
+      {/* Delete confirmation dialog */}
+      <Dialog open={!!leagueToDelete} onOpenChange={(open) => { if (!open) setLeagueToDelete(null); }}>
+        <DialogContent className="bg-gray-900 border-gray-600">
+          <DialogHeader>
+            <DialogTitle className="text-white">Delete League</DialogTitle>
+          </DialogHeader>
+          <p className="text-gray-300 text-sm">
+            Are you sure you want to permanently delete{" "}
+            <span className="font-semibold text-white">"{leagueToDelete?.name}"</span>?
+            This will remove all members, draft picks, and scoring data. This cannot be undone.
+          </p>
+          <div className="flex gap-3 mt-2">
+            <Button
+              variant="outline"
+              className="flex-1 border-gray-600 text-white"
+              onClick={() => setLeagueToDelete(null)}
+            >
+              Cancel
+            </Button>
+            <Button
+              className="flex-1 bg-red-700 hover:bg-red-600 text-white"
+              disabled={deleteLeagueMutation.isPending}
+              onClick={() => leagueToDelete && deleteLeagueMutation.mutate(leagueToDelete.id)}
+            >
+              {deleteLeagueMutation.isPending ? "Deleting…" : "Delete League"}
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
