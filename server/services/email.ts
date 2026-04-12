@@ -1,7 +1,7 @@
 import { Resend } from "resend";
 
 let resend: Resend | null = null;
-const FROM_ADDRESS = process.env.RESEND_FROM || "PhishDraft <noreply@phishdraft.com>";
+const FROM_ADDRESS = process.env.RESEND_FROM || "PhishDraft <noreply@phishphantasy.live>";
 
 if (process.env.RESEND_API_KEY) {
   resend = new Resend(process.env.RESEND_API_KEY);
