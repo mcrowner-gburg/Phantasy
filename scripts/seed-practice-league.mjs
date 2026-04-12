@@ -109,7 +109,7 @@ async function main() {
   console.log("\n2a. Cleaning up old practice leagues...");
   try {
     const { data: allLeagues } = await api("GET", "/api/admin/leagues", null, adminCookie);
-    const practiceLeagues = allLeagues.filter(l => l.name?.startsWith("Practice League"));
+    const practiceLeagues = allLeagues.filter(l => l.name?.startsWith("Practice League") || l.name?.includes("NYE Run"));
     for (const league of practiceLeagues) {
       try {
         await api("DELETE", `/api/leagues/${league.id}`, null, adminCookie);
@@ -180,13 +180,13 @@ async function main() {
   let league;
   try {
     const { data } = await api("POST", "/api/leagues", {
-      name: "Practice League – Summer 2025",
-      description: "Auto-generated practice run for scoring demo",
+      name: "Practice League – NYE Run 2025-26",
+      description: "Auto-generated practice run for NYE scoring demo",
       isPublic: true,
       maxPlayers: 8,
       ownerId: adminUserId,
-      seasonStartDate: new Date("2025-06-20").toISOString(),
-      seasonEndDate:   new Date("2025-09-21").toISOString(),
+      seasonStartDate: new Date("2025-12-27").toISOString(),
+      seasonEndDate:   new Date("2026-01-13").toISOString(),
       draftRounds: 10,
       pickTimeLimit: 90,
     }, adminCookie);
@@ -370,15 +370,32 @@ async function main() {
   let shows = [];
   try {
     const { data } = await api("GET", "/api/admin/concerts", null, adminCookie);
-    const start = new Date("2025-06-20");
-    const end   = new Date("2025-09-21");
+    const start = new Date("2025-12-27");
+    const end   = new Date("2026-01-13");
     shows = (Array.isArray(data) ? data : []).filter(s => {
       const d = new Date(s.date);
       return d >= start && d <= end;
     });
     console.log(`   ✓ ${shows.length} shows in season range`);
   } catch (e) {
-    console.error(`   ✗ ${e.message}`);
+    // Fall back to fetching directly from phish.in if admin concerts endpoint fails
+    console.warn(`   ⚠ ${e.message} — fetching directly from phish.in`);
+    try {
+      for (const yr of ["2025", "2026"]) {
+        const r = await fetch(`https://phish.in/api/v2/shows?per_page=100&year=${yr}`, { headers: { Accept: "application/json" } });
+        if (r.ok) {
+          const d = await r.json();
+          const inRange = (d.data || []).filter(s => {
+            const dt = new Date(s.date);
+            return dt >= start && dt <= end;
+          });
+          shows.push(...inRange.map(s => ({ date: s.date })));
+        }
+      }
+      console.log(`   ✓ ${shows.length} shows fetched from phish.in`);
+    } catch (e2) {
+      console.error(`   ✗ ${e2.message}`);
+    }
   }
 
   // Build lookup: title.toLowerCase() → [username, ...]
@@ -456,7 +473,7 @@ async function main() {
   console.log("\n" + "═".repeat(W));
   console.log("  PRACTICE LEAGUE RESULTS — Summer 2025");
   console.log(`  "${league.name}" (id=${league.id})`);
-  console.log(`  Season: Jun 20 – Sep 21, 2025  |  ${showsScored} shows scored`);
+  console.log(`  Season: Dec 27, 2025 – Jan 13, 2026  |  ${showsScored} shows scored`);
   console.log("═".repeat(W));
 
   const ranked = Object.entries(scores)

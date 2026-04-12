@@ -262,6 +262,10 @@ export const insertLeagueSchema = createInsertSchema(leagues).pick({
   tourId: true,
   maxPlayers: true,
   isPublic: true,
+  draftRounds: true,
+  pickTimeLimit: true,
+  seasonStartDate: true,
+  seasonEndDate: true,
 });
 
 export const insertDraftedSongSchema = createInsertSchema(draftedSongs).pick({
