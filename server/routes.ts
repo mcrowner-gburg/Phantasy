@@ -150,11 +150,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const updates = { ...req.body };
       
       // Convert date strings to Date objects for database
-      if (updates.seasonStartDate) {
-        updates.seasonStartDate = updates.seasonStartDate === 'null' ? null : new Date(updates.seasonStartDate);
+      if (updates.seasonStartDate !== undefined) {
+        updates.seasonStartDate = (!updates.seasonStartDate || updates.seasonStartDate === 'null') ? null : new Date(updates.seasonStartDate);
       }
-      if (updates.seasonEndDate) {
-        updates.seasonEndDate = updates.seasonEndDate === 'null' ? null : new Date(updates.seasonEndDate);
+      if (updates.seasonEndDate !== undefined) {
+        updates.seasonEndDate = (!updates.seasonEndDate || updates.seasonEndDate === 'null') ? null : new Date(updates.seasonEndDate);
+      }
+      if (updates.draftDate !== undefined) {
+        updates.draftDate = (!updates.draftDate || updates.draftDate === 'null') ? null : new Date(updates.draftDate);
       }
       
       // Check if user is league owner or admin
