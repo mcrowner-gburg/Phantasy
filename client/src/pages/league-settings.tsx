@@ -11,7 +11,7 @@ import { Switch } from "@/components/ui/switch";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/hooks/useAuth";
 import { apiRequest } from "@/lib/queryClient";
-import { Settings, Calendar, Users, Lock, Shield, Clock } from "lucide-react";
+import { Settings, Calendar, Users, Lock, Shield, Clock, Link2, Copy, Check } from "lucide-react";
 
 export default function LeagueSettings() {
   const { id: leagueId } = useParams<{ id: string }>();
@@ -56,6 +56,31 @@ export default function LeagueSettings() {
       });
     }
   }, [league]);
+
+  // Invite link state
+  const [inviteUrl, setInviteUrl] = useState<string | null>(null);
+  const [copied, setCopied] = useState(false);
+
+  const generateInviteMutation = useMutation({
+    mutationFn: async () => {
+      const res = await apiRequest("POST", `/api/leagues/${leagueId}/invite`, {});
+      return res.json();
+    },
+    onSuccess: (data: { inviteCode: string }) => {
+      const url = `${window.location.origin}/join/${data.inviteCode}`;
+      setInviteUrl(url);
+    },
+    onError: () => {
+      toast({ title: "Error", description: "Failed to generate invite link.", variant: "destructive" });
+    },
+  });
+
+  const copyInviteUrl = () => {
+    if (!inviteUrl) return;
+    navigator.clipboard.writeText(inviteUrl);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2000);
+  };
 
   // Update league mutation
   const updateLeagueMutation = useMutation({
@@ -358,6 +383,38 @@ export default function LeagueSettings() {
                     <p className="text-xs text-blue-600 dark:text-blue-400 mt-1">
                       Only concerts within this date range will contribute to player points.
                     </p>
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+
+            {/* Invite Link */}
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <Link2 className="h-5 w-5" />
+                  Invite Players
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-3">
+                <p className="text-sm text-gray-600">
+                  Generate a shareable link — anyone who clicks it will be able to join this league.
+                </p>
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={() => generateInviteMutation.mutate()}
+                  disabled={generateInviteMutation.isPending}
+                >
+                  <Link2 className="h-4 w-4 mr-2" />
+                  {generateInviteMutation.isPending ? "Generating..." : "Generate Invite Link"}
+                </Button>
+                {inviteUrl && (
+                  <div className="flex items-center gap-2 p-3 bg-gray-50 dark:bg-gray-800 rounded-lg">
+                    <code className="flex-1 text-sm truncate">{inviteUrl}</code>
+                    <Button type="button" size="sm" variant="outline" onClick={copyInviteUrl}>
+                      {copied ? <Check className="h-4 w-4 text-green-600" /> : <Copy className="h-4 w-4" />}
+                    </Button>
                   </div>
                 )}
               </CardContent>
