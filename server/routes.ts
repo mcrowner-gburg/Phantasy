@@ -1245,24 +1245,23 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       // Find user by email
       const user = await storage.getUserByEmail(email);
+      console.log(`forgot-password: user lookup for ${email}: ${user ? `found id=${user.id}` : 'not found'}`);
       if (!user) {
-        // For security, don't reveal if email exists
         return res.json({ message: "If this email is registered, you will receive a password reset link." });
       }
-      
+
       // Generate reset token
       const resetToken = nanoid(32);
-      const expiresAt = new Date(Date.now() + 60 * 60 * 1000); // 1 hour from now
-      
+      const expiresAt = new Date(Date.now() + 60 * 60 * 1000);
+
       // Save token to database
-      await storage.createPasswordResetToken({
-        userId: user.id,
-        token: resetToken,
-        expiresAt,
-      });
-      
+      console.log(`forgot-password: saving reset token for user ${user.id}`);
+      await storage.createPasswordResetToken({ userId: user.id, token: resetToken, expiresAt });
+      console.log(`forgot-password: token saved, calling sendPasswordResetEmail`);
+
       const baseUrl = "https://phishphantasy.live";
       const sent = await sendPasswordResetEmail(email, resetToken, baseUrl);
+      console.log(`forgot-password: sendPasswordResetEmail returned ${sent}`);
 
       if (!sent) {
         return res.status(500).json({ message: "Failed to send reset email — please contact support" });
