@@ -213,14 +213,13 @@ async function main() {
   }
 
   // ── 6. Each user accepts invite and joins the league ──────────────────────
+  // The invite URL above is what a real user would click. For the script we
+  // use the direct join endpoint (no auth required) so session cookie timing
+  // is not a concern.
   console.log("\n6. Players accepting invite and joining league...");
   for (const u of userSessions) {
     try {
-      if (inviteCode && u.cookie) {
-        await api("POST", `/api/leagues/join/${inviteCode}`, {}, u.cookie);
-      } else {
-        await api("POST", `/api/leagues/${league.id}/join`, { userId: u.id }, u.cookie);
-      }
+      await api("POST", `/api/leagues/${league.id}/join`, { userId: u.id }, u.cookie);
       console.log(`   ✓ ${u.username} joined`);
     } catch (e) {
       if (e.message.includes("already")) {

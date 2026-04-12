@@ -460,17 +460,40 @@ export const storage = {
   return pick[0];
 },
 
+  // songId here is cachedSongs.id (what the /api/songs endpoint returns).
+  // draftedSongs stores the songs-table id (realSongId from makeDraftPick).
+  // We resolve through title to bridge the two namespaces.
   async isSongDraftedInLeague(songId: number, leagueId: number): Promise<boolean> {
+    const [cached] = await db.select({ title: cachedSongs.title })
+      .from(cachedSongs).where(eq(cachedSongs.id, songId)).limit(1);
+    if (!cached) return false;
+    const [song] = await db.select({ id: songs.id })
+      .from(songs).where(eq(songs.title, cached.title)).limit(1);
+    if (!song) return false;
     const result = await db.select().from(draftedSongs).where(
-      and(eq(draftedSongs.songId, songId), eq(draftedSongs.leagueId, leagueId))
+      and(eq(draftedSongs.songId, song.id), eq(draftedSongs.leagueId, leagueId))
     ).limit(1);
     return result.length > 0;
   },
 
+  // Returns cachedSongs IDs for all songs drafted in this league,
+  // so that /api/songs can filter the list correctly.
   async getDraftedSongIdsForLeague(leagueId: number): Promise<number[]> {
-    const result = await db.select({ songId: draftedSongs.songId })
+    const drafted = await db.select({ songId: draftedSongs.songId })
       .from(draftedSongs).where(eq(draftedSongs.leagueId, leagueId));
-    return result.map(r => r.songId!);
+    if (drafted.length === 0) return [];
+
+    // Resolve songs-table ids → titles → cachedSongs ids
+    const songIds = drafted.map(d => d.songId!).filter(Boolean);
+    const songTitles = await db.select({ title: songs.title })
+      .from(songs).where(inArray(songs.id, songIds));
+    const titleSet = new Set(songTitles.map(s => s.title.toLowerCase()));
+
+    const allCached = await db.select({ id: cachedSongs.id, title: cachedSongs.title })
+      .from(cachedSongs);
+    return allCached
+      .filter(cs => titleSet.has(cs.title.toLowerCase()))
+      .map(cs => cs.id);
   },
 
   // ==================== SONGS ====================

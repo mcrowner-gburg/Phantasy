@@ -583,9 +583,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
       console.log('🔄 Getting cached songs...');
       const cachedSongs = await storage.getCachedSongs();
       
-      // Transform cached songs to the expected format for the frontend
-      const allSongs = cachedSongs.map((cached, index) => ({
-        id: index + 1,
+      // Transform cached songs to the expected format for the frontend.
+      // Use the real cachedSongs.id so draft-pick and dedup checks use
+      // a stable, unique identifier rather than a fragile array index.
+      const allSongs = cachedSongs.map((cached) => ({
+        id: cached.id,
         title: cached.title,
         category: cached.category,
         rarityScore: cached.rarityScore,
