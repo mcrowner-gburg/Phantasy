@@ -64,7 +64,7 @@ export default function Leagues() {
       setNewLeague({ name: "", description: "", tourId: (activeTour as any)?.id || 1, maxPlayers: 24, isPublic: true });
       toast({
         title: "League created successfully!",
-        description: "Your new fantasy league is ready for players.",
+        description: "Your new phantasy league is ready for players.",
       });
     },
     onError: (error: any) => {
@@ -86,7 +86,7 @@ export default function Leagues() {
       queryClient.invalidateQueries({ queryKey: ["/api/leagues"] });
       toast({
         title: "Joined league successfully!",
-        description: "Welcome to your new fantasy league!",
+        description: "Welcome to your new phantasy league!",
       });
       setActiveTab("my-leagues");
     },
@@ -141,7 +141,7 @@ export default function Leagues() {
             <div>
               <h2 className="text-2xl font-bold">My Leagues</h2>
               <p className="phish-text">
-                {activeTour ? `Join or create leagues for ${(activeTour as any)?.name}` : "Join or create fantasy leagues"}
+                {activeTour ? `Join or create leagues for ${(activeTour as any)?.name}` : "Join or create phantasy leagues"}
               </p>
             </div>
             <div className="flex items-center space-x-4">
@@ -440,7 +440,7 @@ export default function Leagues() {
                   <Users className="mx-auto mb-4 phish-text" size={64} />
                   <h3 className="text-xl font-bold text-white mb-2">No Leagues Yet</h3>
                   <p className="phish-text mb-6">
-                    Create your first fantasy Phish league or join one with friends to get started!
+                    Create your first phantasy Phish league or join one with friends to get started!
                   </p>
                   <Button
                     className="gradient-button w-full"

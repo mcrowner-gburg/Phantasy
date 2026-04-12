@@ -348,7 +348,7 @@ export default function LeagueSettings() {
               </CardHeader>
               <CardContent className="space-y-4">
                 <p className="text-sm text-gray-600">
-                  Set the date range for this fantasy league. Only songs from concerts played within this period will count toward points.
+                  Set the date range for this phantasy league. Only songs from concerts played within this period will count toward points.
                 </p>
                 
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">

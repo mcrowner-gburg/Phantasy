@@ -138,7 +138,7 @@ export default function Concerts() {
                 <Badge className="bg-green-500 text-black">Connected</Badge>
               </div>
               <p className="text-sm phish-text mt-2">
-                Setlists and song durations sourced from phish.in · Set openers highlighted green · Encores highlighted yellow · +N = fantasy points
+                Setlists and song durations sourced from phish.in · Set openers highlighted green · Encores highlighted yellow · +N = phantasy points
               </p>
             </CardContent>
           </Card>

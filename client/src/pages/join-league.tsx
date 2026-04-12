@@ -101,7 +101,7 @@ export default function JoinLeague() {
           </div>
           <CardTitle className="text-2xl">Join Phish League</CardTitle>
           <p className="text-muted-foreground">
-            You've been invited to join a fantasy Phish league!
+            You've been invited to join a phantasy Phish league!
           </p>
         </CardHeader>
         
@@ -117,7 +117,7 @@ export default function JoinLeague() {
             <div className="grid grid-cols-2 gap-4 text-sm">
               <div className="flex items-center gap-2">
                 <Trophy className="h-4 w-4 text-amber-500" />
-                <span>Fantasy Draft</span>
+                <span>Phantasy Draft</span>
               </div>
               <div className="flex items-center gap-2">
                 <Calendar className="h-4 w-4 text-blue-500" />

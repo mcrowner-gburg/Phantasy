@@ -115,7 +115,7 @@ export class DatabaseStorage implements IStorage {
     // Example league
     const league: League = {
       id: this.currentLeagueId++,
-      name: "Winter Tour Fantasy League",
+      name: "Winter Tour Phantasy League",
       description: "Draft songs for NYE shows",
       tourId: 1,
       ownerId: user.id,
