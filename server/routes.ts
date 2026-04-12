@@ -16,20 +16,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Set up authentication middleware
   setupAuth(app);
 
-  // Temporary diagnostic — remove after confirming email works
-  app.post("/api/auth/test-email", async (req: any, res: any) => {
-    const { to } = req.body;
-    if (!to) return res.status(400).json({ message: "to required" });
-    const hasKey = !!process.env.RESEND_API_KEY;
-    const from = process.env.RESEND_FROM || "PhishDraft <noreply@phishphantasy.live>";
-    try {
-      const { sendPasswordResetEmail } = await import("./services/email");
-      const sent = await sendPasswordResetEmail(to, "test-token-123", "https://phishphantasy.live");
-      res.json({ hasKey, from, sent });
-    } catch (e: any) {
-      res.json({ hasKey, from, sent: false, error: e.message });
-    }
-  });
 
   // Admin routes
   app.use("/api/admin", adminRoutes);
