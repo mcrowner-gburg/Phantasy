@@ -1,7 +1,10 @@
 import { Resend } from "resend";
 
 let resend: Resend | null = null;
-const FROM_ADDRESS = process.env.RESEND_FROM || "PhishDraft <noreply@phishphantasy.live>";
+// Build from address from env vars to avoid Railway stripping angle brackets
+const FROM_EMAIL = process.env.RESEND_FROM_EMAIL || "noreply@phishphantasy.live";
+const FROM_NAME  = process.env.RESEND_FROM_NAME  || "PhishDraft";
+const FROM_ADDRESS = `${FROM_NAME} <${FROM_EMAIL}>`;
 
 if (process.env.RESEND_API_KEY) {
   resend = new Resend(process.env.RESEND_API_KEY);
