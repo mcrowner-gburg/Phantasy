@@ -1,6 +1,7 @@
 import { Switch, Route, Redirect } from "wouter";
 import { queryClient } from "./lib/queryClient";
 import { QueryClientProvider } from "@tanstack/react-query";
+import { useQuery } from "@tanstack/react-query";
 import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { useAuth } from "@/hooks/useAuth";
@@ -20,6 +21,15 @@ import LeagueSettings from "@/pages/league-settings";
 import Profile from "@/pages/profile";
 import DraftRoom from "@/pages/draft-room";
 import NotFound from "@/pages/not-found";
+
+// Redirects /draft-room → active draft league, or /leagues if none
+function DraftRoomRedirect() {
+  const { data: leagues } = useQuery<any[]>({ queryKey: ["/api/leagues"] });
+  if (!leagues) return null;
+  const active = leagues.find((l) => l.draftStatus === "active");
+  const target = active ? `/draft-room/${active.id}` : `/draft-room/${leagues[0]?.id ?? ""}`;
+  return <Redirect to={leagues.length ? target : "/leagues"} />;
+}
 
 function Router() {
   const { isAuthenticated, isLoading } = useAuth();
@@ -56,6 +66,7 @@ function Router() {
       <Route path="/leagues" component={Leagues} />
       <Route path="/admin" component={Admin} />
       <Route path="/profile" component={Profile} />
+      <Route path="/draft-room" component={DraftRoomRedirect} />
       <Route path="/draft-room/:id" component={DraftRoom} />
       <Route path="/leagues/:id/settings" component={LeagueSettings} />
       <Route path="/leagues/:id">
