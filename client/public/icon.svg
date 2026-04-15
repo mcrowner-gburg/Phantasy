@@ -1,0 +1,26 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
+  <!-- Background -->
+  <rect width="512" height="512" rx="96" fill="#0f172a"/>
+
+  <!-- Donut ring — Phish nod -->
+  <circle cx="256" cy="210" r="110" fill="none" stroke="#3b82f6" stroke-width="36"/>
+  <circle cx="256" cy="210" r="38" fill="#0f172a"/>
+
+  <!-- Stars / sparkles inside donut suggesting scoring/points -->
+  <circle cx="256" cy="172" r="10" fill="#60a5fa"/>
+  <circle cx="294" cy="210" r="10" fill="#60a5fa"/>
+  <circle cx="256" cy="248" r="10" fill="#60a5fa"/>
+  <circle cx="218" cy="210" r="10" fill="#60a5fa"/>
+
+  <!-- "PHANTASY" wordmark -->
+  <text
+    x="256"
+    y="376"
+    font-family="'Arial Black', 'Helvetica Neue', Arial, sans-serif"
+    font-weight="900"
+    font-size="72"
+    fill="#f8fafc"
+    text-anchor="middle"
+    letter-spacing="-2"
+  >PHANTASY</text>
+</svg>
