@@ -26,6 +26,7 @@ import { useLocation } from "wouter";
 export default function Draft() {
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedLeagueId, setSelectedLeagueId] = useState<number | undefined>();
+  const [sortOrder, setSortOrder] = useState<"alpha" | "common" | "rare">("alpha");
   const { user } = useAuth();
   const [, setLocation] = useLocation();
 
@@ -73,13 +74,15 @@ export default function Draft() {
       s.title.toLowerCase().includes(searchQuery.toLowerCase())
     ) ?? [];
 
-  // Songs sorted so wish-listed ones float to top, then alphabetical
+  // Songs sorted so wish-listed ones float to top, then by selected sort order
   const sortedSongs = [...filteredSongs].sort((a, b) => {
     const aW = wishList.indexOf(a.id);
     const bW = wishList.indexOf(b.id);
     if (aW !== -1 && bW !== -1) return aW - bW;
     if (aW !== -1) return -1;
     if (bW !== -1) return 1;
+    if (sortOrder === "common") return (b.totalPlays ?? 0) - (a.totalPlays ?? 0);
+    if (sortOrder === "rare") return (a.totalPlays ?? 0) - (b.totalPlays ?? 0);
     return a.title.localeCompare(b.title);
   });
 
@@ -160,18 +163,30 @@ export default function Draft() {
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
             {/* Song Browser — takes 2/3 width */}
             <div className="lg:col-span-2 space-y-4">
-              {/* Search */}
-              <div className="relative">
-                <Search
-                  className="absolute left-3 top-1/2 -translate-y-1/2 phish-text"
-                  size={18}
-                />
-                <Input
-                  placeholder="Search songs…"
-                  className="pl-10 bg-black border-gray-600 text-white placeholder-gray-400"
-                  value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
-                />
+              {/* Search + Sort */}
+              <div className="flex gap-2">
+                <div className="relative flex-1">
+                  <Search
+                    className="absolute left-3 top-1/2 -translate-y-1/2 phish-text"
+                    size={18}
+                  />
+                  <Input
+                    placeholder="Search songs…"
+                    className="pl-10 bg-black border-gray-600 text-white placeholder-gray-400"
+                    value={searchQuery}
+                    onChange={(e) => setSearchQuery(e.target.value)}
+                  />
+                </div>
+                <Select value={sortOrder} onValueChange={(v) => setSortOrder(v as typeof sortOrder)}>
+                  <SelectTrigger className="w-40 bg-black border-gray-600 text-white flex-shrink-0">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent className="bg-gray-900 border-gray-600">
+                    <SelectItem value="alpha" className="text-white">A – Z</SelectItem>
+                    <SelectItem value="rare" className="text-white">Rare first</SelectItem>
+                    <SelectItem value="common" className="text-white">Common first</SelectItem>
+                  </SelectContent>
+                </Select>
               </div>
 
               {/* Legend */}
