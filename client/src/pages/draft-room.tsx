@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useParams } from "wouter";
 import { NavigationSidebar } from "@/components/navigation-sidebar";
@@ -7,7 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Separator } from "@/components/ui/separator";
-import { Clock, Users, Music, Timer, Crown, User } from "lucide-react";
+import { Clock, Users, Music, Timer, Crown, User, Zap } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest } from "@/lib/queryClient";
 import { useAuth } from "@/hooks/useAuth";
@@ -17,6 +17,8 @@ export default function DraftRoom() {
   const [searchQuery, setSearchQuery] = useState("");
   const [timeRemaining, setTimeRemaining] = useState(0);
   const [startCountdown, setStartCountdown] = useState(0);
+  const [autoDraftEnabled, setAutoDraftEnabled] = useState(false);
+  const autoDraftFiredRef = useRef(false);
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const { user } = useAuth();
@@ -67,6 +69,29 @@ export default function DraftRoom() {
     onError: (error: any) => {
       toast({
         title: "Draft failed",
+        description: error.message || "Please try again.",
+        variant: "destructive",
+      });
+    },
+  });
+
+  // Auto-draft mutation — immediately picks the top available song for the current user
+  const autoDraftMutation = useMutation({
+    mutationFn: async () => {
+      return apiRequest("POST", `/api/leagues/${leagueId}/auto-pick`, { userId: user?.id });
+    },
+    onSuccess: (data: any) => {
+      queryClient.invalidateQueries({ queryKey: [`/api/leagues/${leagueId}/draft-status`] });
+      queryClient.invalidateQueries({ queryKey: [`/api/leagues/${leagueId}/draft-picks`] });
+      queryClient.invalidateQueries({ queryKey: ["/api/songs"] });
+      toast({
+        title: "Auto-drafted!",
+        description: data?.songTitle ? `Picked: ${data.songTitle}` : "Your pick has been made automatically.",
+      });
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Auto-draft failed",
         description: error.message || "Please try again.",
         variant: "destructive",
       });
@@ -128,11 +153,22 @@ export default function DraftRoom() {
     return () => clearInterval(t);
   }, [league?.currentPlayer, league?.draftStatus, league?.pickDeadline, user?.id]);
 
+  // When auto-draft is enabled and it becomes the user's turn, pick immediately
+  const isMyTurn = league && league.currentPlayer === user?.id;
+  useEffect(() => {
+    if (!isMyTurn || !autoDraftEnabled) {
+      autoDraftFiredRef.current = false;
+      return;
+    }
+    if (autoDraftFiredRef.current) return;
+    autoDraftFiredRef.current = true;
+    autoDraftMutation.mutate();
+  }, [isMyTurn, autoDraftEnabled]);
+
   const filteredSongs = songs?.filter((song: any) =>
     song.title.toLowerCase().includes(searchQuery.toLowerCase())
   ) || [];
 
-  const isMyTurn = league && league.currentPlayer === user?.id;
   const isOwner = league && league.ownerId === user?.id;
   const currentPlayer = draftOrder?.find((member: any) => member.userId === league?.currentPlayer);
 
@@ -265,6 +301,15 @@ export default function DraftRoom() {
                         <span className="text-xs text-gray-500">until auto-pick</span>
                       )}
                     </div>
+                    <Button
+                      variant={autoDraftEnabled ? "default" : "outline"}
+                      size="sm"
+                      className="mt-3"
+                      onClick={() => setAutoDraftEnabled(prev => !prev)}
+                    >
+                      <Zap className="h-4 w-4 mr-1" />
+                      {autoDraftEnabled ? "Auto Draft: On" : "Auto Draft: Off"}
+                    </Button>
                   </div>
                 </div>
               )}

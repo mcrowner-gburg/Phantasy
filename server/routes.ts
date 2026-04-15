@@ -1,7 +1,7 @@
 import type { Express } from "express";
 import { createServer, type Server } from "http";
 import { storage } from "./storage-db";
-import { insertUserSchema, insertTourSchema, insertLeagueSchema, insertDraftedSongSchema, insertSongPerformanceSchema, cachedShows, cachedSetlists } from "@shared/schema";
+import { insertUserSchema, insertTourSchema, insertLeagueSchema, insertDraftedSongSchema, insertSongPerformanceSchema, cachedShows, cachedSetlists, draftPicks } from "@shared/schema";
 import { z } from "zod";
 import { phishApi } from "./services/phish-api";
 import { setupAuth, requireAuth } from "./auth";
@@ -10,7 +10,7 @@ import { nanoid } from "nanoid";
 import bcrypt from "bcrypt";
 import adminRoutes from "./routes/admin";
 import { db } from "./db";
-import { sql } from "drizzle-orm";
+import { sql, eq } from "drizzle-orm";
 
 export async function registerRoutes(app: Express): Promise<Server> {
   // Set up authentication middleware
@@ -793,6 +793,29 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.json(picks);
     } catch (error) {
       res.status(500).json({ message: "Failed to get draft picks" });
+    }
+  });
+
+  // Admin-only: wipe all picks and reset draft state so a league can be re-drafted
+  app.post("/api/admin/leagues/:id/reset-draft", requireAuth, async (req, res) => {
+    try {
+      const leagueId = parseInt(req.params.id);
+      const userId = (req as any).userId;
+      const user = await storage.getUser(userId);
+      if (!user || (user.role !== "admin" && user.role !== "superadmin")) {
+        return res.status(403).json({ message: "Admin only" });
+      }
+      await db.delete(draftPicks).where(eq(draftPicks.leagueId, leagueId));
+      await storage.updateLeague(leagueId, {
+        draftStatus: "scheduled",
+        currentPick: 1,
+        currentRound: 1,
+        currentPlayer: null,
+        pickDeadline: null,
+      } as any);
+      res.json({ message: `Draft reset for league ${leagueId}` });
+    } catch (error: any) {
+      res.status(500).json({ message: error.message || "Failed to reset draft" });
     }
   });
 

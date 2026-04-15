@@ -39,8 +39,9 @@ export function setupAuth(app: express.Application) {
   // Authentication routes
   app.post('/api/auth/register', async (req, res) => {
     try {
-      const { username, email, phoneNumber, password } = req.body;
-      
+      const { username, phoneNumber, password } = req.body;
+      const email = req.body.email?.toLowerCase();
+
       if (!username || !email || !password) {
         return res.status(400).json({ message: 'Username, email, and password are required' });
       }

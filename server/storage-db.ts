@@ -27,7 +27,7 @@ export const storage = {
   },
 
   async getUserByEmail(email: string): Promise<User | undefined> {
-    const result = await db.select().from(users).where(eq(users.email, email)).limit(1);
+    const result = await db.select().from(users).where(sql`lower(${users.email}) = lower(${email})`).limit(1);
     return result[0];
   },
 
