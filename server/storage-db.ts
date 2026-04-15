@@ -279,6 +279,10 @@ export const storage = {
       and(eq(leagueInvites.inviteCode, inviteCode), eq(leagueInvites.isActive, true))
     ).limit(1);
     if (!invite[0]) return false;
+    // Respect maxUses if set
+    if (invite[0].maxUses !== null && (invite[0].currentUses ?? 0) >= invite[0].maxUses) {
+      return false;
+    }
     await this.joinLeague(userId, invite[0].leagueId);
     await db.update(leagueInvites)
       .set({ currentUses: sql`${leagueInvites.currentUses} + 1` })

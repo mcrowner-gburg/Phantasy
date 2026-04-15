@@ -213,7 +213,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.post("/api/leagues/join/:inviteCode", requireAuth, async (req, res) => {
     try {
       const inviteCode = req.params.inviteCode;
-      const userId = req.user?.id;
+      const userId = (req as any).userId;
 
       if (!userId) {
         return res.status(401).json({ message: 'User not authenticated' });
