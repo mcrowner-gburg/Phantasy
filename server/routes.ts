@@ -692,7 +692,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.post("/api/leagues/:id/auto-pick", async (req, res) => {
     try {
       const leagueId = parseInt(req.params.id);
-      const { userId } = req.body;
+      const { userId, preferredSongIds } = req.body;
 
       const league = await storage.getDraftStatus(leagueId);
       if (!league || league.draftStatus !== "active") {
@@ -702,13 +702,26 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ message: "Not this player's turn" });
       }
 
+      // Try queue songs first (in priority order), then fall back to most-played
+      if (Array.isArray(preferredSongIds) && preferredSongIds.length > 0) {
+        for (const songId of preferredSongIds) {
+          const isDrafted = await storage.isSongDraftedInLeague(songId, leagueId);
+          if (!isDrafted) {
+            const song = await storage.getSong(songId);
+            const pick = await storage.makeDraftPick(leagueId, userId, songId, league.pickTimeLimit ?? 90);
+            return res.json({ ...pick, autoPicked: true, fromQueue: true, songTitle: song?.title ?? `Song #${songId}` });
+          }
+        }
+      }
+
+      // Fallback: most-played undrafted song from the last year
       const available = await storage.getAvailableSongsPlayedLastYear(leagueId);
       if (available.length === 0) {
         return res.status(400).json({ message: "No available songs to auto-pick" });
       }
 
       const pick = await storage.makeDraftPick(leagueId, userId, available[0].id, league.pickTimeLimit ?? 90);
-      res.json({ ...pick, autoPicked: true, songTitle: available[0].title });
+      res.json({ ...pick, autoPicked: true, fromQueue: false, songTitle: available[0].title });
     } catch (error: any) {
       res.status(500).json({ message: error.message || "Failed to auto-pick" });
     }

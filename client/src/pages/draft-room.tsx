@@ -6,11 +6,11 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
-import { Separator } from "@/components/ui/separator";
-import { Clock, Users, Music, Timer, Crown, User, Zap } from "lucide-react";
+import { Clock, Users, Music, Timer, Crown, Zap, Star, StarOff, ChevronUp, ChevronDown, Trash2 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest } from "@/lib/queryClient";
 import { useAuth } from "@/hooks/useAuth";
+import { useWishList } from "@/hooks/useWishList";
 
 export default function DraftRoom() {
   const { id: leagueId } = useParams<{ id: string }>();
@@ -23,10 +23,13 @@ export default function DraftRoom() {
   const queryClient = useQueryClient();
   const { user } = useAuth();
 
+  const leagueIdNum = leagueId ? parseInt(leagueId) : undefined;
+  const { list: wishList, toggle: toggleQueue, move: moveQueue, remove: removeQueue } = useWishList(leagueIdNum);
+
   // Get draft status
   const { data: league, isLoading: leagueLoading } = useQuery({
     queryKey: [`/api/leagues/${leagueId}/draft-status`],
-    refetchInterval: 2000, // Poll every 2 seconds for real-time updates
+    refetchInterval: 2000,
   }) as { data: any, isLoading: boolean };
 
   // Get draft order
@@ -38,15 +41,22 @@ export default function DraftRoom() {
   // Get draft picks
   const { data: draftPicks } = useQuery({
     queryKey: [`/api/leagues/${leagueId}/draft-picks`],
-    refetchInterval: 2000, // Poll for real-time updates
+    refetchInterval: 2000,
   });
 
   // Get available songs for this league
   const { data: songs, isLoading: songsLoading } = useQuery({
     queryKey: ["/api/songs", leagueId],
     queryFn: () => fetch(`/api/songs?leagueId=${leagueId}`).then(res => res.json()),
-    refetchInterval: 5000, // Refresh available songs
+    refetchInterval: 5000,
   });
+
+  // Remove queue songs that got drafted by someone else
+  useEffect(() => {
+    if (!songs || !league || league.draftStatus !== "active") return;
+    const availableIds = new Set((songs as any[]).map((s: any) => s.id));
+    wishList.forEach(id => { if (!availableIds.has(id)) removeQueue(id); });
+  }, [songs]);
 
   // Draft pick mutation
   const draftMutation = useMutation({
@@ -61,40 +71,37 @@ export default function DraftRoom() {
       queryClient.invalidateQueries({ queryKey: [`/api/leagues/${leagueId}/draft-status`] });
       queryClient.invalidateQueries({ queryKey: [`/api/leagues/${leagueId}/draft-picks`] });
       queryClient.invalidateQueries({ queryKey: ["/api/songs"] });
-      toast({
-        title: "Pick successful!",
-        description: "Your song has been drafted.",
-      });
+      toast({ title: "Pick successful!", description: "Your song has been drafted." });
     },
     onError: (error: any) => {
-      toast({
-        title: "Draft failed",
-        description: error.message || "Please try again.",
-        variant: "destructive",
-      });
+      toast({ title: "Draft failed", description: error.message || "Please try again.", variant: "destructive" });
     },
   });
 
-  // Auto-draft mutation — immediately picks the top available song for the current user
+  // Auto-draft mutation — queue-aware: tries queue songs first, then falls back to most-played
   const autoDraftMutation = useMutation({
     mutationFn: async () => {
-      return apiRequest("POST", `/api/leagues/${leagueId}/auto-pick`, { userId: user?.id });
+      const availableIds = new Set((songs as any[] ?? []).map((s: any) => s.id));
+      const preferredSongIds = wishList.filter(id => availableIds.has(id));
+      return apiRequest("POST", `/api/leagues/${leagueId}/auto-pick`, {
+        userId: user?.id,
+        preferredSongIds,
+      });
     },
     onSuccess: (data: any) => {
       queryClient.invalidateQueries({ queryKey: [`/api/leagues/${leagueId}/draft-status`] });
       queryClient.invalidateQueries({ queryKey: [`/api/leagues/${leagueId}/draft-picks`] });
       queryClient.invalidateQueries({ queryKey: ["/api/songs"] });
+      const fromQueue = data?.fromQueue;
       toast({
-        title: "Auto-drafted!",
-        description: data?.songTitle ? `Picked: ${data.songTitle}` : "Your pick has been made automatically.",
+        title: fromQueue ? "Queue pick made!" : "Auto-drafted!",
+        description: data?.songTitle
+          ? `${fromQueue ? "Picked from your queue" : "Auto-picked"}: ${data.songTitle}`
+          : "Your pick has been made automatically.",
       });
     },
     onError: (error: any) => {
-      toast({
-        title: "Auto-draft failed",
-        description: error.message || "Please try again.",
-        variant: "destructive",
-      });
+      toast({ title: "Auto-draft failed", description: error.message || "Please try again.", variant: "destructive" });
     },
   });
 
@@ -105,17 +112,10 @@ export default function DraftRoom() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: [`/api/leagues/${leagueId}/draft-status`] });
-      toast({
-        title: "Draft started!",
-        description: "The draft is now active.",
-      });
+      toast({ title: "Draft started!", description: "The draft is now active." });
     },
     onError: (error: any) => {
-      toast({
-        title: "Failed to start draft",
-        description: error.message || "Please try again.",
-        variant: "destructive",
-      });
+      toast({ title: "Failed to start draft", description: error.message || "Please try again.", variant: "destructive" });
     },
   });
 
@@ -165,29 +165,32 @@ export default function DraftRoom() {
     autoDraftMutation.mutate();
   }, [isMyTurn, autoDraftEnabled]);
 
-  const filteredSongs = songs?.filter((song: any) =>
+  const filteredSongs = (songs as any[] ?? []).filter((song: any) =>
     song.title.toLowerCase().includes(searchQuery.toLowerCase())
-  ) || [];
+  );
 
   const isOwner = league && league.ownerId === user?.id;
   const currentPlayer = draftOrder?.find((member: any) => member.userId === league?.currentPlayer);
 
+  // Queue songs — only ones still available
+  const availableSongIds = new Set((songs as any[] ?? []).map((s: any) => s.id));
+  const queueSongs = wishList
+    .filter(id => availableSongIds.has(id))
+    .map(id => (songs as any[])?.find((s: any) => s.id === id))
+    .filter(Boolean);
+
   // Build the snake pick order for the current and next round
   const buildSnakeRoundOrder = (members: any[], round: number) => {
     if (!members || members.length === 0) return [];
-    // odd rounds: forward (0→N-1), even rounds: backward (N-1→0)
     return round % 2 === 1 ? [...members] : [...members].reverse();
   };
 
   const currentRound = league?.currentRound ?? 1;
   const currentRoundOrder = buildSnakeRoundOrder(draftOrder || [], currentRound);
   const nextRoundOrder = buildSnakeRoundOrder(draftOrder || [], currentRound + 1);
-  // Picks already made in the current round
   const picksInCurrentRound = ((league?.currentPick ?? 1) - 1) % (draftOrder?.length || 1);
-  // Remaining picks in this round = players after the current position
   const remainingThisRound = currentRoundOrder.slice(picksInCurrentRound);
 
-  // Loading and error handling
   if (leagueLoading || draftOrderLoading || !user) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 dark:from-gray-900 dark:to-gray-800">
@@ -310,6 +313,16 @@ export default function DraftRoom() {
                       <Zap className="h-4 w-4 mr-1" />
                       {autoDraftEnabled ? "Auto Draft: On" : "Auto Draft: Off"}
                     </Button>
+                    {autoDraftEnabled && queueSongs.length > 0 && (
+                      <p className="text-xs text-gray-500 mt-1">
+                        Will pick from your queue ({queueSongs.length} song{queueSongs.length !== 1 ? "s" : ""})
+                      </p>
+                    )}
+                    {autoDraftEnabled && queueSongs.length === 0 && (
+                      <p className="text-xs text-gray-500 mt-1">
+                        Queue empty — will pick most-played available song
+                      </p>
+                    )}
                   </div>
                 </div>
               )}
@@ -339,36 +352,159 @@ export default function DraftRoom() {
                     <div className="text-center py-8">Loading songs...</div>
                   ) : (
                     <div className="space-y-2 max-h-96 overflow-y-auto">
-                      {filteredSongs.map((song: any) => (
-                        <div
-                          key={song.id}
-                          className="flex items-center justify-between p-3 border rounded-lg hover:bg-gray-50 dark:hover:bg-gray-800"
-                        >
-                          <div>
-                            <div className="font-medium">{song.title}</div>
-                            <div className="text-sm text-gray-600">
-                              {song.category} • {song.plays24Months} plays (24 months)
+                      {filteredSongs.map((song: any) => {
+                        const queuePos = wishList.indexOf(song.id);
+                        const inQueue = queuePos !== -1;
+                        return (
+                          <div
+                            key={song.id}
+                            className={`flex items-center justify-between p-3 border rounded-lg transition-colors ${
+                              inQueue
+                                ? "border-yellow-400 bg-yellow-50 dark:bg-yellow-900/20"
+                                : "hover:bg-gray-50 dark:hover:bg-gray-800"
+                            }`}
+                          >
+                            <div className="flex items-center gap-2 min-w-0">
+                              {/* Queue toggle star */}
+                              <button
+                                onClick={() => toggleQueue(song.id)}
+                                className={`flex-shrink-0 transition-colors ${
+                                  inQueue ? "text-yellow-500 hover:text-yellow-400" : "text-gray-300 hover:text-yellow-400"
+                                }`}
+                                title={inQueue ? "Remove from queue" : "Add to queue"}
+                              >
+                                {inQueue ? <Star className="h-4 w-4" fill="currentColor" /> : <Star className="h-4 w-4" />}
+                              </button>
+                              {inQueue && (
+                                <span className="text-xs font-bold text-yellow-600 w-5 flex-shrink-0">
+                                  #{queuePos + 1}
+                                </span>
+                              )}
+                              <div className="min-w-0">
+                                <div className={`font-medium truncate ${inQueue ? "text-yellow-800 dark:text-yellow-200" : ""}`}>
+                                  {song.title}
+                                </div>
+                                <div className="text-sm text-gray-600">
+                                  {song.category} • {song.plays24Months} plays (24 months)
+                                </div>
+                              </div>
                             </div>
+                            {isMyTurn && league && league.draftStatus === "active" && (
+                              <Button
+                                onClick={() => draftMutation.mutate(song.id)}
+                                disabled={draftMutation.isPending}
+                                size="sm"
+                                className="ml-2 flex-shrink-0"
+                              >
+                                Draft
+                              </Button>
+                            )}
                           </div>
-                          {isMyTurn && league && league.draftStatus === "active" && (
-                            <Button
-                              onClick={() => draftMutation.mutate(song.id)}
-                              disabled={draftMutation.isPending}
-                              size="sm"
-                            >
-                              Draft
-                            </Button>
-                          )}
-                        </div>
-                      ))}
+                        );
+                      })}
                     </div>
                   )}
                 </CardContent>
               </Card>
             </div>
 
-            {/* Draft Board */}
+            {/* Right column */}
             <div className="space-y-6">
+              {/* Draft Queue */}
+              <Card className="border-yellow-400 border-opacity-60">
+                <CardHeader className="pb-2">
+                  <CardTitle className="flex items-center gap-2 text-yellow-600 dark:text-yellow-400">
+                    <Star className="h-4 w-4" fill="currentColor" />
+                    My Queue
+                    {queueSongs.length > 0 && (
+                      <Badge variant="outline" className="ml-auto text-yellow-600 border-yellow-400 text-xs">
+                        {queueSongs.length}
+                      </Badge>
+                    )}
+                  </CardTitle>
+                  <p className="text-xs text-gray-500">
+                    {queueSongs.length === 0
+                      ? "Star songs below to build your queue"
+                      : "Your picks in priority order"}
+                  </p>
+                </CardHeader>
+                <CardContent className="pt-0">
+                  {queueSongs.length === 0 ? (
+                    <div className="text-center py-6 text-gray-400">
+                      <StarOff className="h-8 w-8 mx-auto mb-2 text-gray-300" />
+                      <p className="text-sm">No songs queued yet.</p>
+                      <p className="text-xs mt-1">Tap ★ next to any song to add it.</p>
+                    </div>
+                  ) : (
+                    <div className="space-y-1.5 max-h-64 overflow-y-auto">
+                      {queueSongs.map((song: any, idx: number) => (
+                        <div
+                          key={song.id}
+                          className="flex items-center gap-2 p-2 rounded-lg bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800"
+                        >
+                          <span className="text-xs font-bold text-yellow-600 w-5 flex-shrink-0">
+                            {idx + 1}
+                          </span>
+                          <div className="flex-1 min-w-0">
+                            <p className="text-sm font-medium truncate">{song.title}</p>
+                          </div>
+                          <div className="flex items-center gap-0.5 flex-shrink-0">
+                            {/* Draft from queue button — only on user's turn */}
+                            {isMyTurn && league?.draftStatus === "active" && (
+                              <Button
+                                size="sm"
+                                variant="default"
+                                className="h-6 px-2 text-xs mr-1"
+                                onClick={() => draftMutation.mutate(song.id)}
+                                disabled={draftMutation.isPending}
+                              >
+                                Draft
+                              </Button>
+                            )}
+                            <button
+                              onClick={() => moveQueue(song.id, -1)}
+                              disabled={idx === 0}
+                              className="text-gray-400 hover:text-gray-700 disabled:opacity-20 p-0.5"
+                              title="Move up"
+                            >
+                              <ChevronUp className="h-3.5 w-3.5" />
+                            </button>
+                            <button
+                              onClick={() => moveQueue(song.id, 1)}
+                              disabled={idx === queueSongs.length - 1}
+                              className="text-gray-400 hover:text-gray-700 disabled:opacity-20 p-0.5"
+                              title="Move down"
+                            >
+                              <ChevronDown className="h-3.5 w-3.5" />
+                            </button>
+                            <button
+                              onClick={() => removeQueue(song.id)}
+                              className="text-gray-300 hover:text-red-400 p-0.5"
+                              title="Remove"
+                            >
+                              <Trash2 className="h-3.5 w-3.5" />
+                            </button>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+
+                  {/* Draft top of queue shortcut */}
+                  {isMyTurn && league?.draftStatus === "active" && queueSongs.length > 0 && (
+                    <Button
+                      className="w-full mt-3"
+                      size="sm"
+                      onClick={() => draftMutation.mutate(queueSongs[0].id)}
+                      disabled={draftMutation.isPending}
+                    >
+                      <Zap className="h-3.5 w-3.5 mr-1" />
+                      Draft #{1}: {queueSongs[0].title}
+                    </Button>
+                  )}
+                </CardContent>
+              </Card>
+
               {/* Draft Order */}
               <Card>
                 <CardHeader>
@@ -380,7 +516,6 @@ export default function DraftRoom() {
                 <CardContent>
                   {league?.draftStatus === "active" && draftOrder && draftOrder.length > 0 ? (
                     <div className="space-y-3">
-                      {/* Remaining picks this round */}
                       <div>
                         <div className="text-xs font-semibold text-gray-500 uppercase mb-1">
                           Round {currentRound} {currentRound % 2 === 1 ? "→" : "←"}
@@ -411,7 +546,6 @@ export default function DraftRoom() {
                           })}
                         </div>
                       </div>
-                      {/* Preview of next round */}
                       {currentRound < (league?.draftRounds ?? 10) && (
                         <div>
                           <div className="text-xs font-semibold text-gray-400 uppercase mb-1">
