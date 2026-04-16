@@ -863,6 +863,45 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Admin: reassign a draft pick to a different user and/or song
+  app.post("/api/admin/leagues/:id/reassign-pick", requireAuth, async (req, res) => {
+    try {
+      const leagueId = parseInt(req.params.id);
+      const userId = (req as any).userId;
+      const user = await storage.getUser(userId);
+      if (!user || (user.role !== "admin" && user.role !== "superadmin")) {
+        return res.status(403).json({ message: "Admin only" });
+      }
+      const { pickId, newUserId, newSongId } = req.body;
+      // Get existing pick
+      const [existing] = await db.select().from(draftPicks).where(eq(draftPicks.id, pickId)).limit(1);
+      if (!existing) return res.status(404).json({ message: "Pick not found" });
+
+      // Update draftPicks row
+      await db.update(draftPicks)
+        .set({ userId: newUserId, songId: newSongId })
+        .where(eq(draftPicks.id, pickId));
+
+      // Remove old draftedSongs entry
+      await db.delete(draftedSongs).where(
+        sql`${draftedSongs.leagueId} = ${leagueId} AND ${draftedSongs.userId} = ${existing.userId} AND ${draftedSongs.songId} = ${existing.songId}`
+      );
+
+      // Insert new draftedSongs entry
+      await db.insert(draftedSongs).values({
+        leagueId,
+        userId: newUserId,
+        songId: newSongId,
+        draftRound: existing.draftRound ?? 1,
+        draftPick: existing.pickNumber ?? 1,
+      }).onConflictDoNothing();
+
+      res.json({ message: `Pick #${existing.pickNumber} reassigned`, pickId, newUserId, newSongId });
+    } catch (error: any) {
+      res.status(500).json({ message: error.message || "Failed to reassign pick" });
+    }
+  });
+
   app.post("/api/leagues/:id/draft-pick", async (req, res) => {
     try {
       const leagueId = parseInt(req.params.id);
