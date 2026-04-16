@@ -347,7 +347,7 @@ export const storage = {
 
       const [song] = await db.select().from(songs).where(eq(songs.title, cs.title)).limit(1);
       if (!song) continue;
-      if (draftedIds.includes(song.id)) continue;
+      if (draftedIds.includes(cs.id)) continue; // draftedIds contains cachedSongs.id values
       available.push({ id: song.id, title: song.title });
     }
     return available;
