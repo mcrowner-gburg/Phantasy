@@ -58,7 +58,8 @@ export function PreDraftScreen({ leagueId, league, members, isOwner }: PreDraftS
   // New endpoint needed on the server — shuffles members, stores order, returns array
   const randomizeMutation = useMutation({
     mutationFn: async () => {
-      return apiRequest("POST", `/api/leagues/${leagueId}/randomize-draft-order`, {});
+      const res = await apiRequest("POST", `/api/leagues/${leagueId}/randomize-draft-order`, {});
+      return res.json();
     },
     onSuccess: (data: any) => {
       // Server returns { orderedUserIds: number[] }
@@ -80,7 +81,8 @@ export function PreDraftScreen({ leagueId, league, members, isOwner }: PreDraftS
   // POST /api/leagues/:id/start-draft — fires after race completes
   const startMutation = useMutation({
     mutationFn: async () => {
-      return apiRequest("POST", `/api/leagues/${leagueId}/start-draft`, {});
+      const res = await apiRequest("POST", `/api/leagues/${leagueId}/start-draft`, {});
+      return res.json();
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: [`/api/leagues/${leagueId}/draft-status`] });
