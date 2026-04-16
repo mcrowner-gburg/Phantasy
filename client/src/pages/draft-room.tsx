@@ -315,7 +315,7 @@ export default function DraftRoom() {
                       placeholder="Search songs..."
                       value={searchQuery}
                       onChange={(e) => setSearchQuery(e.target.value)}
-                      className="w-full"
+                      className="w-full text-gray-900 placeholder:text-gray-500"
                     />
                   </div>
                 </CardHeader>
