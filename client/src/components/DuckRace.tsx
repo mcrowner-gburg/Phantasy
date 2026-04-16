@@ -52,6 +52,17 @@ export function DuckRace({ orderedPlayers, onComplete }: DuckRaceProps) {
   const durationMs = (userId: number) =>
     WINNER_FINISH + (finishPlace[userId] - 1) * PLACE_SPREAD;
 
+  // Shuffle lane positions once on mount so the winning duck isn't always
+  // in lane 1 — finish order and lane order are independent.
+  const [laneOrder] = useState<Player[]>(() => {
+    const arr = [...orderedPlayers];
+    for (let i = arr.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      [arr[i], arr[j]] = [arr[j], arr[i]];
+    }
+    return arr;
+  });
+
   // ─── phase & countdown ───────────────────────────────────────────────────
   const [phase, setPhase]         = useState<Phase>("countdown");
   const [countNum, setCountNum]   = useState(3);
@@ -153,8 +164,8 @@ export function DuckRace({ orderedPlayers, onComplete }: DuckRaceProps) {
           {/* Start line */}
           <div className="absolute left-16 top-0 bottom-0 w-px bg-white opacity-10" />
 
-          {/* Lanes */}
-          {orderedPlayers.map((player, idx) => {
+          {/* Lanes — displayed in shuffled order so finish order isn't predictable by lane position */}
+          {laneOrder.map((player, idx) => {
             const place = finishPlace[player.userId];
             const hasFinished = finishedIds.includes(player.userId);
             const myDuration = durationMs(player.userId);
