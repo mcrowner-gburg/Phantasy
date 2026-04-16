@@ -1,10 +1,6 @@
 import { useState } from "react";
 import { Link, useLocation } from "wouter";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest } from "@/lib/queryClient";
 
@@ -22,10 +18,7 @@ export default function Login() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/auth/user"] });
-      toast({
-        title: "Welcome back!",
-        description: "You have successfully logged in.",
-      });
+      toast({ title: "Welcome back!", description: "You have successfully logged in." });
       navigate("/");
     },
     onError: (error: Error) => {
@@ -51,63 +44,107 @@ export default function Login() {
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gray-50 dark:bg-gray-900 px-4">
-      <Card className="w-full max-w-md">
-        <CardHeader className="space-y-1">
-          <CardTitle className="text-2xl font-bold text-center">Welcome back</CardTitle>
-          <CardDescription className="text-center">
-            Sign in to your PhishDraft account
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          <form onSubmit={handleSubmit} className="space-y-4">
-            <div className="space-y-2">
-              <Label htmlFor="usernameOrEmail">Username or Email</Label>
-              <Input
-                id="usernameOrEmail"
-                type="text"
-                value={usernameOrEmail}
-                onChange={(e) => setUsernameOrEmail(e.target.value)}
-                placeholder="Enter your username or email"
-                className="text-gray-900"
-                required
-              />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="password">Password</Label>
-              <Input
-                id="password"
-                type="password"
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                placeholder="Enter your password"
-                className="text-gray-900"
-                required
-              />
-            </div>
-            <Button
-              type="submit"
-              className="w-full"
-              disabled={loginMutation.isPending}
-            >
-              {loginMutation.isPending ? "Signing in..." : "Sign in"}
-            </Button>
-          </form>
-          <div className="mt-4 space-y-2 text-center">
-            <div>
-              <Link href="/forgot-password" className="text-sm text-blue-600 hover:underline">
-                Forgot your password?
-              </Link>
-            </div>
-            <p className="text-sm text-gray-600 dark:text-gray-400">
-              Don't have an account?{" "}
-              <Link href="/register" className="text-blue-600 hover:underline">
-                Sign up
-              </Link>
-            </p>
+    <div className="min-h-screen flex items-center justify-center px-4" style={{ backgroundColor: "#030712" }}>
+      <div
+        className="w-full max-w-md rounded-xl p-8 space-y-6"
+        style={{ backgroundColor: "#111827", border: "1px solid #374151" }}
+      >
+        {/* Header */}
+        <div className="text-center space-y-1">
+          <h1 className="text-2xl font-bold" style={{ color: "#ffffff" }}>Welcome back</h1>
+          <p style={{ color: "#9ca3af" }}>Sign in to your Phantasy account</p>
+        </div>
+
+        {/* Form */}
+        <form onSubmit={handleSubmit} className="space-y-4">
+          <div className="space-y-1.5">
+            <label htmlFor="usernameOrEmail" style={{ color: "#d1d5db", fontSize: "0.875rem", fontWeight: 500 }}>
+              Username or Email
+            </label>
+            <input
+              id="usernameOrEmail"
+              type="text"
+              value={usernameOrEmail}
+              onChange={(e) => setUsernameOrEmail(e.target.value)}
+              placeholder="Enter your username or email"
+              required
+              style={{
+                display: "block",
+                width: "100%",
+                padding: "0.5rem 0.75rem",
+                borderRadius: "0.5rem",
+                border: "1px solid #374151",
+                backgroundColor: "#1f2937",
+                color: "#ffffff",
+                fontSize: "0.875rem",
+                outline: "none",
+                boxSizing: "border-box",
+              }}
+            />
           </div>
-        </CardContent>
-      </Card>
+
+          <div className="space-y-1.5">
+            <label htmlFor="password" style={{ color: "#d1d5db", fontSize: "0.875rem", fontWeight: 500 }}>
+              Password
+            </label>
+            <input
+              id="password"
+              type="password"
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              placeholder="Enter your password"
+              required
+              style={{
+                display: "block",
+                width: "100%",
+                padding: "0.5rem 0.75rem",
+                borderRadius: "0.5rem",
+                border: "1px solid #374151",
+                backgroundColor: "#1f2937",
+                color: "#ffffff",
+                fontSize: "0.875rem",
+                outline: "none",
+                boxSizing: "border-box",
+              }}
+            />
+          </div>
+
+          <button
+            type="submit"
+            disabled={loginMutation.isPending}
+            style={{
+              display: "block",
+              width: "100%",
+              padding: "0.625rem 1rem",
+              borderRadius: "0.5rem",
+              border: "none",
+              backgroundColor: loginMutation.isPending ? "#1d4ed8" : "#2563eb",
+              color: "#ffffff",
+              fontSize: "0.875rem",
+              fontWeight: 600,
+              cursor: loginMutation.isPending ? "not-allowed" : "pointer",
+              opacity: loginMutation.isPending ? 0.7 : 1,
+            }}
+          >
+            {loginMutation.isPending ? "Signing in..." : "Sign in"}
+          </button>
+        </form>
+
+        {/* Footer links */}
+        <div className="space-y-2 text-center">
+          <div>
+            <Link href="/forgot-password" style={{ color: "#60a5fa", fontSize: "0.875rem" }}>
+              Forgot your password?
+            </Link>
+          </div>
+          <p style={{ color: "#9ca3af", fontSize: "0.875rem" }}>
+            Don't have an account?{" "}
+            <Link href="/register" style={{ color: "#60a5fa" }}>
+              Sign up
+            </Link>
+          </p>
+        </div>
+      </div>
     </div>
   );
 }
