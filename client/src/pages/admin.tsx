@@ -31,6 +31,8 @@ export default function Admin() {
   const [songSearch, setSongSearch] = useState("");
   const [selectedSongId, setSelectedSongId] = useState<number | null>(null);
   const [selectedSongTitle, setSelectedSongTitle] = useState("");
+  const [addMemberSearch, setAddMemberSearch] = useState("");
+  const [addMemberDialogOpen, setAddMemberDialogOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
   const [isCreateUserDialogOpen, setIsCreateUserDialogOpen] = useState(false);
   const [isEditUserDialogOpen, setIsEditUserDialogOpen] = useState(false);
@@ -176,9 +178,6 @@ export default function Admin() {
       toast({ title: "Failed to add pick", description: error.message, variant: "destructive" });
     },
   });
-
-  const [addMemberSearch, setAddMemberSearch] = useState("");
-  const [addMemberDialogOpen, setAddMemberDialogOpen] = useState(false);
 
   const removeMemberMutation = useMutation({
     mutationFn: async (targetUserId: number) => {
