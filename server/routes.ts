@@ -95,16 +95,24 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const { tourId, public: isPublic } = req.query;
       
       if (isPublic === "true") {
-        const leagues = await storage.getPublicLeagues(tourId ? parseInt(tourId as string) : undefined);
-        res.json(leagues);
+        const leagueList = await storage.getPublicLeagues(tourId ? parseInt(tourId as string) : undefined);
+        const withCounts = await Promise.all(leagueList.map(async (l: any) => {
+          const members = await storage.getLeagueMembers(l.id);
+          return { ...l, memberCount: members.length };
+        }));
+        res.json(withCounts);
       } else {
         // Use authenticated user from session
         const userId = (req as any).userId;
         if (!userId) {
           return res.status(401).json({ message: "User not authenticated" });
         }
-        const leagues = await storage.getUserLeagues(userId);
-        res.json(leagues);
+        const leagueList = await storage.getUserLeagues(userId);
+        const withCounts = await Promise.all(leagueList.map(async (l: any) => {
+          const members = await storage.getLeagueMembers(l.id);
+          return { ...l, memberCount: members.length };
+        }));
+        res.json(withCounts);
       }
     } catch (error) {
       res.status(500).json({ message: "Failed to fetch leagues" });
@@ -956,6 +964,88 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.json({ autoDraft: serverAutoDraftEnabled.has(key), leagueId, userId: targetUserId });
     } catch (error: any) {
       res.status(500).json({ message: error.message || "Failed to toggle auto-draft" });
+    }
+  });
+
+  // Admin: delete a draft pick and remove the corresponding draftedSongs entry
+  app.delete("/api/admin/picks/:pickId", requireAuth, async (req: any, res: any) => {
+    try {
+      const userId = (req as any).userId;
+      const user = await storage.getUser(userId);
+      if (!user || (user.role !== "admin" && user.role !== "superadmin")) {
+        return res.status(403).json({ message: "Admin only" });
+      }
+      const pickId = parseInt(req.params.pickId);
+      const [existing] = await db.select().from(draftPicks).where(eq(draftPicks.id, pickId)).limit(1);
+      if (!existing) return res.status(404).json({ message: "Pick not found" });
+
+      await db.delete(draftPicks).where(eq(draftPicks.id, pickId));
+      await db.delete(draftedSongs).where(
+        sql`${draftedSongs.leagueId} = ${existing.leagueId} AND ${draftedSongs.userId} = ${existing.userId} AND ${draftedSongs.songId} = ${existing.songId}`
+      );
+      res.json({ message: `Pick #${existing.pickNumber} deleted` });
+    } catch (error: any) {
+      res.status(500).json({ message: error.message || "Failed to delete pick" });
+    }
+  });
+
+  // Admin: manually add a draft pick for a user (bypasses turn order, doesn't advance draft state)
+  app.post("/api/admin/leagues/:id/add-pick", requireAuth, async (req: any, res: any) => {
+    try {
+      const adminUserId = (req as any).userId;
+      const adminUser = await storage.getUser(adminUserId);
+      if (!adminUser || (adminUser.role !== "admin" && adminUser.role !== "superadmin")) {
+        return res.status(403).json({ message: "Admin only" });
+      }
+      const leagueId = parseInt(req.params.id);
+      const { userId, songId } = req.body; // songId is cachedSongs.id
+
+      // Resolve to songs table id
+      const { cachedSongs: cachedSongsTable } = await import("../shared/schema");
+      const { songs: songsTable } = await import("../shared/schema");
+      const { inArray: inArr } = await import("drizzle-orm");
+
+      const [cs] = await db.select().from(cachedSongsTable).where(eq(cachedSongsTable.id, songId)).limit(1);
+      if (!cs) return res.status(404).json({ message: "Song not found" });
+
+      await db.insert(songsTable).values({
+        title: cs.title,
+        category: cs.category,
+        rarityScore: cs.rarityScore ?? 0,
+        totalPlays: cs.timesPlayed ?? 0,
+        plays24Months: cs.plays24Months ?? 0,
+      }).onConflictDoNothing();
+      const [song] = await db.select().from(songsTable).where(eq(songsTable.title, cs.title)).limit(1);
+      if (!song) return res.status(500).json({ message: "Failed to resolve song" });
+
+      const league = await storage.getLeague(leagueId);
+
+      // Get next pick number (max existing + 1)
+      const existingPicks = await db.select().from(draftPicks).where(eq(draftPicks.leagueId, leagueId));
+      const nextPickNum = existingPicks.length > 0
+        ? Math.max(...existingPicks.map(p => p.pickNumber ?? 0)) + 1
+        : 1;
+
+      const [pick] = await db.insert(draftPicks).values({
+        leagueId,
+        userId,
+        songId: song.id,
+        pickNumber: nextPickNum,
+        round: league?.currentRound ?? 1,
+        timeUsed: 0,
+      }).returning();
+
+      await db.insert(draftedSongs).values({
+        leagueId,
+        userId,
+        songId: song.id,
+        draftRound: league?.currentRound ?? 1,
+        draftPick: nextPickNum,
+      }).onConflictDoNothing();
+
+      res.json({ ...pick, songTitle: song.title });
+    } catch (error: any) {
+      res.status(500).json({ message: error.message || "Failed to add pick" });
     }
   });
 

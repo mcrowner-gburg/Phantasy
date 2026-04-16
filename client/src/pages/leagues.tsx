@@ -276,7 +276,7 @@ export default function Leagues() {
                           <Users className="mr-2" size={16} />
                           Players
                         </div>
-                        <span className="text-white font-medium">1/{league.maxPlayers}</span>
+                        <span className="text-white font-medium">{league.memberCount ?? '?'}/{league.maxPlayers}</span>
                       </div>
 
                       <div className="flex items-center justify-between text-sm">

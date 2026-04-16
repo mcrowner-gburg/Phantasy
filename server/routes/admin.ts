@@ -189,6 +189,28 @@ router.get("/my-leagues", async (req: any, res: any) => {
   }
 });
 
+// GET /api/admin/leagues/:id/members — members with user data
+router.get("/leagues/:id/members", async (req: any, res: any) => {
+  try {
+    const userId = req.session?.user?.id || req.session?.userId;
+    if (!userId) return res.status(401).json({ message: "Not authenticated" });
+    const leagueId = parseInt(req.params.id);
+    const canAccess = await storage.isUserAdmin(userId) || await storage.isUserLeagueAdmin(userId, leagueId);
+    if (!canAccess) return res.status(403).json({ message: "Not authorized" });
+    const members = await storage.getLeagueMembers(leagueId);
+    res.json(members.map((m: any) => ({
+      id: m.id,
+      userId: m.userId,
+      username: m.user?.username,
+      role: m.role,
+      joinedAt: m.joinedAt,
+      totalPoints: m.user?.totalPoints ?? 0,
+    })));
+  } catch (e: any) {
+    res.status(500).json({ message: e.message || "Failed to fetch members" });
+  }
+});
+
 // PUT /api/admin/users/:id/role — superadmin only
 router.put("/users/:id/role", requireSuperAdmin, async (req: any, res: any) => {
   try {
