@@ -37,6 +37,8 @@ export default function DraftRoom() {
   const { data: draftOrder, isLoading: draftOrderLoading } = useQuery({
     queryKey: [`/api/leagues/${leagueId}/draft-order`],
     enabled: !!leagueId,
+    refetchInterval: 3000,
+    staleTime: 0,
   }) as { data: any[], isLoading: boolean };
 
   // Get draft picks
