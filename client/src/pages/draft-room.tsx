@@ -19,7 +19,7 @@ export default function DraftRoom() {
   const [timeRemaining, setTimeRemaining] = useState(0);
   const [startCountdown, setStartCountdown] = useState(0);
   const [autoDraftEnabled, setAutoDraftEnabled] = useState(false);
-  const autoDraftFiredRef = useRef(false);
+  const autoDraftFiredRef = useRef<number | null>(null); // stores pick# we last auto-drafted for
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const { user } = useAuth();
@@ -148,19 +148,17 @@ export default function DraftRoom() {
     return () => clearInterval(t);
   }, [league?.currentPlayer, league?.draftStatus, league?.pickDeadline]);
 
-  // When auto-draft is enabled and it becomes the user's turn, pick immediately.
-  // Use a short timeout so rapid isMyTurn flickers (caused by 2s poll) don't double-fire.
+  // When auto-draft is enabled and it becomes the user's turn, pick once per unique pick slot.
+  // Track by currentPick number so isMyTurn flickers from the 2s poll can't double-fire.
   const isMyTurn = league && league.currentPlayer === user?.id;
+  const currentPick = league?.currentPick ?? null;
   useEffect(() => {
-    if (!isMyTurn || !autoDraftEnabled) {
-      autoDraftFiredRef.current = false;
-      return;
-    }
-    if (autoDraftFiredRef.current) return;
-    autoDraftFiredRef.current = true;
-    const t = setTimeout(() => { autoDraftMutation.mutate(); }, 400);
+    if (!isMyTurn || !autoDraftEnabled || currentPick === null) return;
+    if (autoDraftFiredRef.current === currentPick) return;
+    autoDraftFiredRef.current = currentPick;
+    const t = setTimeout(() => { autoDraftMutation.mutate(); }, 500);
     return () => clearTimeout(t);
-  }, [isMyTurn, autoDraftEnabled]);
+  }, [isMyTurn, autoDraftEnabled, currentPick]);
 
   const filteredSongs = (songs as any[] ?? []).filter((song: any) =>
     song.title.toLowerCase().includes(searchQuery.toLowerCase())

@@ -12,6 +12,12 @@ import adminRoutes from "./routes/admin";
 import { db } from "./db";
 import { sql, eq } from "drizzle-orm";
 
+// In-memory server-side auto-draft registry (resets on server restart).
+// Enables specific users to have their picks made automatically by the server.
+// Key format: `${leagueId}:${userId}`
+const serverAutoDraftEnabled = new Set<string>();
+const serverAutoDraftRegistry = new Map<string, number>(); // key → last currentPick that was auto-fired
+
 export async function registerRoutes(app: Express): Promise<Server> {
   // Set up authentication middleware
   setupAuth(app);
@@ -767,6 +773,31 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const leagueId = parseInt(req.params.id);
       const league = await storage.getDraftStatus(leagueId);
+
+      // Server-side auto-draft: fire a pick if the current player has it enabled.
+      // Node.js is single-threaded so the Set/Map check+set is atomic — safe against double-fire.
+      if (league?.draftStatus === "active" && league?.currentPlayer) {
+        const key = `${leagueId}:${league.currentPlayer}`;
+        if (serverAutoDraftEnabled.has(key)) {
+          const lastFiredPick = serverAutoDraftRegistry.get(key) ?? -1;
+          if (lastFiredPick !== league.currentPick) {
+            serverAutoDraftRegistry.set(key, league.currentPick!);
+            // Fire async — don't await so the response is not delayed
+            setTimeout(() => {
+              storage.getAvailableSongsPlayedLastYear(leagueId).then(async (available: any[]) => {
+                if (!available.length) return;
+                try {
+                  const pick = await storage.makeDraftPick(leagueId, league.currentPlayer!, available[0].id, league.pickTimeLimit ?? 90);
+                  console.log(`[server-auto-draft] Picked "${available[0].title}" for user ${league.currentPlayer} (pick #${league.currentPick}) in league ${leagueId}`);
+                } catch (e: any) {
+                  console.warn(`[server-auto-draft] Pick failed for user ${league.currentPlayer}: ${e.message}`);
+                }
+              });
+            }, 500);
+          }
+        }
+      }
+
       res.json(league);
     } catch (error) {
       res.status(500).json({ message: "Failed to get draft status" });
@@ -899,6 +930,32 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.json({ message: `Pick #${existing.pickNumber} reassigned`, pickId, newUserId, newSongId });
     } catch (error: any) {
       res.status(500).json({ message: error.message || "Failed to reassign pick" });
+    }
+  });
+
+  // Admin: enable or disable server-side auto-draft for a specific user in a league
+  // Body: { enable: boolean }
+  app.post("/api/admin/leagues/:id/auto-draft/:userId", requireAuth, async (req: any, res: any) => {
+    try {
+      const requestingUserId = (req as any).userId;
+      const requester = await storage.getUser(requestingUserId);
+      if (!requester || (requester.role !== "admin" && requester.role !== "superadmin")) {
+        return res.status(403).json({ message: "Admin only" });
+      }
+      const leagueId = req.params.id;
+      const targetUserId = req.params.userId;
+      const key = `${leagueId}:${targetUserId}`;
+      const enable: boolean = req.body.enable !== false; // default to true if not specified
+      if (enable) {
+        serverAutoDraftEnabled.add(key);
+      } else {
+        serverAutoDraftEnabled.delete(key);
+        serverAutoDraftRegistry.delete(key);
+      }
+      console.log(`[server-auto-draft] ${enable ? "Enabled" : "Disabled"} for user ${targetUserId} in league ${leagueId}`);
+      res.json({ autoDraft: serverAutoDraftEnabled.has(key), leagueId, userId: targetUserId });
+    } catch (error: any) {
+      res.status(500).json({ message: error.message || "Failed to toggle auto-draft" });
     }
   });
 
