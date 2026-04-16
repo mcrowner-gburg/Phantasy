@@ -1,7 +1,7 @@
 import type { Express } from "express";
 import { createServer, type Server } from "http";
 import { storage } from "./storage-db";
-import { insertUserSchema, insertTourSchema, insertLeagueSchema, insertDraftedSongSchema, insertSongPerformanceSchema, cachedShows, cachedSetlists, draftPicks } from "@shared/schema";
+import { insertUserSchema, insertTourSchema, insertLeagueSchema, insertDraftedSongSchema, insertSongPerformanceSchema, cachedShows, cachedSetlists, draftPicks, draftedSongs } from "@shared/schema";
 import { z } from "zod";
 import { phishApi } from "./services/phish-api";
 import { setupAuth, requireAuth } from "./auth";
@@ -849,6 +849,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(403).json({ message: "Admin only" });
       }
       await db.delete(draftPicks).where(eq(draftPicks.leagueId, leagueId));
+      await db.delete(draftedSongs).where(eq(draftedSongs.leagueId, leagueId));
       await storage.updateLeague(leagueId, {
         draftStatus: "scheduled",
         currentPick: 1,
