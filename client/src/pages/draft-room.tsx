@@ -133,29 +133,21 @@ export default function DraftRoom() {
     return () => clearInterval(t);
   }, [league?.draftStatus, league?.draftDate]);
 
-  // Pick timer — resets each time the current player changes
+  // Pick timer — countdown display only. Server-side automation handles timed-out picks.
   useEffect(() => {
     if (league?.draftStatus !== "active" || !league?.pickDeadline) return;
 
     const update = () => {
       const secs = Math.max(0, Math.floor((new Date(league.pickDeadline).getTime() - Date.now()) / 1000));
       setTimeRemaining(secs);
-
-      // When it's our turn and the clock hits 0, trigger server auto-pick
-      if (secs === 0 && league.currentPlayer === user?.id) {
-        apiRequest("POST", `/api/leagues/${leagueId}/auto-pick`, { userId: user?.id }).then(() => {
-          queryClient.invalidateQueries({ queryKey: [`/api/leagues/${leagueId}/draft-status`] });
-          queryClient.invalidateQueries({ queryKey: [`/api/leagues/${leagueId}/draft-picks`] });
-          queryClient.invalidateQueries({ queryKey: ["/api/songs"] });
-        }).catch(() => {});
-      }
     };
     update();
     const t = setInterval(update, 1000);
     return () => clearInterval(t);
-  }, [league?.currentPlayer, league?.draftStatus, league?.pickDeadline, user?.id]);
+  }, [league?.currentPlayer, league?.draftStatus, league?.pickDeadline]);
 
-  // When auto-draft is enabled and it becomes the user's turn, pick immediately
+  // When auto-draft is enabled and it becomes the user's turn, pick immediately.
+  // Use a short timeout so rapid isMyTurn flickers (caused by 2s poll) don't double-fire.
   const isMyTurn = league && league.currentPlayer === user?.id;
   useEffect(() => {
     if (!isMyTurn || !autoDraftEnabled) {
@@ -164,7 +156,8 @@ export default function DraftRoom() {
     }
     if (autoDraftFiredRef.current) return;
     autoDraftFiredRef.current = true;
-    autoDraftMutation.mutate();
+    const t = setTimeout(() => { autoDraftMutation.mutate(); }, 400);
+    return () => clearTimeout(t);
   }, [isMyTurn, autoDraftEnabled]);
 
   const filteredSongs = (songs as any[] ?? []).filter((song: any) =>
