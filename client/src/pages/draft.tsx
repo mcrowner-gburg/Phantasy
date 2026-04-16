@@ -35,10 +35,11 @@ export default function Draft() {
     enabled: !!user?.id,
   });
 
-  // Auto-select first league
+  // Auto-select the active/scheduled league, then fall back to first
   useEffect(() => {
     if (leagues && leagues.length > 0 && !selectedLeagueId) {
-      setSelectedLeagueId(leagues[0].id);
+      const active = leagues.find((l) => l.draftStatus === "active" || l.draftStatus === "scheduled");
+      setSelectedLeagueId((active ?? leagues[0]).id);
     }
   }, [leagues, selectedLeagueId]);
 

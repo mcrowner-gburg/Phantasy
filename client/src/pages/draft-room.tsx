@@ -84,10 +84,11 @@ export default function DraftRoom() {
     mutationFn: async () => {
       const availableIds = new Set((songs as any[] ?? []).map((s: any) => s.id));
       const preferredSongIds = wishList.filter(id => availableIds.has(id));
-      return apiRequest("POST", `/api/leagues/${leagueId}/auto-pick`, {
+      const res = await apiRequest("POST", `/api/leagues/${leagueId}/auto-pick`, {
         userId: user?.id,
         preferredSongIds,
       });
+      return res.json();
     },
     onSuccess: (data: any) => {
       queryClient.invalidateQueries({ queryKey: [`/api/leagues/${leagueId}/draft-status`] });
@@ -309,7 +310,7 @@ export default function DraftRoom() {
 
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
             {/* Available Songs */}
-            <div className="lg:col-span-2">
+            <div className="lg:col-span-2 space-y-6">
               <Card>
                 <CardHeader>
                   <CardTitle className="flex items-center gap-2">
@@ -384,6 +385,44 @@ export default function DraftRoom() {
                   )}
                 </CardContent>
               </Card>
+
+              {/* Your Picks */}
+              {(() => {
+                const myPicks = (draftPicks as any[] ?? []).filter(
+                  (p: any) => p.userId === user?.id || p.user?.id === user?.id
+                );
+                if (myPicks.length === 0) return null;
+                return (
+                  <Card>
+                    <CardHeader className="pb-2">
+                      <CardTitle className="flex items-center gap-2">
+                        <Crown className="h-4 w-4 text-blue-500" />
+                        My Picks
+                        <Badge variant="outline" className="ml-auto text-xs">
+                          {myPicks.length}
+                        </Badge>
+                      </CardTitle>
+                    </CardHeader>
+                    <CardContent className="pt-0">
+                      <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+                        {myPicks.map((pick: any, idx: number) => (
+                          <div
+                            key={pick.id}
+                            className="flex items-start gap-2 p-2 rounded-lg bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800"
+                          >
+                            <span className="text-xs font-bold text-blue-500 w-5 flex-shrink-0 pt-0.5">
+                              R{pick.draftRound ?? idx + 1}
+                            </span>
+                            <span className="text-sm font-medium leading-tight">
+                              {pick.song?.title ?? `Pick #${pick.pickNumber}`}
+                            </span>
+                          </div>
+                        ))}
+                      </div>
+                    </CardContent>
+                  </Card>
+                );
+              })()}
             </div>
 
             {/* Right column */}
