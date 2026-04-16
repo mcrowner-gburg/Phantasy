@@ -227,7 +227,7 @@ export default function LeagueSettings() {
                     value={formData.name}
                     onChange={(e) => setFormData({ ...formData, name: e.target.value })}
                     placeholder="Enter league name"
-                    className="text-gray-900"
+                    className=""
                     required
                   />
                 </div>
@@ -239,7 +239,7 @@ export default function LeagueSettings() {
                     value={formData.description}
                     onChange={(e) => setFormData({ ...formData, description: e.target.value })}
                     placeholder="Describe your league (optional)"
-                    className="text-gray-900"
+                    className=""
                     rows={3}
                   />
                 </div>
@@ -253,7 +253,7 @@ export default function LeagueSettings() {
                     max="100"
                     value={formData.maxPlayers}
                     onChange={(e) => setFormData({ ...formData, maxPlayers: parseInt(e.target.value) })}
-                    className="text-gray-900"
+                    className=""
                   />
                 </div>
 
@@ -297,7 +297,7 @@ export default function LeagueSettings() {
                       type="date"
                       value={formData.draftDate}
                       onChange={(e) => setFormData({ ...formData, draftDate: e.target.value })}
-                      className="text-gray-900"
+                      className=""
                     />
                   </div>
                   <div>
@@ -307,7 +307,7 @@ export default function LeagueSettings() {
                       type="time"
                       value={formData.draftTime}
                       onChange={(e) => setFormData({ ...formData, draftTime: e.target.value })}
-                      className="text-gray-900"
+                      className=""
                     />
                   </div>
                 </div>
@@ -321,7 +321,7 @@ export default function LeagueSettings() {
                     max="300"
                     value={formData.pickTimeLimit}
                     onChange={(e) => setFormData({ ...formData, pickTimeLimit: parseInt(e.target.value) })}
-                    className="text-gray-900"
+                    className=""
                   />
                   <p className="text-xs text-gray-500 mt-1">
                     If a player doesn't pick within this time, a song is auto-selected for them.
@@ -359,7 +359,7 @@ export default function LeagueSettings() {
                       type="date"
                       value={formData.seasonStartDate}
                       onChange={(e) => setFormData({ ...formData, seasonStartDate: e.target.value })}
-                      className="text-gray-900"
+                      className=""
                     />
                   </div>
 
@@ -370,7 +370,7 @@ export default function LeagueSettings() {
                       type="date"
                       value={formData.seasonEndDate}
                       onChange={(e) => setFormData({ ...formData, seasonEndDate: e.target.value })}
-                      className="text-gray-900"
+                      className=""
                     />
                   </div>
                 </div>
