@@ -381,39 +381,89 @@ export default function DraftRoom() {
                 </CardContent>
               </Card>
 
-              {/* Your Picks */}
-              {(() => {
+              {/* My Picks — always visible once draft is active */}
+              {league?.draftStatus === "active" && (() => {
                 const myPicks = (draftPicks as any[] ?? []).filter(
                   (p: any) => p.userId === user?.id || p.user?.id === user?.id
                 );
-                if (myPicks.length === 0) return null;
                 return (
                   <Card>
                     <CardHeader className="pb-2">
                       <CardTitle className="flex items-center gap-2">
                         <Crown className="h-4 w-4 text-blue-500" />
                         My Picks
-                        <Badge variant="outline" className="ml-auto text-xs">
-                          {myPicks.length}
-                        </Badge>
+                        {myPicks.length > 0 && (
+                          <Badge variant="outline" className="ml-auto text-xs">
+                            {myPicks.length}
+                          </Badge>
+                        )}
                       </CardTitle>
                     </CardHeader>
                     <CardContent className="pt-0">
-                      <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
-                        {myPicks.map((pick: any, idx: number) => (
-                          <div
-                            key={pick.id}
-                            className="flex items-start gap-2 p-2 rounded-lg bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800"
-                          >
-                            <span className="text-xs font-bold text-blue-500 w-5 flex-shrink-0 pt-0.5">
-                              R{pick.draftRound ?? idx + 1}
-                            </span>
-                            <span className="text-sm font-medium leading-tight">
-                              {pick.song?.title ?? `Pick #${pick.pickNumber}`}
-                            </span>
+                      {myPicks.length === 0 ? (
+                        <p className="text-sm text-gray-500 text-center py-3">No picks yet</p>
+                      ) : (
+                        <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+                          {myPicks.map((pick: any, idx: number) => (
+                            <div
+                              key={pick.id}
+                              className="flex items-start gap-2 p-2 rounded-lg bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800"
+                            >
+                              <span className="text-xs font-bold text-blue-500 w-5 flex-shrink-0 pt-0.5">
+                                R{pick.draftRound ?? idx + 1}
+                              </span>
+                              <span className="text-sm font-medium leading-tight">
+                                {pick.song?.title ?? `Pick #${pick.pickNumber}`}
+                              </span>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </CardContent>
+                  </Card>
+                );
+              })()}
+
+              {/* All Picks — grouped by player */}
+              {league?.draftStatus === "active" && (draftPicks as any[] ?? []).length > 0 && (() => {
+                const allPicks = draftPicks as any[];
+                // Group by user
+                const byUser: Record<string, { username: string; picks: any[] }> = {};
+                allPicks.forEach((p: any) => {
+                  const uid = String(p.userId);
+                  const name = p.user?.username ?? `Player ${p.userId}`;
+                  if (!byUser[uid]) byUser[uid] = { username: name, picks: [] };
+                  byUser[uid].picks.push(p);
+                });
+                return (
+                  <Card>
+                    <CardHeader className="pb-2">
+                      <CardTitle className="flex items-center gap-2">
+                        <Music className="h-4 w-4 text-green-500" />
+                        All Picks
+                        <Badge variant="outline" className="ml-auto text-xs">
+                          {allPicks.length}
+                        </Badge>
+                      </CardTitle>
+                    </CardHeader>
+                    <CardContent className="pt-0 space-y-3">
+                      {Object.values(byUser).map(({ username, picks }) => (
+                        <div key={username}>
+                          <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1">
+                            {username} ({picks.length})
+                          </p>
+                          <div className="flex flex-wrap gap-1">
+                            {picks.map((p: any) => (
+                              <span
+                                key={p.id}
+                                className="text-xs px-2 py-0.5 rounded-full bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-300"
+                              >
+                                {p.song?.title ?? `Pick #${p.pickNumber}`}
+                              </span>
+                            ))}
                           </div>
-                        ))}
-                      </div>
+                        </div>
+                      ))}
                     </CardContent>
                   </Card>
                 );
