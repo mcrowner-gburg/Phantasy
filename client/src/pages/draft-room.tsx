@@ -11,6 +11,7 @@ import { useToast } from "@/hooks/use-toast";
 import { apiRequest } from "@/lib/queryClient";
 import { useAuth } from "@/hooks/useAuth";
 import { useWishList } from "@/hooks/useWishList";
+import { PreDraftScreen } from "@/components/PreDraftScreen";
 
 export default function DraftRoom() {
   const { id: leagueId } = useParams<{ id: string }>();
@@ -256,36 +257,13 @@ export default function DraftRoom() {
               </div>
 
               {league && league.draftStatus === "scheduled" && (
-                <div className="mt-4 text-center space-y-3">
-                  {league.draftDate && (
-                    <div>
-                      <p className="text-sm text-gray-600 mb-1">
-                        Draft starts {new Date(league.draftDate).toLocaleString()}
-                      </p>
-                      {startCountdown > 0 && (
-                        <div className="flex items-center justify-center gap-2">
-                          <Timer className="h-4 w-4 text-blue-600" />
-                          <span className="font-mono text-lg text-blue-600">
-                            {startCountdown >= 3600
-                              ? `${Math.floor(startCountdown / 3600)}h ${Math.floor((startCountdown % 3600) / 60)}m`
-                              : startCountdown >= 60
-                              ? `${Math.floor(startCountdown / 60)}m ${startCountdown % 60}s`
-                              : `${startCountdown}s`}
-                          </span>
-                        </div>
-                      )}
-                    </div>
-                  )}
-                  {isOwner && (
-                    <Button
-                      onClick={() => startDraftMutation.mutate()}
-                      disabled={startDraftMutation.isPending}
-                      size="lg"
-                      variant="outline"
-                    >
-                      Start Draft Now
-                    </Button>
-                  )}
+                <div className="mt-4">
+                  <PreDraftScreen
+                    leagueId={leagueId!}
+                    league={league}
+                    members={draftOrder ?? []}
+                    isOwner={!!isOwner}
+                  />
                 </div>
               )}
 

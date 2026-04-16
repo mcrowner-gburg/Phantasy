@@ -787,15 +787,45 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const leagueId = parseInt(req.params.id);
       const { userIds } = req.body;
-      
+
       if (!Array.isArray(userIds)) {
         return res.status(400).json({ message: "userIds must be an array" });
       }
-      
+
       await storage.setDraftOrder(leagueId, userIds);
       res.json({ message: "Draft order set successfully" });
     } catch (error: any) {
       res.status(500).json({ message: error.message || "Failed to set draft order" });
+    }
+  });
+
+  // Shuffle all league members into a random draft order, persist it, return the order.
+  // Owner / admin only. Safe to call multiple times before the draft starts.
+  app.post("/api/leagues/:id/randomize-draft-order", requireAuth, async (req, res) => {
+    try {
+      const leagueId = parseInt(req.params.id);
+      const userId   = (req as any).userId;
+
+      const league = await storage.getLeague(leagueId);
+      if (!league) return res.status(404).json({ message: "League not found" });
+
+      const user = await storage.getUser(userId);
+      if (league.ownerId !== userId && user?.role !== "admin" && user?.role !== "superadmin") {
+        return res.status(403).json({ message: "Owner only" });
+      }
+
+      const members  = await storage.getLeagueMembers(leagueId);
+      const ids      = members.map((m: any) => m.userId);
+      // Fisher-Yates shuffle
+      for (let i = ids.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [ids[i], ids[j]] = [ids[j], ids[i]];
+      }
+
+      await storage.setDraftOrder(leagueId, ids);
+      res.json({ orderedUserIds: ids });
+    } catch (err: any) {
+      res.status(500).json({ message: err.message || "Failed to randomize order" });
     }
   });
 
