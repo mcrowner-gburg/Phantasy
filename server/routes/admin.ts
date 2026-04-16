@@ -8,8 +8,8 @@ import {
 import { storage } from "../storage-db";
 import { phishApi } from "../services/phish-api";
 import { db } from "../db";
-import { draftedSongs, songs } from "../../shared/schema";
-import { eq } from "drizzle-orm";
+import { draftedSongs, songs, leagueMembers } from "../../shared/schema";
+import { eq, and } from "drizzle-orm";
 import { requireLeagueAdmin, requireSuperAdmin } from "../middleware/admin";
 
 const router = Router();
@@ -208,6 +208,47 @@ router.get("/leagues/:id/members", async (req: any, res: any) => {
     })));
   } catch (e: any) {
     res.status(500).json({ message: e.message || "Failed to fetch members" });
+  }
+});
+
+// DELETE /api/admin/leagues/:id/members/:userId — remove a member from a league
+router.delete("/leagues/:id/members/:userId", async (req: any, res: any) => {
+  try {
+    const requestingUserId = req.session?.user?.id || req.session?.userId;
+    if (!requestingUserId) return res.status(401).json({ message: "Not authenticated" });
+    const leagueId = parseInt(req.params.id);
+    const canAccess = await storage.isUserAdmin(requestingUserId) || await storage.isUserLeagueAdmin(requestingUserId, leagueId);
+    if (!canAccess) return res.status(403).json({ message: "Not authorized" });
+
+    const targetUserId = parseInt(req.params.userId);
+    await db.delete(leagueMembers).where(
+      and(eq(leagueMembers.leagueId, leagueId), eq(leagueMembers.userId, targetUserId))
+    );
+    res.json({ message: "Member removed from league" });
+  } catch (e: any) {
+    res.status(500).json({ message: e.message || "Failed to remove member" });
+  }
+});
+
+// POST /api/admin/leagues/:id/members — add a user to a league by userId or username/email search
+router.post("/leagues/:id/members", async (req: any, res: any) => {
+  try {
+    const requestingUserId = req.session?.user?.id || req.session?.userId;
+    if (!requestingUserId) return res.status(401).json({ message: "Not authenticated" });
+    const leagueId = parseInt(req.params.id);
+    const canAccess = await storage.isUserAdmin(requestingUserId) || await storage.isUserLeagueAdmin(requestingUserId, leagueId);
+    if (!canAccess) return res.status(403).json({ message: "Not authorized" });
+
+    const { userId } = req.body;
+    if (!userId) return res.status(400).json({ message: "userId required" });
+
+    const user = await storage.getUser(parseInt(userId));
+    if (!user) return res.status(404).json({ message: "User not found" });
+
+    await storage.joinLeague(parseInt(userId), leagueId);
+    res.json({ message: `${user.username} added to league`, username: user.username, userId: user.id });
+  } catch (e: any) {
+    res.status(500).json({ message: e.message || "Failed to add member" });
   }
 });
 
