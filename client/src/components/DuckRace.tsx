@@ -179,30 +179,40 @@ export function DuckRace({ orderedPlayers, onComplete }: DuckRaceProps) {
                   </span>
                 </div>
 
-                {/* Duck */}
+                {/* Duck — spans the full race track width */}
                 <div
                   className="absolute"
-                  style={{
-                    left: "180px",
-                    right: "36px",
-                    top: 0,
-                    bottom: 0,
-                  }}
+                  style={{ left: "180px", right: "36px", top: 0, bottom: 0 }}
                 >
+                  {/* Animate left: 0 → calc(100% - 40px) across the container */}
                   <div
-                    className="absolute top-1/2 -translate-y-1/2"
                     style={{
-                      left: 0,
-                      // Trigger: once go=true, move the duck to the right edge
-                      transform: go
-                        ? `translateX(calc(100% - 28px))`
-                        : "translateX(0)",
+                      position: "absolute",
+                      top: "50%",
+                      left: go ? "calc(100% - 40px)" : "0px",
+                      transform: "translateY(-50%)",
                       transition: go
-                        ? `transform ${myDuration}ms cubic-bezier(0.3, 0, 0.7, 1)`
+                        ? `left ${myDuration}ms cubic-bezier(0.3, 0, 0.7, 1)`
                         : "none",
                     }}
                   >
-                    {/* Duck body with wobble animation */}
+                    {/* Water ripple — shown behind duck while racing */}
+                    {go && !hasFinished && (
+                      <span
+                        className="absolute text-xs text-blue-300 opacity-50 pointer-events-none select-none"
+                        style={{
+                          right: "100%",
+                          top: "50%",
+                          transform: "translateY(-50%)",
+                          animation: "fade-trail 0.5s ease-out infinite",
+                          whiteSpace: "nowrap",
+                        }}
+                      >
+                        ～～
+                      </span>
+                    )}
+
+                    {/* Duck body */}
                     <span
                       className="text-3xl select-none"
                       style={{
@@ -227,19 +237,6 @@ export function DuckRace({ orderedPlayers, onComplete }: DuckRaceProps) {
                         </span>
                       )}
                     </span>
-                  </div>
-                )}
-
-                {/* Water ripple behind duck */}
-                {go && !hasFinished && (
-                  <div
-                    className="absolute top-1/2 -translate-y-1/2 text-xs text-blue-400 opacity-40 pointer-events-none"
-                    style={{
-                      left: "184px",
-                      animation: "fade-trail 0.4s ease-out infinite",
-                    }}
-                  >
-                    ～～
                   </div>
                 )}
               </div>
