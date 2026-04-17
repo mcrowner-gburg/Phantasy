@@ -729,7 +729,10 @@ export const storage = {
       );
       // Exclude members who never made a draft pick (e.g. league owner who didn't play)
       if (drafts.length === 0) continue;
-      const totalPoints = drafts.reduce((sum, d) => sum + (d.points ?? 0), 0);
+      const draftedPointsSum = drafts.reduce((sum, d) => sum + (d.points ?? 0), 0);
+      // Fall back to the user-level totalPoints when per-song points haven't been
+      // scored yet (e.g. scoreLeague reset them but recompute hasn't run).
+      const totalPoints = draftedPointsSum > 0 ? draftedPointsSum : (member.user?.totalPoints ?? 0);
       standings.push({
         ...member.user,
         totalPoints,
