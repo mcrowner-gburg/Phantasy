@@ -6,6 +6,7 @@ import { Badge } from "@/components/ui/badge";
 import { Bell, Plus, ArrowUp, Star, Trophy, Music, Calendar } from "lucide-react";
 import DraftedSongs from "@/components/dashboard/drafted-songs";
 import LeagueStandings from "@/components/dashboard/league-standings";
+import ShowSetlist from "@/components/dashboard/show-setlist";
 import { format } from "date-fns";
 import { useAuth } from "@/hooks/useAuth";
 import { useLocation } from "wouter";
@@ -297,10 +298,15 @@ export default function Dashboard() {
           </div>
 
           {/* My Drafted Songs */}
-          <DraftedSongs 
-            draftedSongs={draftedSongs || []} 
+          <DraftedSongs
+            draftedSongs={draftedSongs || []}
             onDraftClick={() => window.location.href = '/draft'}
           />
+
+          {/* Show Setlist */}
+          {league?.id && recentConcerts?.length > 0 && (
+            <ShowSetlist recentConcerts={recentConcerts} leagueId={league.id} />
+          )}
 
           {/* League Standings */}
           <LeagueStandings 

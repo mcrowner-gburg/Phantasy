@@ -1,7 +1,7 @@
 import type { Express } from "express";
 import { createServer, type Server } from "http";
 import { storage } from "./storage-db";
-import { insertUserSchema, insertTourSchema, insertLeagueSchema, insertDraftedSongSchema, insertSongPerformanceSchema, cachedShows, cachedSetlists, draftPicks, draftedSongs } from "@shared/schema";
+import { insertUserSchema, insertTourSchema, insertLeagueSchema, insertDraftedSongSchema, insertSongPerformanceSchema, cachedShows, cachedSetlists, draftPicks, draftedSongs, songs } from "@shared/schema";
 import { z } from "zod";
 import { phishApi } from "./services/phish-api";
 import { setupAuth, requireAuth } from "./auth";
@@ -10,7 +10,7 @@ import { nanoid } from "nanoid";
 import bcrypt from "bcrypt";
 import adminRoutes from "./routes/admin";
 import { db } from "./db";
-import { sql, eq } from "drizzle-orm";
+import { sql, eq, and } from "drizzle-orm";
 
 // In-memory server-side auto-draft registry (resets on server restart).
 // Enables specific users to have their picks made automatically by the server.
@@ -760,6 +760,78 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.json(sorted);
     } catch (error: any) {
       res.status(500).json({ message: error.message || "Failed to fetch player songs" });
+    }
+  });
+
+  // GET /api/leagues/:id/setlist?date=YYYY-MM-DD
+  // Returns the phish.in setlist for a show + which league members drafted each song.
+  app.get("/api/leagues/:id/setlist", async (req: any, res: any) => {
+    try {
+      const leagueId = parseInt(req.params.id);
+      const date = req.query.date as string;
+      if (!date) return res.status(400).json({ message: "date query param required" });
+
+      const tracks = await phishApi.getSetlist(date);
+      if (!tracks || tracks.length === 0) {
+        return res.json({ date, songPerformances: [] });
+      }
+
+      // Resolve all drafted songs in this league to title → drafters
+      const drafted = await db
+        .select({ songId: draftedSongs.songId, userId: draftedSongs.userId })
+        .from(draftedSongs)
+        .where(eq(draftedSongs.leagueId, leagueId));
+
+      const draftersByTitle: Record<string, { userId: number; username: string }[]> = {};
+      for (const d of drafted) {
+        if (!d.songId) continue;
+        const [song] = await db.select().from(songs).where(eq(songs.id, d.songId)).limit(1);
+        if (!song) continue;
+        const user = await storage.getUser(d.userId!);
+        if (!user) continue;
+        const key = song.title.toLowerCase();
+        if (!draftersByTitle[key]) draftersByTitle[key] = [];
+        draftersByTitle[key].push({ userId: user.id, username: user.username });
+      }
+
+      // Find first position per set for set-opener detection
+      const firstPosBySet: Record<string, number> = {};
+      for (const t of tracks) {
+        const setKey = t.set || "Set 1";
+        const pos = t.position || 0;
+        if (!(setKey in firstPosBySet) || pos < firstPosBySet[setKey]) firstPosBySet[setKey] = pos;
+      }
+
+      const songPerformances = tracks.map((track: any, idx: number) => {
+        const title = track.song || track.title || "";
+        const setKey = track.set || "Set 1";
+        const isEncore = track.isEncore || setKey.toLowerCase().includes("encore");
+        const isSetOpener = !isEncore && track.position === firstPosBySet[setKey];
+        const durationSeconds = track.duration ? Math.round(track.duration / 1000) : 0;
+        const mins = durationSeconds / 60;
+        let points = 1;
+        if (isSetOpener) points += 1;
+        if (isEncore)    points += 1;
+        if (mins >= 20)  points += 1;
+        if (mins >= 30)  points += 1;
+        if (mins >= 40)  points += 1;
+        const draftedBy = draftersByTitle[title.toLowerCase()] || [];
+        return {
+          id: idx,
+          song: { title },
+          setNumber: setKey,
+          position: track.position || idx + 1,
+          isSetOpener,
+          isEncore,
+          durationSeconds,
+          points,
+          draftedBy,
+        };
+      });
+
+      res.json({ date, songPerformances });
+    } catch (error: any) {
+      res.status(500).json({ message: error.message || "Failed to fetch setlist" });
     }
   });
 
