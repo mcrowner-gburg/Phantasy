@@ -65,7 +65,7 @@ export default function Dashboard() {
           <div className="flex flex-col lg:flex-row lg:justify-between lg:items-center space-y-4 lg:space-y-0">
             <div>
               <h2 className="text-2xl font-bold">Dashboard</h2>
-              <p className="phish-text">Welcome back to {tour?.name || "your phantasy Phish league"}</p>
+              <p className="phish-text">Welcome to Phantasy Phish</p>
             </div>
             <div className="flex flex-col sm:flex-row items-stretch sm:items-center space-y-2 sm:space-y-0 sm:space-x-4">
               <div className="relative self-start sm:self-auto">
