@@ -54,7 +54,7 @@ export class PhishNetService {
       // Use date-string comparison to avoid midnight-UTC edge cases where
       // new Date("2026-04-18") (midnight UTC) < new Date() (e.g. 02:00 UTC).
       const todayStr = new Date().toISOString().split("T")[0];
-      return shows.filter((show: any) => show.showdate > todayStr);
+      return shows.filter((show: any) => show.showdate >= todayStr);
     } catch (error) {
       console.error("Error fetching upcoming shows from Phish.net:", error);
       return [];
@@ -74,7 +74,7 @@ export class PhishNetService {
       const shows: any[] = data.data || [];
       const todayStr = new Date().toISOString().split("T")[0];
       return shows
-        .filter((show: any) => show.showdate <= todayStr)
+        .filter((show: any) => show.showdate < todayStr)
         .slice(0, limit)
         .map((show: any) => ({
           showid: show.showid,
