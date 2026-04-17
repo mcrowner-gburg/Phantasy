@@ -214,12 +214,12 @@ export default function Dashboard() {
                         <div 
                           key={concert.id || index} 
                           className="border phish-border rounded-lg p-4 hover:border-green-500 transition-colors cursor-pointer"
-                          onClick={() => window.open(`https://phish.in/${format(new Date(concert.date), "yyyy-MM-dd")}`, '_blank')}
+                          onClick={() => window.open(`https://phish.in/${format(new Date(concert.date + "T12:00:00"), "yyyy-MM-dd")}`, '_blank')}
                         >
                           <div className="flex justify-between items-start mb-2">
                             <div>
-                              <p className="font-bold text-green-500">{format(new Date(concert.date), "MMM dd, yyyy")}</p>
-                              <p className="text-sm phish-text">{format(new Date(concert.date), "h:mm a zzz")}</p>
+                              <p className="font-bold text-green-500">{format(new Date(concert.date + "T12:00:00"), "MMM dd, yyyy")}</p>
+                              <p className="text-sm phish-text">{format(new Date(concert.date + "T12:00:00"), "h:mm a zzz")}</p>
                             </div>
                             <Badge className="bg-gray-500 text-white text-xs px-2 py-1 rounded-full font-medium">
                               COMPLETED
@@ -254,19 +254,19 @@ export default function Dashboard() {
                   <div className="space-y-4">
                     {upcomingConcerts?.length > 0 ? (
                       upcomingConcerts.map((concert: any, index: number) => {
-                        const isTonight = format(new Date(concert.date), "yyyy-MM-dd") === format(new Date(), "yyyy-MM-dd");
-                        const isNYE = format(new Date(concert.date), "MM-dd") === "12-31";
+                        const isTonight = format(new Date(concert.date + "T12:00:00"), "yyyy-MM-dd") === format(new Date(), "yyyy-MM-dd");
+                        const isNYE = format(new Date(concert.date + "T12:00:00"), "MM-dd") === "12-31";
                         
                         return (
                           <div 
                             key={concert.id || index} 
                             className="border phish-border rounded-lg p-4 hover:border-green-500 transition-colors cursor-pointer"
-                            onClick={() => window.open(`https://phish.net/setlists/phish-${format(new Date(concert.date), "MMMM-dd-yyyy").toLowerCase()}-${concert.venue.toLowerCase().replace(/\s+/g, '-').replace(/[^a-z0-9-]/g, '')}-${concert.city.toLowerCase().replace(/\s+/g, '-')}-${concert.state?.toLowerCase()}-usa.html`, '_blank')}
+                            onClick={() => window.open(`https://phish.net/setlists/phish-${format(new Date(concert.date + "T12:00:00"), "MMMM-dd-yyyy").toLowerCase()}-${concert.venue.toLowerCase().replace(/\s+/g, '-').replace(/[^a-z0-9-]/g, '')}-${concert.city.toLowerCase().replace(/\s+/g, '-')}-${concert.state?.toLowerCase()}-usa.html`, '_blank')}
                           >
                             <div className="flex justify-between items-start mb-2">
                               <div>
-                                <p className="font-bold text-green-500">{format(new Date(concert.date), "MMM dd, yyyy")}</p>
-                                <p className="text-sm phish-text">{format(new Date(concert.date), "h:mm a zzz")}</p>
+                                <p className="font-bold text-green-500">{format(new Date(concert.date + "T12:00:00"), "MMM dd, yyyy")}</p>
+                                <p className="text-sm phish-text">{format(new Date(concert.date + "T12:00:00"), "h:mm a zzz")}</p>
                               </div>
                               {isTonight && (
                                 <Badge className="bg-green-500 text-black text-xs px-2 py-1 rounded-full font-medium">

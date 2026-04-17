@@ -1445,7 +1445,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const recentConcerts = recentShows.slice(0, 3).map((show: any) => ({
         id: parseInt(show.showid),
         tourId: 1,
-        date: new Date(show.showdate),
+        date: show.showdate,
         venue: show.venue,
         city: show.city,
         state: show.state,
@@ -1453,14 +1453,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
         setlist: [],
         isCompleted: true,
       }));
-      
+
       // Get upcoming concerts from Phish.net API
       const upcomingShows = await phishApi.getUpcomingShows();
       const upcomingConcerts = upcomingShows
         .map((show: any) => ({
           id: parseInt(show.showid),
           tourId: 1,
-          date: new Date(show.showdate),
+          date: show.showdate,
           venue: show.venue,
           city: show.city,
           state: show.state,
