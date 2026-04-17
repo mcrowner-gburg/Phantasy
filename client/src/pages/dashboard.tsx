@@ -183,7 +183,7 @@ export default function Dashboard() {
                   <div>
                     <p className="phish-text text-sm font-medium">Next Show</p>
                     <p className="text-xl font-bold text-white">
-                      {upcomingConcerts?.[0] ? format(new Date(upcomingConcerts[0].date), "MMM dd") : "TBA"}
+                      {upcomingConcerts?.[0] ? format(new Date(upcomingConcerts[0].date + "T12:00:00"), "MMM dd") : "TBA"}
                     </p>
                   </div>
                   <div className="w-12 h-12 bg-purple-600 rounded-lg flex items-center justify-center">
