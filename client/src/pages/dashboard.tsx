@@ -203,7 +203,7 @@ export default function Dashboard() {
                 <CardContent className="p-6">
                   <div className="flex items-center justify-between mb-6">
                     <h3 className="text-xl font-bold">Recent Shows</h3>
-                    <Button variant="link" className="text-green-500 hover:text-green-400 text-sm p-0">
+                    <Button variant="link" className="text-green-500 hover:text-green-400 text-sm p-0" onClick={() => window.open("https://phish.net/setlists", "_blank")}>
                       View All
                     </Button>
                   </div>
@@ -246,7 +246,7 @@ export default function Dashboard() {
                 <CardContent className="p-6">
                   <div className="flex items-center justify-between mb-6">
                     <h3 className="text-xl font-bold">Upcoming Shows</h3>
-                    <Button variant="link" className="text-green-500 hover:text-green-400 text-sm p-0">
+                    <Button variant="link" className="text-green-500 hover:text-green-400 text-sm p-0" onClick={() => window.open("https://phish.net/tour/upcoming", "_blank")}>
                       View Schedule
                     </Button>
                   </div>
