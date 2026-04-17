@@ -1442,7 +1442,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       // Get recent shows (last 3 completed shows) from Phish.net API
       const recentShows = await phishApi.getRecentShows(20);
-      const completedShows = recentShows.filter((show: any) => new Date(show.showdate) < new Date());
+      const completedShows = recentShows
+        .filter((show: any) => new Date(show.showdate) < new Date())
+        .sort((a: any, b: any) => new Date(b.showdate).getTime() - new Date(a.showdate).getTime());
       const recentConcerts = completedShows.slice(0, 3).map((show: any) => ({
         id: parseInt(show.showid),
         tourId: 1,
