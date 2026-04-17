@@ -51,8 +51,10 @@ export class PhishNetService {
       if (!response.ok) throw new Error(`Phish.net API error: ${response.statusText}`);
       const data = await response.json();
       const shows = data.data || [];
-      const today = new Date();
-      return shows.filter((show: any) => new Date(show.showdate) > today);
+      // Use date-string comparison to avoid midnight-UTC edge cases where
+      // new Date("2026-04-18") (midnight UTC) < new Date() (e.g. 02:00 UTC).
+      const todayStr = new Date().toISOString().split("T")[0];
+      return shows.filter((show: any) => show.showdate > todayStr);
     } catch (error) {
       console.error("Error fetching upcoming shows from Phish.net:", error);
       return [];
@@ -61,24 +63,29 @@ export class PhishNetService {
 
   async getRecentShows(limit = 20): Promise<any[]> {
     try {
+      // Use phish.net — it indexes shows much faster than phish.in (which waits
+      // for audio uploads), so recent shows appear within a day of playing.
       const currentYear = new Date().getFullYear();
       const response = await fetch(
-        `${this.phishInUrl}/shows?year=${currentYear}&per_page=${limit}`,
-        { headers: { "Accept": "application/json" } }
+        `${this.phishNetUrl}/shows/showyear/${currentYear}.json?apikey=${this.apiKey}&order_by=showdate&direction=desc`
       );
-      if (!response.ok) throw new Error(`Phish.in API error: ${response.statusText}`);
+      if (!response.ok) throw new Error(`Phish.net API error: ${response.statusText}`);
       const data = await response.json();
-      const shows = data.shows || data.data || [];
-      return shows.map((show: any) => ({
-        showid: show.id,
-        showdate: show.date,
-        venue: show.venue?.name || "Unknown Venue",
-        city: show.venue?.city || "Unknown City",
-        state: show.venue?.state || null,
-        country: show.venue?.country || "USA",
-      }));
+      const shows: any[] = data.data || [];
+      const todayStr = new Date().toISOString().split("T")[0];
+      return shows
+        .filter((show: any) => show.showdate <= todayStr)
+        .slice(0, limit)
+        .map((show: any) => ({
+          showid: show.showid,
+          showdate: show.showdate,
+          venue: show.venue || "Unknown Venue",
+          city: show.city || "Unknown City",
+          state: show.state || null,
+          country: show.country || "USA",
+        }));
     } catch (error) {
-      console.error("Error fetching recent shows from Phish.in:", error);
+      console.error("Error fetching recent shows from Phish.net:", error);
       return [];
     }
   }
