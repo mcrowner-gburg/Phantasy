@@ -3,7 +3,7 @@ import { NavigationSidebar } from "@/components/navigation-sidebar";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Bell, Plus, ArrowUp, Star, Trophy, Music, Calendar } from "lucide-react";
+import { Plus, ArrowUp, Star, Trophy, Music, Calendar } from "lucide-react";
 import DraftedSongs from "@/components/dashboard/drafted-songs";
 import LeagueStandings from "@/components/dashboard/league-standings";
 import ShowSetlist from "@/components/dashboard/show-setlist";
@@ -68,12 +68,7 @@ export default function Dashboard() {
               <p className="phish-text">Welcome to Phantasy Phish</p>
             </div>
             <div className="flex flex-col sm:flex-row items-stretch sm:items-center space-y-2 sm:space-y-0 sm:space-x-4">
-              <div className="relative self-start sm:self-auto">
-                <Bell className="phish-text hover:text-white cursor-pointer" size={20} />
-                <Badge className="absolute -top-1 -right-1 bg-orange-500 text-white text-xs w-4 h-4 p-0 flex items-center justify-center">
-                  3
-                </Badge>
-              </div>
+
               <Button 
                 className="gradient-button px-6 py-2 rounded-full font-medium hover:opacity-90 transition-opacity"
                 onClick={() => setLocation("/leagues")}
