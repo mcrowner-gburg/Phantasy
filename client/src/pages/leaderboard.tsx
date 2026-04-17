@@ -1,9 +1,10 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { NavigationSidebar } from "@/components/navigation-sidebar";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Crown, Trophy, User, Medal, TrendingUp, Music, X, ChevronRight } from "lucide-react";
 import { useAuth } from "@/hooks/useAuth";
 import { useLocation } from "wouter";
@@ -12,17 +13,22 @@ export default function Leaderboard() {
   const { user } = useAuth();
   const [, setLocation] = useLocation();
   const [selectedPlayer, setSelectedPlayer] = useState<{ id: number; username: string } | null>(null);
+  const [selectedLeagueId, setSelectedLeagueId] = useState<number | null>(null);
 
-  // Get user's first league as default
   const { data: leagues } = useQuery<any[]>({
     queryKey: ["/api/leagues"],
     enabled: !!user?.id,
   });
 
-  // Check if there's a league parameter in the URL
-  const urlParams = new URLSearchParams(window.location.search);
-  const leagueIdFromUrl = urlParams.get("league");
-  const leagueId = leagueIdFromUrl ? parseInt(leagueIdFromUrl) : (leagues as any)?.[0]?.id;
+  // Initialize from URL param or first league
+  useEffect(() => {
+    if (!leagues?.length) return;
+    const urlParams = new URLSearchParams(window.location.search);
+    const fromUrl = urlParams.get("league");
+    setSelectedLeagueId(fromUrl ? parseInt(fromUrl) : leagues[0].id);
+  }, [leagues]);
+
+  const leagueId = selectedLeagueId;
 
   const { data: standings, isLoading } = useQuery<any[]>({
     queryKey: [`/api/leagues/${leagueId}/standings`],
@@ -69,9 +75,30 @@ export default function Leaderboard() {
               <h2 className="text-2xl font-bold">Leaderboard</h2>
               <p className="phish-text">See how you stack up against other players</p>
             </div>
-            <Badge variant="outline" className="border-green-500 text-green-500">
-              {leagueInfo?.name || "Loading…"}
-            </Badge>
+            {leagues && leagues.length > 1 ? (
+              <Select
+                value={selectedLeagueId?.toString() ?? ""}
+                onValueChange={(val) => {
+                  setSelectedLeagueId(parseInt(val));
+                  setSelectedPlayer(null);
+                }}
+              >
+                <SelectTrigger className="w-48 border-green-500 text-green-400 bg-transparent">
+                  <SelectValue placeholder="Select league" />
+                </SelectTrigger>
+                <SelectContent>
+                  {leagues.map((l: any) => (
+                    <SelectItem key={l.id} value={l.id.toString()}>
+                      {l.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            ) : (
+              <Badge variant="outline" className="border-green-500 text-green-500">
+                {leagueInfo?.name || "Loading…"}
+              </Badge>
+            )}
           </div>
         </header>
 
