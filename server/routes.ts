@@ -9,6 +9,7 @@ import { sendPasswordResetEmail } from "./services/email";
 import { nanoid } from "nanoid";
 import bcrypt from "bcrypt";
 import adminRoutes from "./routes/admin";
+import { cacheService } from "./services/cache-service";
 import { db } from "./db";
 import { sql, eq, and } from "drizzle-orm";
 
@@ -841,6 +842,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.post("/api/leagues/:id/score", async (req: any, res: any) => {
     try {
       const leagueId = parseInt(req.params.id);
+      // Refresh shows cache first so recent shows are included in scoring
+      await cacheService.getCachedShows(true);
       const result = await storage.scoreLeague(leagueId);
       res.json({ message: "Scoring complete", ...result });
     } catch (error: any) {

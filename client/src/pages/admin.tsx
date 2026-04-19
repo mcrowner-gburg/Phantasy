@@ -348,6 +348,20 @@ export default function Admin() {
     },
   });
 
+  const scoreLeagueMutation = useMutation({
+    mutationFn: async (leagueId: number) => {
+      const res = await apiRequest("POST", `/api/leagues/${leagueId}/score`, undefined);
+      return res.json();
+    },
+    onSuccess: (data: any) => {
+      queryClient.invalidateQueries({ queryKey: [`/api/leagues/${selectedLeague}/standings`] });
+      toast({ title: "Scores recalculated", description: `${data.shows} shows scored, ${data.points} total points` });
+    },
+    onError: (error: any) => {
+      toast({ title: "Failed to recalculate scores", description: error.message, variant: "destructive" });
+    },
+  });
+
   const calculateOriginalPoints = (performance: any) => {
     let points = 1; // Base point for being played
     if (performance.isSetOpener) points += 1; // First song of any set
@@ -846,7 +860,7 @@ export default function Admin() {
               </div>
 
               {selectedLeague && (
-                <div className="flex gap-4 mb-6">
+                <div className="flex gap-4 mb-6 flex-wrap">
                   <Button
                     onClick={() => setShowMembers(!showMembers)}
                     variant="outline"
@@ -854,6 +868,16 @@ export default function Admin() {
                   >
                     <Users className="mr-2" size={16} />
                     {showMembers ? 'Hide' : 'Show'} League Members
+                  </Button>
+
+                  <Button
+                    onClick={() => scoreLeagueMutation.mutate(selectedLeague)}
+                    disabled={scoreLeagueMutation.isPending}
+                    variant="outline"
+                    className="border-yellow-500 text-yellow-500 hover:bg-yellow-500/10"
+                  >
+                    <TrendingUp className="mr-2" size={16} />
+                    {scoreLeagueMutation.isPending ? "Calculating..." : "Recalculate Scores"}
                   </Button>
                   
                   <Dialog>
