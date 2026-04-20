@@ -231,8 +231,7 @@ export class CacheService {
 
         const insertData: InsertCachedShow[] = uniqueShows.map((show: any) => ({
           phishNetId: String(show.showid || show.showdate),
-          // Store as noon UTC so date displays correctly regardless of client timezone
-          showDate: new Date(show.showdate + 'T12:00:00Z'),
+          showDate: new Date(show.showdate + 'T00:00:00Z'),
           venue: show.venue || 'Unknown Venue',
           city: show.city || 'Unknown City',
           state: show.state || null,

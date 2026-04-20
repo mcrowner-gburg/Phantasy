@@ -616,15 +616,17 @@ export const storage = {
     const league = await this.getLeague(leagueId);
     if (!league) throw new Error("League not found");
 
-    const seasonStart = league.seasonStartDate ? new Date(league.seasonStartDate) : null;
-    const seasonEnd   = league.seasonEndDate   ? new Date(league.seasonEndDate)   : null;
+    const seasonStartStr = league.seasonStartDate
+      ? new Date(league.seasonStartDate).toISOString().split('T')[0] : null;
+    const seasonEndStr = league.seasonEndDate
+      ? new Date(league.seasonEndDate).toISOString().split('T')[0] : null;
 
-    // All shows in our cache
+    // All shows in our cache — compare date strings to avoid time-of-day false exclusions
     const allShows = await this.getCachedShows();
     const shows = allShows.filter((s: any) => {
-      const d = new Date(s.showDate);
-      if (seasonStart && d < seasonStart) return false;
-      if (seasonEnd   && d > seasonEnd)   return false;
+      const d = new Date(s.showDate).toISOString().split('T')[0];
+      if (seasonStartStr && d < seasonStartStr) return false;
+      if (seasonEndStr   && d > seasonEndStr)   return false;
       return true;
     });
 
