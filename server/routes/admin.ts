@@ -7,6 +7,7 @@ import {
 } from "../controllers/adminController";
 import { storage } from "../storage-db";
 import { phishApi } from "../services/phish-api";
+import { cacheService } from "../services/cache-service";
 import { db } from "../db";
 import { draftedSongs, songs, leagueMembers } from "../../shared/schema";
 import { eq, and } from "drizzle-orm";
@@ -22,19 +23,43 @@ router.delete("/users/:id", deleteUser);
 router.get("/concerts", async (_req, res) => {
   try {
     const shows = await storage.getCachedShows();
-    const completed = shows
-      .filter((s: any) => new Date(s.showDate) < new Date())
-      .sort((a: any, b: any) => new Date(b.showDate).getTime() - new Date(a.showDate).getTime())
-      .map((s: any) => ({
-        id: s.id,
-        date: s.showDate,
-        venue: s.venue,
-        city: s.city,
-        state: s.state,
-      }));
-    res.json(completed);
+    const todayStr = new Date().toISOString().split('T')[0];
+    const sorted = shows
+      .filter((s: any) => {
+        const d = s.showDate instanceof Date ? s.showDate : new Date(s.showDate);
+        return d.toISOString().split('T')[0] < todayStr;
+      })
+      .sort((a: any, b: any) => new Date(b.showDate).getTime() - new Date(a.showDate).getTime());
+
+    // Deduplicate by date — the DB may have entries from multiple API sources
+    const seenDates = new Set<string>();
+    const deduped = sorted.filter((s: any) => {
+      const dateKey = (s.showDate instanceof Date ? s.showDate : new Date(s.showDate))
+        .toISOString().split('T')[0];
+      if (seenDates.has(dateKey)) return false;
+      seenDates.add(dateKey);
+      return true;
+    });
+
+    res.json(deduped.map((s: any) => ({
+      id: s.id,
+      date: (s.showDate instanceof Date ? s.showDate : new Date(s.showDate))
+        .toISOString().split('T')[0],
+      venue: s.venue,
+      city: s.city,
+      state: s.state,
+    })));
   } catch (e: any) {
     res.status(500).json({ message: e.message || "Failed to fetch concerts" });
+  }
+});
+
+router.post("/refresh-shows", async (_req, res) => {
+  try {
+    await cacheService.getCachedShows(true);
+    res.json({ message: "Shows cache refreshed successfully" });
+  } catch (e: any) {
+    res.status(500).json({ message: e.message || "Failed to refresh shows cache" });
   }
 });
 

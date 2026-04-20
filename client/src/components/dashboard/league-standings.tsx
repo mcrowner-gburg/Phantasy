@@ -28,10 +28,26 @@ export default function LeagueStandings({
 }: LeagueStandingsProps) {
   const [, setLocation] = useLocation();
 
-  const handleExportCSV = () => {
+  const handleExportCSV = async () => {
     if (!leagueId) return;
-    // Trigger CSV download
-    window.location.href = `/api/leagues/${leagueId}/export-picks`;
+    try {
+      const response = await fetch(`/api/leagues/${leagueId}/export-picks`);
+      if (!response.ok) throw new Error(`Export failed: ${response.status}`);
+      const blob = await response.blob();
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      const disposition = response.headers.get('Content-Disposition');
+      const match = disposition?.match(/filename="([^"]+)"/);
+      a.download = match?.[1] ?? `league_picks_${new Date().toISOString().split('T')[0]}.csv`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      window.URL.revokeObjectURL(url);
+    } catch (error) {
+      console.error('CSV export failed:', error);
+      alert('Failed to export CSV. Please try again.');
+    }
   };
 
   const getRankBadgeColor = (rank: number) => {

@@ -90,6 +90,28 @@ export class PhishNetService {
     }
   }
 
+  async getShowsByYear(year: number): Promise<any[]> {
+    try {
+      const response = await fetch(
+        `${this.phishNetUrl}/shows/showyear/${year}.json?apikey=${this.apiKey}&order_by=showdate&direction=asc`
+      );
+      if (!response.ok) throw new Error(`Phish.net API error: ${response.statusText}`);
+      const data = await response.json();
+      return (data.data || []).map((show: any) => ({
+        showid: show.showid,
+        showdate: show.showdate,
+        venue: show.venue || "Unknown Venue",
+        city: show.city || "Unknown City",
+        state: show.state || null,
+        country: show.country || "USA",
+        tourid: show.tourid || null,
+      }));
+    } catch (error) {
+      console.error(`Error fetching shows for year ${year} from Phish.net:`, error);
+      return [];
+    }
+  }
+
   async getShowsLast24Months(): Promise<any[]> {
     try {
       const currentYear = new Date().getFullYear();
@@ -97,26 +119,8 @@ export class PhishNetService {
       const allShows: any[] = [];
 
       for (const year of years) {
-        try {
-          const response = await fetch(
-            `${this.phishInUrl}/shows?year=${year}&per_page=100`,
-            { headers: { "Accept": "application/json" } }
-          );
-          if (response.ok) {
-            const data = await response.json();
-            const shows = (data.shows || data.data || []).map((show: any) => ({
-              showid: show.id,
-              showdate: show.date,
-              venue: show.venue?.name || "Unknown Venue",
-              city: show.venue?.city || "Unknown City",
-              state: show.venue?.state || null,
-              country: show.venue?.country || "USA",
-            }));
-            allShows.push(...shows);
-          }
-        } catch (err) {
-          console.error(`Error fetching shows from ${year}:`, err);
-        }
+        const shows = await this.getShowsByYear(year);
+        allShows.push(...shows);
       }
 
       const twentyFourMonthsAgo = new Date();

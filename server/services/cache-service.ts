@@ -202,69 +202,55 @@ export class CacheService {
   // Refresh shows cache from Phish.net API
   private async refreshShowsCache(): Promise<void> {
     console.log('Refreshing shows cache from Phish.net API...');
-    
+
     try {
-      // Set refreshing flag
       await db
         .insert(cacheMetadata)
-        .values({
-          cacheType: 'shows',
-          isRefreshing: true,
-        })
-        .onConflictDoUpdate({
-          target: cacheMetadata.cacheType,
-          set: { isRefreshing: true },
-        });
+        .values({ cacheType: 'shows', isRefreshing: true })
+        .onConflictDoUpdate({ target: cacheMetadata.cacheType, set: { isRefreshing: true } });
 
-      // Fetch shows from last 24 months and upcoming shows
-      const [last24MonthsShows, upcomingShows] = await Promise.all([
-        this.phishApi.getShowsLast24Months(),
-        this.phishApi.getUpcomingShows()
-      ]);
+      // Fetch all shows from Phish.net for the last 3 years (correct Eastern-time dates)
+      const currentYear = new Date().getFullYear();
+      const years = [currentYear, currentYear - 1, currentYear - 2];
+      const allShows: any[] = [];
+      for (const year of years) {
+        const shows = await this.phishApi.getShowsByYear(year);
+        allShows.push(...shows);
+      }
 
-      const allShows = [...last24MonthsShows, ...upcomingShows];
       console.log(`Fetched ${allShows.length} shows from Phish.net API`);
 
       if (allShows.length > 0) {
-        // Clear existing cache for current year
-        const currentYear = new Date().getFullYear();
-        // Only clear current year to preserve historical data
-        
-        // Insert new data
-        const insertData: InsertCachedShow[] = allShows.map((show: any) => ({
-          phishNetId: show.showid || show.showdate,
-          showDate: new Date(show.showdate),
+        // Deduplicate by showdate — Phish.net shouldn't have dupes, but be safe
+        const seen = new Set<string>();
+        const uniqueShows = allShows.filter(show => {
+          if (seen.has(show.showdate)) return false;
+          seen.add(show.showdate);
+          return true;
+        });
+
+        const insertData: InsertCachedShow[] = uniqueShows.map((show: any) => ({
+          phishNetId: String(show.showid || show.showdate),
+          // Store as noon UTC so date displays correctly regardless of client timezone
+          showDate: new Date(show.showdate + 'T12:00:00Z'),
           venue: show.venue || 'Unknown Venue',
           city: show.city || 'Unknown City',
           state: show.state || null,
           country: show.country || 'USA',
-          tourid: show.tour_id || null,
+          tourid: show.tourid || null,
           setlistdata: show.setlistdata || null,
-          isCompleted: new Date(show.showdate) < new Date(),
+          isCompleted: show.showdate < new Date().toISOString().split('T')[0],
         }));
 
-        // Use upsert to avoid duplicates
-        for (const showData of insertData) {
-          await db
-            .insert(cachedShows)
-            .values(showData)
-            .onConflictDoUpdate({
-              target: cachedShows.phishNetId,
-              set: {
-                venue: showData.venue,
-                city: showData.city,
-                state: showData.state,
-                country: showData.country,
-                tourid: showData.tourid,
-                setlistdata: showData.setlistdata,
-                isCompleted: showData.isCompleted,
-                cachedAt: new Date(),
-              },
-            });
+        // Clear and re-insert to remove stale cross-API duplicates with wrong dates
+        await db.delete(cachedShows);
+        const batchSize = 50;
+        for (let i = 0; i < insertData.length; i += batchSize) {
+          await db.insert(cachedShows).values(insertData.slice(i, i + batchSize)).onConflictDoNothing();
         }
 
-        await this.updateCacheMetadata('shows', allShows.length);
-        console.log(`Successfully cached ${allShows.length} shows`);
+        await this.updateCacheMetadata('shows', uniqueShows.length);
+        console.log(`Successfully cached ${uniqueShows.length} shows`);
       }
     } catch (error) {
       console.error('Error refreshing shows cache:', error);

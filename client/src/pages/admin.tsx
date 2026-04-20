@@ -15,7 +15,7 @@ import { LeagueInviteGenerator } from "@/components/admin/league-invite-generato
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest } from "@/lib/queryClient";
 import { useAuth } from "@/hooks/useAuth";
-import { format } from "date-fns";
+import { format, parseISO } from "date-fns";
 
 export default function Admin() {
   const { user: currentUser } = useAuth();
@@ -823,7 +823,25 @@ export default function Admin() {
           {/* Show/League Selection - Available to all admins */}
           <Card className="glassmorphism border-gray-600">
             <CardContent className="p-6">
-              <h3 className="text-xl font-bold mb-6">Select Show & League for Point Management</h3>
+              <div className="flex items-center justify-between mb-6">
+                <h3 className="text-xl font-bold">Select Show & League for Point Management</h3>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="border-gray-600 hover:border-blue-500 text-xs"
+                  onClick={async () => {
+                    try {
+                      await apiRequest("POST", "/api/admin/refresh-shows");
+                      queryClient.invalidateQueries({ queryKey: ["/api/admin/concerts"] });
+                      toast({ title: "Shows cache refreshed", description: "Show list updated from Phish.net." });
+                    } catch {
+                      toast({ title: "Refresh failed", variant: "destructive" });
+                    }
+                  }}
+                >
+                  Refresh Shows
+                </Button>
+              </div>
               
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
                 <div>
@@ -835,7 +853,7 @@ export default function Admin() {
                     <SelectContent className="bg-gray-900 border-gray-600">
                       {concerts?.map((concert: any) => (
                         <SelectItem key={concert.id} value={concert.id.toString()}>
-                          {concert.venue} - {format(new Date(concert.date), "MMM dd, yyyy")}
+                          {concert.venue} - {format(parseISO(String(concert.date).substring(0, 10)), "MMM dd, yyyy")}
                         </SelectItem>
                       ))}
                     </SelectContent>
@@ -1272,7 +1290,7 @@ export default function Admin() {
                   <CardContent className="p-6">
                     <div className="flex justify-between items-center mb-6">
                       <h3 className="text-xl font-bold">
-                        {showData.concert.venue} - {format(new Date(showData.concert.date), "MMMM dd, yyyy")}
+                        {showData.concert.venue} - {format(parseISO(String(showData.concert.date).substring(0, 10)), "MMMM dd, yyyy")}
                       </h3>
                       <Badge className="bg-blue-500 text-white">
                         {showData.songPerformances.length} songs
