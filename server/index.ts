@@ -70,6 +70,7 @@ async function runMigrations() {
         adjusted_by integer NOT NULL REFERENCES users(id),
         created_at timestamptz DEFAULT now()
       );
+      ALTER TABLE point_adjustments DROP CONSTRAINT IF EXISTS point_adjustments_concert_id_fkey;
       UPDATE users SET role = 'superadmin' WHERE username = 'mcrowner';
     `);
     console.log("Migrations complete");

@@ -149,7 +149,7 @@ export const activities = pgTable("activities", {
 export const pointAdjustments = pgTable("point_adjustments", {
   id: serial("id").primaryKey(),
   leagueId: integer("league_id").references(() => leagues.id).notNull(),
-  concertId: integer("concert_id").references(() => concerts.id).notNull(),
+  concertId: integer("concert_id").notNull(), // cachedShows.id — no FK, different table from concerts
   songId: integer("song_id").references(() => songs.id).notNull(),
   userId: integer("user_id").references(() => users.id), // User who drafted the song
   originalPoints: integer("original_points").default(0),
