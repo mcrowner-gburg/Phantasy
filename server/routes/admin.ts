@@ -167,7 +167,7 @@ router.post("/adjustments", requireLeagueAdmin, async (req: any, res: any) => {
       originalPoints: originalPoints ?? 0,
       adjustedPoints: adjustedPoints ?? 0,
       reason: reason || "",
-      adjustedBy: req.session.user.id,
+      adjustedBy: (req.session as any).userId,
     });
     res.json(adjustment);
   } catch (e: any) {
