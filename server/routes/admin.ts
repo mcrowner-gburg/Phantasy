@@ -9,8 +9,8 @@ import { storage } from "../storage-db";
 import { phishApi } from "../services/phish-api";
 import { cacheService } from "../services/cache-service";
 import { db } from "../db";
-import { draftedSongs, songs, leagueMembers } from "../../shared/schema";
-import { eq, and } from "drizzle-orm";
+import { draftedSongs, songs, leagueMembers, users } from "../../shared/schema";
+import { eq, and, inArray } from "drizzle-orm";
 import { requireLeagueAdmin, requireSuperAdmin } from "../middleware/admin";
 
 const router = Router();
@@ -98,19 +98,27 @@ router.get("/shows/:concertId/league/:leagueId", async (req, res) => {
       .from(draftedSongs)
       .where(eq(draftedSongs.leagueId, leagueId));
 
-    // Build a map of song title -> drafters, and title -> songId for adjustment lookups
+    // Batch-fetch all songs and users in two queries instead of N+1
+    const songIds = [...new Set(drafted.map(d => d.songId).filter(Boolean))] as number[];
+    const userIds = [...new Set(drafted.map(d => d.userId).filter(Boolean))] as number[];
+    const [songRows, userRows] = await Promise.all([
+      songIds.length ? db.select({ id: songs.id, title: songs.title }).from(songs).where(inArray(songs.id, songIds)) : [],
+      userIds.length ? db.select({ id: users.id, username: users.username }).from(users).where(inArray(users.id, userIds)) : [],
+    ]);
+    const songMap = new Map(songRows.map(s => [s.id, s.title]));
+    const userMap = new Map(userRows.map(u => [u.id, u.username]));
+
     const draftersByTitle: Record<string, { userId: number; username: string }[]> = {};
     const titleToSongId: Record<string, number> = {};
     for (const d of drafted) {
-      if (!d.songId) continue;
-      const [song] = await db.select().from(songs).where(eq(songs.id, d.songId)).limit(1);
-      if (!song) continue;
-      const user = await storage.getUser(d.userId!);
-      if (!user) continue;
-      const title = song.title.toLowerCase();
-      if (!draftersByTitle[title]) draftersByTitle[title] = [];
-      draftersByTitle[title].push({ userId: user.id, username: user.username });
-      titleToSongId[title] = d.songId;
+      if (!d.songId || !d.userId) continue;
+      const title = songMap.get(d.songId);
+      const username = userMap.get(d.userId);
+      if (!title || !username) continue;
+      const key = title.toLowerCase();
+      if (!draftersByTitle[key]) draftersByTitle[key] = [];
+      draftersByTitle[key].push({ userId: d.userId, username });
+      titleToSongId[key] = d.songId;
     }
 
     // Determine the first position in each set so we can flag set openers

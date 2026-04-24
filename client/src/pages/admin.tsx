@@ -219,11 +219,8 @@ export default function Admin() {
     },
     onSuccess: () => {
       // Invalidate all related queries to refresh the data
-      queryClient.invalidateQueries({ queryKey: ["/api/admin/adjustments"] });
       queryClient.invalidateQueries({ queryKey: ["/api/admin/adjustments/league", selectedLeague] });
-      queryClient.invalidateQueries({ queryKey: ["/api/admin/shows", selectedConcert, "league", selectedLeague] });
-      queryClient.invalidateQueries({ queryKey: ["/api/dashboard"] });
-      queryClient.invalidateQueries({ queryKey: ["/api/leaderboard"] });
+      queryClient.invalidateQueries({ queryKey: [`/api/leagues/${selectedLeague}/standings`] });
       
       setIsAdjustmentDialogOpen(false);
       setAdjustmentForm({ songId: 0, userId: 0, originalPoints: 0, adjustedPoints: 0, reason: "" });
@@ -1500,6 +1497,12 @@ export default function Admin() {
                     ...adjustmentForm,
                     adjustedPoints: parseInt(e.target.value) || 0
                   })}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter') {
+                      e.preventDefault();
+                      adjustmentMutation.mutate(adjustmentForm);
+                    }
+                  }}
                   className="bg-black border-gray-600 text-white"
                 />
               </div>

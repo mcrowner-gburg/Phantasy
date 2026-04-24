@@ -106,16 +106,33 @@ export const storage = {
         eq(pointAdjustments.userId, data.userId),
       )).limit(1);
 
+    const prevAdjusted = existing?.adjustedPoints ?? data.originalPoints;
+    const delta = data.adjustedPoints - prevAdjusted;
+
+    let record;
     if (existing) {
       const [updated] = await db.update(pointAdjustments)
         .set({ adjustedPoints: data.adjustedPoints, reason: data.reason, adjustedBy: data.adjustedBy })
         .where(eq(pointAdjustments.id, existing.id))
         .returning();
-      return updated;
+      record = updated;
+    } else {
+      const [created] = await db.insert(pointAdjustments).values(data).returning();
+      record = created;
     }
 
-    const [created] = await db.insert(pointAdjustments).values(data).returning();
-    return created;
+    // Apply the delta immediately to the player's drafted song total
+    if (delta !== 0) {
+      await db.update(draftedSongs)
+        .set({ points: sql`${draftedSongs.points} + ${delta}` })
+        .where(and(
+          eq(draftedSongs.userId, data.userId),
+          eq(draftedSongs.leagueId, data.leagueId),
+          eq(draftedSongs.songId, data.songId),
+        ));
+    }
+
+    return record;
   },
 
   async getPointAdjustments(leagueId: number, concertId?: number) {
@@ -698,6 +715,21 @@ export const storage = {
 
       // Brief pause to avoid hammering phish.in
       await new Promise(r => setTimeout(r, 200));
+    }
+
+    // Re-apply any manual point adjustments (scoring reset wiped them)
+    const adjustments = await db.select().from(pointAdjustments)
+      .where(eq(pointAdjustments.leagueId, leagueId));
+    for (const adj of adjustments) {
+      const delta = adj.adjustedPoints - adj.originalPoints;
+      if (delta === 0 || !adj.userId) continue;
+      await db.update(draftedSongs)
+        .set({ points: sql`${draftedSongs.points} + ${delta}` })
+        .where(and(
+          eq(draftedSongs.userId, adj.userId),
+          eq(draftedSongs.leagueId, adj.leagueId),
+          eq(draftedSongs.songId, adj.songId),
+        ));
     }
 
     return { shows: showsScored, points: totalPoints };
