@@ -98,9 +98,9 @@ router.get("/shows/:concertId/league/:leagueId", async (req, res) => {
       .from(draftedSongs)
       .where(eq(draftedSongs.leagueId, leagueId));
 
-    // Build a map of song title -> drafters
-    // First, resolve drafted song titles
+    // Build a map of song title -> drafters, and title -> songId for adjustment lookups
     const draftersByTitle: Record<string, { userId: number; username: string }[]> = {};
+    const titleToSongId: Record<string, number> = {};
     for (const d of drafted) {
       if (!d.songId) continue;
       const [song] = await db.select().from(songs).where(eq(songs.id, d.songId)).limit(1);
@@ -110,6 +110,7 @@ router.get("/shows/:concertId/league/:leagueId", async (req, res) => {
       const title = song.title.toLowerCase();
       if (!draftersByTitle[title]) draftersByTitle[title] = [];
       draftersByTitle[title].push({ userId: user.id, username: user.username });
+      titleToSongId[title] = d.songId;
     }
 
     // Determine the first position in each set so we can flag set openers
@@ -133,7 +134,7 @@ router.get("/shows/:concertId/league/:leagueId", async (req, res) => {
       const durationSeconds = track.duration ? Math.round(track.duration / 1000) : 0;
       return {
         id: idx,
-        song: { title },
+        song: { title, id: titleToSongId[title.toLowerCase()] },
         setNumber: setKey,
         position: track.position || idx + 1,
         isSetOpener,
