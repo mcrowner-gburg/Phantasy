@@ -209,6 +209,28 @@ router.get("/adjustments/league/:leagueId", async (req: any, res: any) => {
   }
 });
 
+// DELETE /api/admin/adjustments/by-song — remove all adjustments for a (leagueId, concertId, songId, userId)
+// Must come before /:id to avoid route shadowing
+router.delete("/adjustments/by-song", requireLeagueAdmin, async (req: any, res: any) => {
+  try {
+    const { leagueId, concertId, songId, userId } = req.body;
+    if (!leagueId || !concertId || !songId || !userId) {
+      return res.status(400).json({ message: "leagueId, concertId, songId, userId are required" });
+    }
+    await db.delete(pointAdjustments).where(
+      and(
+        eq(pointAdjustments.leagueId, leagueId),
+        eq(pointAdjustments.concertId, concertId),
+        eq(pointAdjustments.songId, songId),
+        eq(pointAdjustments.userId, userId),
+      )
+    );
+    res.json({ message: "All adjustments for song deleted" });
+  } catch (e: any) {
+    res.status(500).json({ message: e.message || "Failed to delete adjustments" });
+  }
+});
+
 // DELETE /api/admin/adjustments/:id — remove a specific point adjustment
 router.delete("/adjustments/:id", requireLeagueAdmin, async (req: any, res: any) => {
   try {

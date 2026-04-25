@@ -1422,7 +1422,16 @@ export default function Admin() {
                                             variant="ghost"
                                             className="h-5 px-1 text-red-400 hover:text-red-300 text-xs"
                                             onClick={async () => {
-                                              await fetch(`/api/admin/adjustments/${adjustmentInfo.id}`, { method: "DELETE" });
+                                              await fetch("/api/admin/adjustments/by-song", {
+                                                method: "DELETE",
+                                                headers: { "Content-Type": "application/json" },
+                                                body: JSON.stringify({
+                                                  leagueId: selectedLeague,
+                                                  concertId: selectedConcert,
+                                                  songId: adjustmentInfo.songId,
+                                                  userId: drafter.userId,
+                                                }),
+                                              });
                                               queryClient.invalidateQueries({ queryKey: ["/api/admin/adjustments/league", selectedLeague] });
                                               toast({ title: "Adjustment deleted", description: "Re-score to apply base scoring." });
                                             }}
