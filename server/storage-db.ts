@@ -895,12 +895,12 @@ export const storage = {
       for (const r of cachedRows) standingSongTitleById.set(r.id, r.title);
     }
 
-    // Find the most recent completed show in the league's season to compute todayPoints
+    // Find the most recent show in the league's season to compute lastShowPoints.
+    // Include today's shows — no cutoff at "today" since we want the most recent available.
     const seasonStartStr = league?.seasonStartDate
       ? new Date(league.seasonStartDate).toISOString().split('T')[0] : null;
     const seasonEndStr = league?.seasonEndDate
       ? new Date(league.seasonEndDate).toISOString().split('T')[0] : null;
-    const todayStr = new Date().toISOString().split('T')[0];
 
     const allCachedShows = await this.getCachedShows();
     const recentShow = allCachedShows
@@ -908,18 +908,43 @@ export const storage = {
         const d = new Date(s.showDate).toISOString().split('T')[0];
         if (seasonStartStr && d < seasonStartStr) return false;
         if (seasonEndStr && d > seasonEndStr) return false;
-        if (d >= todayStr) return false;
         return true;
       })
       .sort((a, b) => new Date(b.showDate).getTime() - new Date(a.showDate).getTime())[0];
 
-    // Build a todayPoints map using the cached setlist for the most recent show
+    // Build a lastShowPoints map using the cached setlist, falling back to live phish.in fetch
     const todayPointsByUser = new Map<number, number>();
+    let lastShowDate: string | null = null;
     if (recentShow) {
-      const recentShowDate = new Date(recentShow.showDate).toISOString().split('T')[0];
-      const cachedSetlist = await this.getCachedSetlist(recentShowDate);
+      lastShowDate = new Date(recentShow.showDate).toISOString().split('T')[0];
+      let tracks: any[] | null = null;
+
+      const cachedSetlist = await this.getCachedSetlist(lastShowDate);
       if (cachedSetlist?.setlistData) {
-        const tracks = cachedSetlist.setlistData as any[];
+        tracks = cachedSetlist.setlistData as any[];
+      } else {
+        // Not yet cached — fetch live and cache it for next time
+        try {
+          const res = await fetch(`https://phish.in/api/v2/shows/${lastShowDate}`, {
+            headers: { Accept: "application/json" },
+          });
+          if (res.ok) {
+            const data = await res.json();
+            tracks = data.tracks?.length > 0 ? data.tracks : null;
+            if (tracks) {
+              const trackTitles = tracks.map((t: any) => t.title || "");
+              await db.insert(cachedSetlists)
+                .values({ showDate: lastShowDate, setlistData: tracks, songs: trackTitles })
+                .onConflictDoUpdate({
+                  target: cachedSetlists.showDate,
+                  set: { setlistData: tracks, songs: trackTitles, cachedAt: new Date() },
+                });
+            }
+          }
+        } catch { /* non-critical */ }
+      }
+
+      if (tracks) {
         const firstPosBySet: Record<string, number> = {};
         for (const t of tracks) {
           const s = t.set_name || "Set 1";
@@ -941,13 +966,13 @@ export const storage = {
           trackPtsMap[title] = (trackPtsMap[title] ?? 0) + pts;
         }
         for (const [userId, drafts] of draftsByUser) {
-          let userTodayPts = 0;
+          let userLastShowPts = 0;
           for (const d of drafts) {
             if (!d.songId) continue;
             const title = (standingSongTitleById.get(d.songId) || "").toLowerCase();
-            userTodayPts += trackPtsMap[title] ?? 0;
+            userLastShowPts += trackPtsMap[title] ?? 0;
           }
-          todayPointsByUser.set(userId, userTodayPts);
+          todayPointsByUser.set(userId, userLastShowPts);
         }
       }
     }
@@ -964,6 +989,7 @@ export const storage = {
         totalPoints,
         rank: 0,
         todayPoints: todayPointsByUser.get(member.userId) ?? 0,
+        lastShowDate,
         songCount: drafts.length,
       });
     }

@@ -207,7 +207,7 @@ export default function Leaderboard() {
                               <span>•</span>
                               <div className="flex items-center space-x-1">
                                 <TrendingUp size={14} />
-                                <span>+{player.todayPoints || 0} today</span>
+                                <span>+{player.todayPoints || 0} {player.lastShowDate ? `(${player.lastShowDate})` : "last show"}</span>
                               </div>
                             </div>
                           </div>
