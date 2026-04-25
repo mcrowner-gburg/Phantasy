@@ -798,20 +798,38 @@ export const storage = {
     }
 
     // Re-apply any manual point adjustments (scoring reset wiped them).
-    // Match by title rather than songId — the stored songId may be from a different namespace
-    // (cachedSongs vs songs), so a songId WHERE clause would silently miss the row.
+    // Use adjustedPoints as an absolute override — the admin set the final desired value,
+    // so we SET rather than ADD a delta (delta approach breaks when base scoring changes).
     const adjustments = await db.select().from(pointAdjustments)
       .where(eq(pointAdjustments.leagueId, leagueId));
+    const adjsApplied: { username: string; song: string; base: number; override: number }[] = [];
+    // We need user IDs from adjustments to look up usernames
+    const adjUserIds = [...new Set(adjustments.map(a => a.userId).filter(Boolean))] as number[];
+    const adjUserRows = adjUserIds.length
+      ? await db.select({ id: users.id, username: users.username }).from(users).where(inArray(users.id, adjUserIds))
+      : [];
+    const adjUsernameMap = new Map(adjUserRows.map(u => [u.id, u.username]));
+
     for (const adj of adjustments) {
-      const delta = adj.adjustedPoints - adj.originalPoints;
-      if (delta === 0 || !adj.userId) continue;
+      if (!adj.userId) continue;
       const adjTitle = songIdToTitle.get(adj.songId);
-      if (!adjTitle) continue;
+      if (!adjTitle) {
+        console.log(`[scoreLeague] adjustment id=${adj.id} skipped — songId=${adj.songId} not in title map`);
+        continue;
+      }
       const userEntries = (titleMap[adjTitle.toLowerCase()] || []).filter(e => e.userId === adj.userId);
       for (const entry of userEntries) {
+        const basePoints = pointDeltas.get(entry.id) ?? 0;
         await db.update(draftedSongs)
-          .set({ points: sql`${draftedSongs.points} + ${delta}` })
+          .set({ points: adj.adjustedPoints })
           .where(eq(draftedSongs.id, entry.id));
+        adjsApplied.push({
+          username: adjUsernameMap.get(adj.userId) ?? `user#${adj.userId}`,
+          song: adjTitle,
+          base: basePoints,
+          override: adj.adjustedPoints,
+        });
+        console.log(`[scoreLeague] adj id=${adj.id} user=${adj.userId} song="${adjTitle}" base=${basePoints} → override=${adj.adjustedPoints}`);
       }
     }
 
@@ -825,7 +843,7 @@ export const storage = {
       scoredUserIds.map(uid => [usernameMap.get(uid) ?? `user#${uid}`, userPtsLog[uid]])
     );
 
-    return { shows: showsScored, points: totalPoints, perUser, unmappedSongIds };
+    return { shows: showsScored, points: totalPoints, perUser, unmappedSongIds, adjustmentsApplied: adjsApplied };
   },
 
   // ==================== ACTIVITIES ====================

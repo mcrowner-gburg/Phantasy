@@ -9,7 +9,7 @@ import { storage } from "../storage-db";
 import { phishApi } from "../services/phish-api";
 import { cacheService } from "../services/cache-service";
 import { db } from "../db";
-import { draftedSongs, songs, leagueMembers, users } from "../../shared/schema";
+import { draftedSongs, songs, leagueMembers, users, pointAdjustments } from "../../shared/schema";
 import { eq, and, inArray } from "drizzle-orm";
 import { requireLeagueAdmin, requireSuperAdmin } from "../middleware/admin";
 
@@ -200,6 +200,18 @@ router.get("/adjustments/league/:leagueId", async (req: any, res: any) => {
     res.json(adjustments);
   } catch (e: any) {
     res.status(500).json({ message: e.message || "Failed to fetch adjustments" });
+  }
+});
+
+// DELETE /api/admin/adjustments/:id — remove a specific point adjustment
+router.delete("/adjustments/:id", requireLeagueAdmin, async (req: any, res: any) => {
+  try {
+    const id = parseInt(req.params.id);
+    if (isNaN(id)) return res.status(400).json({ message: "Invalid id" });
+    await db.delete(pointAdjustments).where(eq(pointAdjustments.id, id));
+    res.json({ message: "Adjustment deleted" });
+  } catch (e: any) {
+    res.status(500).json({ message: e.message || "Failed to delete adjustment" });
   }
 });
 

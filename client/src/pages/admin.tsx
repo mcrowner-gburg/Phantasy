@@ -352,9 +352,13 @@ export default function Admin() {
     },
     onSuccess: (data: any) => {
       queryClient.invalidateQueries({ queryKey: [`/api/leagues/${selectedLeague}/standings`] });
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/adjustments/league", selectedLeague] });
       const unmapped = data.unmappedSongIds?.length ? ` ⚠️ ${data.unmappedSongIds.length} unmapped song IDs.` : "";
-      const perUser = data.perUser ? ` Players: ${Object.entries(data.perUser).map(([u, p]) => `${u}=${p}`).join(", ")}` : "";
-      toast({ title: "Scores recalculated", description: `${data.shows} shows scored, ${data.points} total points.${unmapped}${perUser}` });
+      const perUser = data.perUser ? ` Base: ${Object.entries(data.perUser).map(([u, p]) => `${u}=${p}`).join(", ")}` : "";
+      const adjs = data.adjustmentsApplied?.length
+        ? ` Overrides: ${data.adjustmentsApplied.map((a: any) => `${a.username}/${a.song} ${a.base}→${a.override}`).join(", ")}`
+        : "";
+      toast({ title: "Scores recalculated", description: `${data.shows} shows scored, ${data.points} total points.${unmapped}${perUser}${adjs}` });
     },
     onError: (error: any) => {
       toast({ title: "Failed to recalculate scores", description: error.message, variant: "destructive" });
@@ -1398,6 +1402,21 @@ export default function Admin() {
                                               {adjustmentInfo.reason}
                                             </div>
                                           )}
+                                          <div className="text-xs text-gray-400">
+                                            {adjustmentInfo.originalPoints} → {adjustmentInfo.adjustedPoints} pts
+                                          </div>
+                                          <Button
+                                            size="sm"
+                                            variant="ghost"
+                                            className="h-5 px-1 text-red-400 hover:text-red-300 text-xs"
+                                            onClick={async () => {
+                                              await fetch(`/api/admin/adjustments/${adjustmentInfo.id}`, { method: "DELETE" });
+                                              queryClient.invalidateQueries({ queryKey: ["/api/admin/adjustments/league", selectedLeague] });
+                                              toast({ title: "Adjustment deleted", description: "Re-score to apply base scoring." });
+                                            }}
+                                          >
+                                            Delete override
+                                          </Button>
                                         </div>
                                       ) : (
                                         <Badge variant="outline" className="border-gray-500 text-gray-400 text-xs">
