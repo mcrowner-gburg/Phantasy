@@ -692,68 +692,89 @@ export const storage = {
       titleMap[key].push(d);
     }
 
+    // Fetch all setlists in parallel batches of 8 — avoids sequential 200ms pauses
+    // that would push large seasons past Railway's 30s request timeout.
+    const BATCH = 8;
+    const showDates = shows.map(s => new Date(s.showDate).toISOString().split("T")[0]);
+    const fetchedSetlists: Array<{ showDate: string; tracks: any[] } | null> = [];
+
+    for (let i = 0; i < showDates.length; i += BATCH) {
+      const chunk = showDates.slice(i, i + BATCH);
+      const results = await Promise.all(chunk.map(async (showDate) => {
+        try {
+          const res = await fetch(`https://phish.in/api/v2/shows/${showDate}`, {
+            headers: { Accept: "application/json" },
+          });
+          if (!res.ok) return null;
+          const data = await res.json();
+          const tracks: any[] = data.tracks || [];
+          return tracks.length > 0 ? { showDate, tracks } : null;
+        } catch { return null; }
+      }));
+      fetchedSetlists.push(...results);
+    }
+
+    // Compute all point deltas in memory — one DB write per drafted-song entry at the end
+    const pointDeltas = new Map<number, number>(); // draftedSong.id → total points earned
     let totalPoints = 0;
     let showsScored = 0;
+    const setlistsToCache: Array<{ showDate: string; tracks: any[] }> = [];
 
-    for (const show of shows) {
-      const showDate = new Date(show.showDate).toISOString().split("T")[0];
+    for (const result of fetchedSetlists) {
+      if (!result) continue;
+      const { showDate, tracks: rawTracks } = result;
+
+      const firstPosBySet: Record<string, number> = {};
+      for (const t of rawTracks) {
+        const s = t.set_name || "Set 1";
+        if (!(s in firstPosBySet) || t.position < firstPosBySet[s]) firstPosBySet[s] = t.position;
+      }
+
+      for (const t of rawTracks) {
+        const title = (t.title || "").toLowerCase();
+        const entries = titleMap[title];
+        if (!entries || entries.length === 0) continue;
+
+        const setKey = t.set_name || "Set 1";
+        const isEncore = setKey.toLowerCase().includes("encore");
+        const isSetOpener = !isEncore && t.position === firstPosBySet[setKey];
+        const durationSecs = t.duration ? Math.round(t.duration / 1000) : 0;
+        const mins = durationSecs / 60;
+
+        let pts = 1;
+        if (isSetOpener) pts += 1;
+        if (isEncore)    pts += 1;
+        if (mins >= 20)  pts += 1;
+        if (mins >= 30)  pts += 1;
+        if (mins >= 40)  pts += 1;
+
+        for (const entry of entries) {
+          pointDeltas.set(entry.id, (pointDeltas.get(entry.id) ?? 0) + pts);
+          totalPoints += pts;
+        }
+      }
+      showsScored++;
+      setlistsToCache.push({ showDate, tracks: rawTracks });
+    }
+
+    // Write final points — one UPDATE per drafted-song entry (not per track)
+    for (const [entryId, delta] of pointDeltas) {
+      await db.update(draftedSongs)
+        .set({ points: delta })
+        .where(eq(draftedSongs.id, entryId));
+    }
+
+    // Cache all setlists for todayPoints computation in standings
+    for (const { showDate, tracks } of setlistsToCache) {
       try {
-        const res = await fetch(`https://phish.in/api/v2/shows/${showDate}`, {
-          headers: { Accept: "application/json" },
-        });
-        if (!res.ok) continue;
-        const data = await res.json();
-        const rawTracks: any[] = data.tracks || [];
-        if (rawTracks.length === 0) continue;
-
-        // Detect first position per set
-        const firstPosBySet: Record<string, number> = {};
-        for (const t of rawTracks) {
-          const s = t.set_name || "Set 1";
-          if (!(s in firstPosBySet) || t.position < firstPosBySet[s]) firstPosBySet[s] = t.position;
-        }
-
-        for (const t of rawTracks) {
-          const title = (t.title || "").toLowerCase();
-          const entries = titleMap[title];
-          if (!entries || entries.length === 0) continue;
-
-          const setKey = t.set_name || "Set 1";
-          const isEncore = setKey.toLowerCase().includes("encore");
-          const isSetOpener = !isEncore && t.position === firstPosBySet[setKey];
-          const durationSecs = t.duration ? Math.round(t.duration / 1000) : 0;
-          const mins = durationSecs / 60;
-
-          let pts = 1;
-          if (isSetOpener) pts += 1;
-          if (isEncore)    pts += 1;
-          if (mins >= 20)  pts += 1;
-          if (mins >= 30)  pts += 1;
-          if (mins >= 40)  pts += 1;
-
-          for (const entry of entries) {
-            await db.update(draftedSongs)
-              .set({ points: sql`${draftedSongs.points} + ${pts}` })
-              .where(eq(draftedSongs.id, entry.id));
-            totalPoints += pts;
-          }
-        }
-        showsScored++;
-
-        // Cache the setlist so standings can compute todayPoints without extra API calls
-        try {
-          const trackTitles = rawTracks.map((t: any) => t.title || "");
-          await db.insert(cachedSetlists)
-            .values({ showDate, setlistData: rawTracks, songs: trackTitles })
-            .onConflictDoUpdate({
-              target: cachedSetlists.showDate,
-              set: { setlistData: rawTracks, songs: trackTitles, cachedAt: new Date() },
-            });
-        } catch { /* non-critical */ }
-      } catch { /* skip shows that fail */ }
-
-      // Brief pause to avoid hammering phish.in
-      await new Promise(r => setTimeout(r, 200));
+        const trackTitles = tracks.map((t: any) => t.title || "");
+        await db.insert(cachedSetlists)
+          .values({ showDate, setlistData: tracks, songs: trackTitles })
+          .onConflictDoUpdate({
+            target: cachedSetlists.showDate,
+            set: { setlistData: tracks, songs: trackTitles, cachedAt: new Date() },
+          });
+      } catch { /* non-critical */ }
     }
 
     // Re-apply any manual point adjustments (scoring reset wiped them)

@@ -21,6 +21,7 @@ export default function Dashboard() {
   const { data: dashboardData, isLoading, error } = useQuery({
     queryKey: [`/api/dashboard?userId=${userId}`],
     enabled: !!userId,
+    staleTime: 0,
   });
 
   if (error) {

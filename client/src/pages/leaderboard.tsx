@@ -30,9 +30,10 @@ export default function Leaderboard() {
 
   const leagueId = selectedLeagueId;
 
-  const { data: standings, isLoading } = useQuery<any[]>({
+  const { data: standings, isLoading, refetch: refetchStandings } = useQuery<any[]>({
     queryKey: [`/api/leagues/${leagueId}/standings`],
     enabled: !!leagueId,
+    staleTime: 0,
   });
 
   const { data: leagueInfo } = useQuery<any>({
