@@ -131,18 +131,23 @@ router.get("/shows/:concertId/league/:leagueId", async (req, res) => {
       }
     }
 
-    // Build song performances from tracks
+    // Build song performances from tracks, tracking occurrence count per title
+    const titleOccCount: Record<string, number> = {};
     const songPerformances = tracks.map((track: any, idx: number) => {
       const title = track.song || track.title || "";
-      const draftedBy = draftersByTitle[title.toLowerCase()] || [];
-      const setKey = track.set || "Set 1";
+      const titleKey = title.toLowerCase();
+      titleOccCount[titleKey] = (titleOccCount[titleKey] ?? 0) + 1;
+      const occurrence = titleOccCount[titleKey];
+
+      const draftedBy = draftersByTitle[titleKey] || [];
+      const setKey = track.set || track.set_name || "Set 1";
       const isEncore = track.isEncore || setKey.toLowerCase().includes("encore");
       const isSetOpener = !isEncore && track.position === firstPositionBySet[setKey];
-      // duration from phish.in is in milliseconds
       const durationSeconds = track.duration ? Math.round(track.duration / 1000) : 0;
       return {
         id: idx,
-        song: { title, id: titleToSongId[title.toLowerCase()] },
+        song: { title, id: titleToSongId[titleKey] },
+        occurrence,
         setNumber: setKey,
         position: track.position || idx + 1,
         isSetOpener,
@@ -166,12 +171,13 @@ router.get("/shows/:concertId/league/:leagueId", async (req, res) => {
 // Requires the caller to be superadmin, global admin, or owner/admin of the league
 router.post("/adjustments", requireLeagueAdmin, async (req: any, res: any) => {
   try {
-    const { leagueId, concertId, songId, userId, originalPoints, adjustedPoints, reason } = req.body;
+    const { leagueId, concertId, songId, userId, occurrence, originalPoints, adjustedPoints, reason } = req.body;
     if (!leagueId || !concertId || !songId || !userId) {
       return res.status(400).json({ message: "leagueId, concertId, songId, userId are required" });
     }
     const adjustment = await storage.createPointAdjustment({
       leagueId, concertId, songId, userId,
+      occurrence: occurrence ?? 1,
       originalPoints: originalPoints ?? 0,
       adjustedPoints: adjustedPoints ?? 0,
       reason: reason || "",

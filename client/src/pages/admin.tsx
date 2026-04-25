@@ -40,6 +40,7 @@ export default function Admin() {
   const [adjustmentForm, setAdjustmentForm] = useState({
     songId: 0,
     userId: 0,
+    occurrence: 1,
     originalPoints: 0,
     adjustedPoints: 0,
     reason: ""
@@ -110,14 +111,13 @@ export default function Admin() {
       const data = await response.json();
       const adjustmentsArray = Array.isArray(data) ? data : [];
       
-      // Remove duplicates based on unique combination of songId, userId, concertId
-      const uniqueAdjustments = adjustmentsArray.filter((adjustment, index, self) => 
-        index === self.findIndex(a => 
-          a.songId === adjustment.songId && 
-          a.userId === adjustment.userId && 
-          a.concertId === adjustment.concertId
-        )
-      );
+      // Remove duplicates — keep the highest id for each (songId, userId, concertId, occurrence) combo
+      const adjDedupeMap = new Map<string, any>();
+      for (const a of adjustmentsArray) {
+        const key = `${a.songId}-${a.userId}-${a.concertId}-${a.occurrence ?? 1}`;
+        if (!adjDedupeMap.has(key) || a.id > adjDedupeMap.get(key).id) adjDedupeMap.set(key, a);
+      }
+      const uniqueAdjustments = Array.from(adjDedupeMap.values());
       
       return uniqueAdjustments;
     },
@@ -223,7 +223,7 @@ export default function Admin() {
       queryClient.invalidateQueries({ queryKey: [`/api/leagues/${selectedLeague}/standings`] });
       
       setIsAdjustmentDialogOpen(false);
-      setAdjustmentForm({ songId: 0, userId: 0, originalPoints: 0, adjustedPoints: 0, reason: "" });
+      setAdjustmentForm({ songId: 0, userId: 0, occurrence: 1, originalPoints: 0, adjustedPoints: 0, reason: "" });
       toast({
         title: "Point adjustment created",
         description: "Points have been successfully adjusted.",
@@ -365,6 +365,12 @@ export default function Admin() {
     },
   });
 
+  const ordinal = (n: number) => {
+    const s = ["th", "st", "nd", "rd"];
+    const v = n % 100;
+    return n + (s[(v - 20) % 10] || s[v] || s[0]);
+  };
+
   const calculateOriginalPoints = (performance: any) => {
     let points = 1; // Base point for being played
     if (performance.isSetOpener) points += 1; // First song of any set
@@ -379,24 +385,24 @@ export default function Admin() {
   // Calculate adjusted points for a specific user and song performance
   const calculateAdjustedPoints = (performance: any, userId: number) => {
     if (!adjustments || !Array.isArray(adjustments)) return calculateOriginalPoints(performance);
-    
-    const adjustment = adjustments.find((adj: any) => 
-      Number(adj.songId) === Number(performance.song.id) && 
+    const occ = performance.occurrence ?? 1;
+    const adjustment = adjustments.find((adj: any) =>
+      Number(adj.songId) === Number(performance.song.id) &&
       Number(adj.userId) === Number(userId) &&
-      Number(adj.concertId) === Number(selectedConcert)
+      Number(adj.concertId) === Number(selectedConcert) &&
+      (adj.occurrence ?? 1) === occ
     );
-    
     return adjustment ? adjustment.adjustedPoints : calculateOriginalPoints(performance);
-  }
+  };
 
-  // Get adjustment info for a specific user and song performance
   const getAdjustmentInfo = (performance: any, userId: number) => {
     if (!adjustments || !Array.isArray(adjustments)) return null;
-    
-    return adjustments.find((adj: any) => 
-      Number(adj.songId) === Number(performance.song.id) && 
+    const occ = performance.occurrence ?? 1;
+    return adjustments.find((adj: any) =>
+      Number(adj.songId) === Number(performance.song.id) &&
       Number(adj.userId) === Number(userId) &&
-      Number(adj.concertId) === Number(selectedConcert)
+      Number(adj.concertId) === Number(selectedConcert) &&
+      (adj.occurrence ?? 1) === occ
     );
   };
 
@@ -405,6 +411,7 @@ export default function Admin() {
     setAdjustmentForm({
       songId: performance.song?.id || performance.songId,
       userId: drafter.userId,
+      occurrence: performance.occurrence ?? 1,
       originalPoints,
       adjustedPoints: originalPoints,
       reason: ""
@@ -1317,6 +1324,11 @@ export default function Admin() {
                             <TableRow key={performance.id} className="border-gray-600">
                               <TableCell className="font-medium text-white">
                                 {performance.song.title}
+                                {performance.occurrence > 1 && (
+                                  <span className="ml-1 text-xs text-yellow-400 font-normal">
+                                    ({ordinal(performance.occurrence)} playing)
+                                  </span>
+                                )}
                               </TableCell>
                               <TableCell className="text-gray-300">
                                 Set {performance.setNumber}
@@ -1495,7 +1507,9 @@ export default function Admin() {
           <DialogHeader>
             <DialogTitle className="text-white">Adjust Points</DialogTitle>
             <DialogDescription className="text-gray-400">
-              Manually adjust the points awarded for this song performance.
+              {adjustmentForm.occurrence > 1
+                ? `Adjusting the ${ordinal(adjustmentForm.occurrence)} playing of this song.`
+                : "Manually adjust the points awarded for this song performance."}
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-4">

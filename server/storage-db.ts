@@ -93,17 +93,20 @@ export const storage = {
     concertId: number;
     songId: number;
     userId: number;
+    occurrence?: number;
     originalPoints: number;
     adjustedPoints: number;
     reason: string;
     adjustedBy: number;
   }) {
+    const occ = data.occurrence ?? 1;
     const [existing] = await db.select().from(pointAdjustments)
       .where(and(
         eq(pointAdjustments.leagueId, data.leagueId),
         eq(pointAdjustments.concertId, data.concertId),
         eq(pointAdjustments.songId, data.songId),
         eq(pointAdjustments.userId, data.userId),
+        eq(pointAdjustments.occurrence, occ),
       )).limit(1);
 
     const prevAdjusted = existing?.adjustedPoints ?? data.originalPoints;
@@ -117,7 +120,7 @@ export const storage = {
         .returning();
       record = updated;
     } else {
-      const [created] = await db.insert(pointAdjustments).values(data).returning();
+      const [created] = await db.insert(pointAdjustments).values({ ...data, occurrence: occ }).returning();
       record = created;
     }
 
@@ -703,6 +706,8 @@ export const storage = {
     // Fetch all setlists in parallel batches of 8 — avoids sequential 200ms pauses
     // that would push large seasons past Railway's 30s request timeout.
     const BATCH = 8;
+    // Map showDate string → cachedShows.id so we can match adjustments (which store concertId)
+    const showDateToId = new Map(shows.map(s => [new Date(s.showDate).toISOString().split("T")[0], s.id]));
     const showDates = shows.map(s => new Date(s.showDate).toISOString().split("T")[0]);
     const fetchedSetlists: Array<{ showDate: string; tracks: any[] } | null> = [];
 
@@ -722,8 +727,10 @@ export const storage = {
       fetchedSetlists.push(...results);
     }
 
-    // Compute all point deltas in memory — one DB write per drafted-song entry at the end
+    // Compute all point deltas in memory.
+    // showOccurrencePts[showId][titleLower][occurrence] = basePts for that specific playing.
     const pointDeltas = new Map<number, number>(); // draftedSong.id → total points earned
+    const showOccurrencePts = new Map<number, Record<string, Record<number, number>>>();
     let totalPoints = 0;
     let showsScored = 0;
     const setlistsToCache: Array<{ showDate: string; tracks: any[] }> = [];
@@ -731,6 +738,7 @@ export const storage = {
     for (const result of fetchedSetlists) {
       if (!result) continue;
       const { showDate, tracks: rawTracks } = result;
+      const showId = showDateToId.get(showDate);
 
       const firstPosBySet: Record<string, number> = {};
       for (const t of rawTracks) {
@@ -738,10 +746,14 @@ export const storage = {
         if (!(s in firstPosBySet) || t.position < firstPosBySet[s]) firstPosBySet[s] = t.position;
       }
 
+      // Count occurrences per title within this show for per-playing identification
+      const titleOccCount: Record<string, number> = {};
+      const thisPts: Record<string, Record<number, number>> = {};
+
       for (const t of rawTracks) {
         const title = (t.title || "").toLowerCase();
-        const entries = titleMap[title];
-        if (!entries || entries.length === 0) continue;
+        titleOccCount[title] = (titleOccCount[title] ?? 0) + 1;
+        const occ = titleOccCount[title];
 
         const setKey = t.set_name || "Set 1";
         const isEncore = setKey.toLowerCase().includes("encore");
@@ -756,17 +768,24 @@ export const storage = {
         if (mins >= 30)  pts += 1;
         if (mins >= 40)  pts += 1;
 
-        for (const entry of entries) {
-          pointDeltas.set(entry.id, (pointDeltas.get(entry.id) ?? 0) + pts);
-          totalPoints += pts;
+        if (!thisPts[title]) thisPts[title] = {};
+        thisPts[title][occ] = pts;
+
+        const entries = titleMap[title];
+        if (entries && entries.length > 0) {
+          for (const entry of entries) {
+            pointDeltas.set(entry.id, (pointDeltas.get(entry.id) ?? 0) + pts);
+            totalPoints += pts;
+          }
         }
       }
+
+      if (showId !== undefined) showOccurrencePts.set(showId, thisPts);
       showsScored++;
       setlistsToCache.push({ showDate, tracks: rawTracks });
     }
 
     console.log(`[scoreLeague] league=${leagueId} shows=${showsScored} totalPts=${totalPoints} entries=${pointDeltas.size}`);
-    // Collect per-user totals and unmapped song IDs for diagnostics
     const userPtsLog: Record<number, number> = {};
     const unmappedSongIds: number[] = [];
     for (const d of drafted) {
@@ -777,14 +796,14 @@ export const storage = {
     console.log(`[scoreLeague] per-user points:`, JSON.stringify(userPtsLog));
     if (unmappedSongIds.length) console.log(`[scoreLeague] unmapped songIds:`, unmappedSongIds);
 
-    // Write final points — one UPDATE per drafted-song entry (not per track)
+    // Write base points — one UPDATE per drafted-song entry
     for (const [entryId, delta] of pointDeltas) {
       await db.update(draftedSongs)
         .set({ points: delta })
         .where(eq(draftedSongs.id, entryId));
     }
 
-    // Cache all setlists for todayPoints computation in standings
+    // Cache all setlists for lastShowPoints computation in standings
     for (const { showDate, tracks } of setlistsToCache) {
       try {
         const trackTitles = tracks.map((t: any) => t.title || "");
@@ -797,40 +816,56 @@ export const storage = {
       } catch { /* non-critical */ }
     }
 
-    // Re-apply any manual point adjustments (scoring reset wiped them).
-    // Use adjustedPoints as an absolute override — the admin set the final desired value,
-    // so we SET rather than ADD a delta (delta approach breaks when base scoring changes).
+    // Re-apply manual point adjustments as per-occurrence deltas.
+    // Deduplicate by (songId, userId, concertId, occurrence) — keep highest id — so that
+    // duplicate legacy records don't compound. Each deduped adjustment replaces just that
+    // occurrence's base pts with the admin's override value.
     const adjustments = await db.select().from(pointAdjustments)
       .where(eq(pointAdjustments.leagueId, leagueId));
-    const adjsApplied: { username: string; song: string; base: number; override: number }[] = [];
-    // We need user IDs from adjustments to look up usernames
-    const adjUserIds = [...new Set(adjustments.map(a => a.userId).filter(Boolean))] as number[];
+
+    const adjDedupeMap = new Map<string, typeof adjustments[0]>();
+    for (const a of adjustments) {
+      const key = `${a.songId}-${a.userId}-${a.concertId}-${a.occurrence ?? 1}`;
+      if (!adjDedupeMap.has(key) || a.id > adjDedupeMap.get(key)!.id) adjDedupeMap.set(key, a);
+    }
+
+    const adjUserIds = [...new Set([...adjDedupeMap.values()].map(a => a.userId).filter(Boolean))] as number[];
     const adjUserRows = adjUserIds.length
       ? await db.select({ id: users.id, username: users.username }).from(users).where(inArray(users.id, adjUserIds))
       : [];
     const adjUsernameMap = new Map(adjUserRows.map(u => [u.id, u.username]));
+    const adjsApplied: { username: string; song: string; occ: number; base: number; override: number }[] = [];
 
-    for (const adj of adjustments) {
+    for (const adj of adjDedupeMap.values()) {
       if (!adj.userId) continue;
       const adjTitle = songIdToTitle.get(adj.songId);
       if (!adjTitle) {
-        console.log(`[scoreLeague] adjustment id=${adj.id} skipped — songId=${adj.songId} not in title map`);
+        console.log(`[scoreLeague] adj id=${adj.id} skipped — songId=${adj.songId} not in title map`);
         continue;
       }
+      const occ = adj.occurrence ?? 1;
+      // Base pts this occurrence earned in its specific show
+      const showPts = showOccurrencePts.get(adj.concertId);
+      const basePtsForOcc = showPts?.[adjTitle.toLowerCase()]?.[occ] ?? 0;
+      const delta = adj.adjustedPoints - basePtsForOcc;
+
       const userEntries = (titleMap[adjTitle.toLowerCase()] || []).filter(e => e.userId === adj.userId);
       for (const entry of userEntries) {
-        const basePoints = pointDeltas.get(entry.id) ?? 0;
+        const current = pointDeltas.get(entry.id) ?? 0;
+        const newPts = current + delta;
+        pointDeltas.set(entry.id, newPts);
         await db.update(draftedSongs)
-          .set({ points: adj.adjustedPoints })
+          .set({ points: newPts })
           .where(eq(draftedSongs.id, entry.id));
-        adjsApplied.push({
-          username: adjUsernameMap.get(adj.userId) ?? `user#${adj.userId}`,
-          song: adjTitle,
-          base: basePoints,
-          override: adj.adjustedPoints,
-        });
-        console.log(`[scoreLeague] adj id=${adj.id} user=${adj.userId} song="${adjTitle}" base=${basePoints} → override=${adj.adjustedPoints}`);
       }
+      adjsApplied.push({
+        username: adjUsernameMap.get(adj.userId) ?? `user#${adj.userId}`,
+        song: adjTitle,
+        occ,
+        base: basePtsForOcc,
+        override: adj.adjustedPoints,
+      });
+      console.log(`[scoreLeague] adj id=${adj.id} user=${adj.userId} song="${adjTitle}" occ=${occ} base=${basePtsForOcc} → override=${adj.adjustedPoints}`);
     }
 
     // Fetch usernames to make per-user breakdown human-readable

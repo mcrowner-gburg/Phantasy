@@ -152,6 +152,7 @@ export const pointAdjustments = pgTable("point_adjustments", {
   concertId: integer("concert_id").notNull(), // cachedShows.id — no FK, different table from concerts
   songId: integer("song_id").references(() => songs.id).notNull(),
   userId: integer("user_id").references(() => users.id), // User who drafted the song
+  occurrence: integer("occurrence").notNull().default(1), // Which playing of the song in the show (1 = first, 2 = second, etc.)
   originalPoints: integer("original_points").default(0),
   adjustedPoints: integer("adjusted_points").default(0),
   reason: text("reason"), // Admin note for the adjustment
