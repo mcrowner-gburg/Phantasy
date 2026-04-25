@@ -40,10 +40,9 @@ app.use(
   })
 );
 
-// ---------- HEALTH CHECK ----------
-app.get("/health", (_req, res) => {
-  res.json({ status: "ok", build: "2026-04-24-v3" });
-});
+// ---------- HEALTH / VERSION ----------
+app.get("/health", (_req, res) => res.json({ status: "ok", build: "2026-04-24-v3" }));
+app.get("/api/version", (_req, res) => res.json({ build: "2026-04-24-v3" }));
 
 // ---------- SERVE FRONTEND ----------
 const clientDistPath =

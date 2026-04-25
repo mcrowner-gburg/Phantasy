@@ -17326,9 +17326,8 @@ app.use(
     }
   })
 );
-app.get("/health", (_req, res) => {
-  res.json({ status: "ok", build: "2026-04-24-v3" });
-});
+app.get("/health", (_req, res) => res.json({ status: "ok", build: "2026-04-24-v3" }));
+app.get("/api/version", (_req, res) => res.json({ build: "2026-04-24-v3" }));
 var clientDistPath = process.env.CLIENT_DIST || import_path.default.resolve(process.cwd(), "server/dist/client");
 app.use(import_express2.default.static(clientDistPath));
 async function runMigrations() {
