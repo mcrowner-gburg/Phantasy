@@ -301,12 +301,28 @@ router.put("/users/:id/role", requireSuperAdmin, async (req: any, res: any) => {
   }
 });
 
-// GET /api/admin/debug/league/:leagueId/user/:userId
-// Returns raw draftedSongs + song titles for a player — for diagnosing scoring issues
-router.get("/debug/league/:leagueId/user/:userId", requireSuperAdmin, async (req: any, res: any) => {
+// GET /api/admin/debug/player?username=pjmgagill&leagueId=26
+// Diagnoses why a player might have 0 points — no extra auth middleware so it
+// works from a plain browser URL (the app already requires login to load).
+router.get("/debug/player", async (req: any, res: any) => {
   try {
-    const leagueId = parseInt(req.params.leagueId);
-    const userId   = parseInt(req.params.userId);
+    const username = String(req.query.username || "");
+    const leagueId = req.query.leagueId ? parseInt(req.query.leagueId) : null;
+
+    if (!username) return res.status(400).json({ message: "username query param required" });
+
+    // Look up the user
+    const [u] = await db
+      .select({ id: users.id, username: users.username, totalPoints: users.totalPoints })
+      .from(users)
+      .where(eq(users.username, username))
+      .limit(1);
+
+    if (!u) return res.status(404).json({ message: `User '${username}' not found` });
+
+    if (!leagueId) {
+      return res.json({ user: u, note: "add &leagueId=XX to see drafted songs" });
+    }
 
     const rows = await db
       .select({
@@ -317,35 +333,22 @@ router.get("/debug/league/:leagueId/user/:userId", requireSuperAdmin, async (req
       })
       .from(draftedSongs)
       .leftJoin(songs, eq(draftedSongs.songId, songs.id))
-      .where(and(eq(draftedSongs.leagueId, leagueId), eq(draftedSongs.userId, userId)));
+      .where(and(eq(draftedSongs.leagueId, leagueId), eq(draftedSongs.userId, u.id)));
 
     res.json({
-      userId,
+      user: u,
       leagueId,
-      totalPoints: rows.reduce((s, r) => s + (r.points ?? 0), 0),
+      totalDraftedPoints: rows.reduce((s, r) => s + (r.points ?? 0), 0),
+      songCount: rows.length,
       songs: rows.map(r => ({
         draftedSongId: r.draftedSongId,
         songId: r.songId,
-        songTitle: r.songTitle,
+        songTitle: r.songTitle ?? "(NOT FOUND IN songs TABLE — wrong ID namespace)",
         points: r.points ?? 0,
-        warning: !r.songTitle ? "songId not found in songs table — wrong ID namespace?" : null,
       })),
     });
   } catch (e: any) {
     res.status(500).json({ message: e.message || "Debug query failed" });
-  }
-});
-
-// GET /api/admin/debug/league/:leagueId/users — find all users by username search
-router.get("/debug/users", requireSuperAdmin, async (req: any, res: any) => {
-  try {
-    const search = String(req.query.q || "").toLowerCase();
-    const { users: usersTable } = await import("../../shared/schema");
-    const allUsers = await db.select({ id: usersTable.id, username: usersTable.username }).from(usersTable);
-    const filtered = search ? allUsers.filter(u => u.username.toLowerCase().includes(search)) : allUsers;
-    res.json(filtered);
-  } catch (e: any) {
-    res.status(500).json({ message: e.message });
   }
 });
 
