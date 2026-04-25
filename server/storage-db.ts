@@ -904,7 +904,12 @@ export const storage = {
       ? new Date(league.seasonEndDate).toISOString().split('T')[0] : null;
     const todayStr = new Date().toISOString().split('T')[0];
 
-    const allSetlistRows = await db.select({ showDate: cachedSetlists.showDate }).from(cachedSetlists);
+    // Only consider setlists that have actual track data (non-empty array).
+    // An empty cached entry (0 tracks) would otherwise shadow an older real setlist.
+    const allSetlistRows = await db
+      .select({ showDate: cachedSetlists.showDate })
+      .from(cachedSetlists)
+      .where(sql`jsonb_array_length(${cachedSetlists.setlistData}) > 0`);
     const recentShowDate = allSetlistRows
       .map(r => r.showDate)
       .filter(d => {
