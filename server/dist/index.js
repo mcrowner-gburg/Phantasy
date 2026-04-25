@@ -17325,6 +17325,7 @@ async function registerRoutes(app2) {
 }
 
 // index.ts
+var import_fs = __toESM(require("fs"));
 import_serverless2.neonConfig.webSocketConstructor = import_ws2.default;
 var pool2 = new import_serverless2.Pool({
   connectionString: process.env.DATABASE_URL
@@ -17352,7 +17353,14 @@ app.use(
 );
 app.get("/health", (_req, res) => res.json({ status: "ok", build: "2026-04-24-v3" }));
 app.get("/api/version", (_req, res) => res.json({ build: "2026-04-24-v3" }));
-var clientDistPath = process.env.CLIENT_DIST || import_path.default.resolve(process.cwd(), "server/dist/client");
+var preferredPath = process.env.CLIENT_DIST || import_path.default.resolve(process.cwd(), "server/dist/client");
+var fallbackPath = import_path.default.resolve(process.cwd(), "client/dist");
+var clientDistPath = import_fs.default.existsSync(import_path.default.join(preferredPath, "index.html")) ? preferredPath : fallbackPath;
+console.log(`[startup] clientDistPath=${clientDistPath} exists=${import_fs.default.existsSync(clientDistPath)}`);
+if (import_fs.default.existsSync(clientDistPath)) {
+  const files = import_fs.default.readdirSync(clientDistPath);
+  console.log(`[startup] client files: ${files.join(", ")}`);
+}
 app.use(import_express2.default.static(clientDistPath));
 async function runMigrations() {
   const client = await pool2.connect();

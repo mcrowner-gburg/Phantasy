@@ -45,8 +45,19 @@ app.get("/health", (_req, res) => res.json({ status: "ok", build: "2026-04-24-v3
 app.get("/api/version", (_req, res) => res.json({ build: "2026-04-24-v3" }));
 
 // ---------- SERVE FRONTEND ----------
-const clientDistPath =
-  process.env.CLIENT_DIST || path.resolve(process.cwd(), "server/dist/client");
+// Try server/dist/client first, fall back to client/dist (in case build phase
+// files aren't preserved to the runtime container by Nixpacks)
+import fs from "fs";
+const preferredPath = process.env.CLIENT_DIST || path.resolve(process.cwd(), "server/dist/client");
+const fallbackPath = path.resolve(process.cwd(), "client/dist");
+const clientDistPath = fs.existsSync(path.join(preferredPath, "index.html"))
+  ? preferredPath
+  : fallbackPath;
+console.log(`[startup] clientDistPath=${clientDistPath} exists=${fs.existsSync(clientDistPath)}`);
+if (fs.existsSync(clientDistPath)) {
+  const files = fs.readdirSync(clientDistPath);
+  console.log(`[startup] client files: ${files.join(", ")}`);
+}
 
 app.use(express.static(clientDistPath));
 
