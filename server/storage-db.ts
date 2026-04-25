@@ -895,28 +895,29 @@ export const storage = {
       for (const r of cachedRows) standingSongTitleById.set(r.id, r.title);
     }
 
-    // Find the most recent completed show in the league's season to compute todayPoints
+    // Find the most recent scored show from cachedSetlists (populated by scoreLeague).
+    // Using cachedSetlists rather than cachedShows means this works without a separate
+    // "Refresh Shows" admin step — any scored show is automatically eligible.
     const seasonStartStr = league?.seasonStartDate
       ? new Date(league.seasonStartDate).toISOString().split('T')[0] : null;
     const seasonEndStr = league?.seasonEndDate
       ? new Date(league.seasonEndDate).toISOString().split('T')[0] : null;
     const todayStr = new Date().toISOString().split('T')[0];
 
-    const allCachedShows = await this.getCachedShows();
-    const recentShow = allCachedShows
-      .filter(s => {
-        const d = new Date(s.showDate).toISOString().split('T')[0];
+    const allSetlistRows = await db.select({ showDate: cachedSetlists.showDate }).from(cachedSetlists);
+    const recentShowDate = allSetlistRows
+      .map(r => r.showDate)
+      .filter(d => {
         if (seasonStartStr && d < seasonStartStr) return false;
         if (seasonEndStr && d > seasonEndStr) return false;
-        if (d >= todayStr) return false;
+        if (d > todayStr) return false; // exclude future shows; today's show is ok
         return true;
       })
-      .sort((a, b) => new Date(b.showDate).getTime() - new Date(a.showDate).getTime())[0];
+      .sort((a, b) => b.localeCompare(a))[0];
 
-    // Build a todayPoints map using the cached setlist for the most recent show
+    // Build a lastShowPoints map using the cached setlist for the most recent show
     const todayPointsByUser = new Map<number, number>();
-    if (recentShow) {
-      const recentShowDate = new Date(recentShow.showDate).toISOString().split('T')[0];
+    if (recentShowDate) {
       const cachedSetlist = await this.getCachedSetlist(recentShowDate);
       if (cachedSetlist?.setlistData) {
         const tracks = cachedSetlist.setlistData as any[];
