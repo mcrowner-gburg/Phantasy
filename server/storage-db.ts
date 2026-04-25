@@ -921,6 +921,7 @@ export const storage = {
     const todayPointsByUser = new Map<number, number>();
     if (recentShowDate) {
       const cachedSetlist = await this.getCachedSetlist(recentShowDate);
+      console.log(`[standings] setlistData=${cachedSetlist ? (Array.isArray(cachedSetlist.setlistData) ? (cachedSetlist.setlistData as any[]).length + ' tracks' : typeof cachedSetlist.setlistData) : 'null'}`);
       if (cachedSetlist?.setlistData) {
         const tracks = cachedSetlist.setlistData as any[];
         const firstPosBySet: Record<string, number> = {};
@@ -943,6 +944,7 @@ export const storage = {
           if (mins >= 40) pts += 1;
           trackPtsMap[title] = (trackPtsMap[title] ?? 0) + pts;
         }
+        console.log(`[standings] trackPtsMap keys: ${Object.keys(trackPtsMap).join(', ')}`);
         for (const [userId, drafts] of draftsByUser) {
           let userTodayPts = 0;
           for (const d of drafts) {
