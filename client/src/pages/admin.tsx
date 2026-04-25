@@ -1440,7 +1440,7 @@ export default function Admin() {
                     <div key={adjustment.id} className="bg-black bg-opacity-30 p-4 rounded-lg border border-gray-600">
                       <div className="flex justify-between items-start">
                         <div>
-                          <h4 className="font-bold text-white">{adjustment.song.title}</h4>
+                          <h4 className="font-bold text-white">{adjustment.song?.title ?? `Song #${adjustment.songId}`}</h4>
                           <p className="text-gray-300">
                             User: {adjustment.user?.username || "Unknown"} | 
                             Points: {adjustment.originalPoints} → {adjustment.adjustedPoints}

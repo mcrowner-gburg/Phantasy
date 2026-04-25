@@ -136,11 +136,32 @@ export const storage = {
   },
 
   async getPointAdjustments(leagueId: number, concertId?: number) {
-    if (concertId) {
-      return db.select().from(pointAdjustments)
-        .where(and(eq(pointAdjustments.leagueId, leagueId), eq(pointAdjustments.concertId, concertId)));
-    }
-    return db.select().from(pointAdjustments).where(eq(pointAdjustments.leagueId, leagueId));
+    const rows = concertId
+      ? await db.select().from(pointAdjustments)
+          .where(and(eq(pointAdjustments.leagueId, leagueId), eq(pointAdjustments.concertId, concertId)))
+      : await db.select().from(pointAdjustments).where(eq(pointAdjustments.leagueId, leagueId));
+
+    if (rows.length === 0) return rows;
+
+    const songIds = [...new Set(rows.map(r => r.songId).filter(Boolean))] as number[];
+    const userIds = [...new Set([
+      ...rows.map(r => r.userId).filter(Boolean),
+      ...rows.map(r => r.adjustedBy).filter(Boolean),
+    ])] as number[];
+
+    const [songRows, userRows] = await Promise.all([
+      songIds.length ? db.select({ id: songs.id, title: songs.title }).from(songs).where(inArray(songs.id, songIds)) : [],
+      userIds.length ? db.select({ id: users.id, username: users.username }).from(users).where(inArray(users.id, userIds)) : [],
+    ]);
+    const songMap = new Map(songRows.map(s => [s.id, s]));
+    const userMap = new Map(userRows.map(u => [u.id, u]));
+
+    return rows.map(r => ({
+      ...r,
+      song: r.songId ? songMap.get(r.songId) ?? null : null,
+      user: r.userId ? userMap.get(r.userId) ?? null : null,
+      adjustedByUser: r.adjustedBy ? userMap.get(r.adjustedBy) ?? null : null,
+    }));
   },
 
   async deleteUser(userId: number): Promise<void> {
