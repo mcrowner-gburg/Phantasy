@@ -845,7 +845,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Refresh shows cache first so recent shows are included in scoring
       await cacheService.getCachedShows(true);
       const result = await storage.scoreLeague(leagueId);
-      res.json({ message: "Scoring complete", ...result });
+      res.json({ message: "Scoring complete", shows: result.shows, points: result.points, perUser: result.perUser, unmappedSongIds: result.unmappedSongIds });
     } catch (error: any) {
       console.error("Score league error:", error);
       res.status(500).json({ message: error.message || "Failed to score league" });

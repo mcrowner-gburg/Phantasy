@@ -352,7 +352,9 @@ export default function Admin() {
     },
     onSuccess: (data: any) => {
       queryClient.invalidateQueries({ queryKey: [`/api/leagues/${selectedLeague}/standings`] });
-      toast({ title: "Scores recalculated", description: `${data.shows} shows scored, ${data.points} total points` });
+      const unmapped = data.unmappedSongIds?.length ? ` ⚠️ ${data.unmappedSongIds.length} unmapped song IDs.` : "";
+      const perUser = data.perUser ? ` Players: ${Object.entries(data.perUser).map(([u, p]) => `${u}=${p}`).join(", ")}` : "";
+      toast({ title: "Scores recalculated", description: `${data.shows} shows scored, ${data.points} total points.${unmapped}${perUser}` });
     },
     onError: (error: any) => {
       toast({ title: "Failed to recalculate scores", description: error.message, variant: "destructive" });

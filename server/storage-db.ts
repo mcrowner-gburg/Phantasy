@@ -766,13 +766,16 @@ export const storage = {
     }
 
     console.log(`[scoreLeague] league=${leagueId} shows=${showsScored} totalPts=${totalPoints} entries=${pointDeltas.size}`);
-    // Log per-user totals to help diagnose zero-point players
+    // Collect per-user totals and unmapped song IDs for diagnostics
     const userPtsLog: Record<number, number> = {};
+    const unmappedSongIds: number[] = [];
     for (const d of drafted) {
       if (!d.userId) continue;
       userPtsLog[d.userId] = (userPtsLog[d.userId] ?? 0) + (pointDeltas.get(d.id) ?? 0);
+      if (d.songId && !songIdToTitle.has(d.songId)) unmappedSongIds.push(d.songId);
     }
     console.log(`[scoreLeague] per-user points:`, JSON.stringify(userPtsLog));
+    if (unmappedSongIds.length) console.log(`[scoreLeague] unmapped songIds:`, unmappedSongIds);
 
     // Write final points — one UPDATE per drafted-song entry (not per track)
     for (const [entryId, delta] of pointDeltas) {
@@ -812,7 +815,17 @@ export const storage = {
       }
     }
 
-    return { shows: showsScored, points: totalPoints };
+    // Fetch usernames to make per-user breakdown human-readable
+    const scoredUserIds = Object.keys(userPtsLog).map(Number);
+    const usernameRows = scoredUserIds.length
+      ? await db.select({ id: users.id, username: users.username }).from(users).where(inArray(users.id, scoredUserIds))
+      : [];
+    const usernameMap = new Map(usernameRows.map(u => [u.id, u.username]));
+    const perUser = Object.fromEntries(
+      scoredUserIds.map(uid => [usernameMap.get(uid) ?? `user#${uid}`, userPtsLog[uid]])
+    );
+
+    return { shows: showsScored, points: totalPoints, perUser, unmappedSongIds };
   },
 
   // ==================== ACTIVITIES ====================
