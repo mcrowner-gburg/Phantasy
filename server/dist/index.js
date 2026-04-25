@@ -1171,7 +1171,6 @@ var init_storage_db = __esm({
         const seasonStartStr = league?.seasonStartDate ? new Date(league.seasonStartDate).toISOString().split("T")[0] : null;
         const seasonEndStr = league?.seasonEndDate ? new Date(league.seasonEndDate).toISOString().split("T")[0] : null;
         const allCachedShows = await this.getCachedShows();
-        console.log(`[standings] league=${leagueId} season=${seasonStartStr}..${seasonEndStr} allShows=${allCachedShows.length}`);
         const recentShow = allCachedShows.filter((s) => {
           const d = new Date(s.showDate).toISOString().split("T")[0];
           if (seasonStartStr && d < seasonStartStr)
@@ -1180,40 +1179,13 @@ var init_storage_db = __esm({
             return false;
           return true;
         }).sort((a, b) => new Date(b.showDate).getTime() - new Date(a.showDate).getTime())[0];
-        console.log(`[standings] recentShow=${recentShow ? new Date(recentShow.showDate).toISOString().split("T")[0] : "none"}`);
         const todayPointsByUser = /* @__PURE__ */ new Map();
         let lastShowDate = null;
         if (recentShow) {
           lastShowDate = new Date(recentShow.showDate).toISOString().split("T")[0];
-          let tracks = null;
           const cachedSetlist = await this.getCachedSetlist(lastShowDate);
-          console.log(`[standings] cachedSetlist for ${lastShowDate}: ${cachedSetlist ? `found, tracks=${cachedSetlist.setlistData?.length ?? 0}` : "not found"}`);
-          if (cachedSetlist?.setlistData) {
-            tracks = cachedSetlist.setlistData;
-          } else {
-            try {
-              const res = await fetch(`https://phish.in/api/v2/shows/${lastShowDate}`, {
-                headers: { Accept: "application/json" }
-              });
-              console.log(`[standings] live fetch ${lastShowDate}: status=${res.status}`);
-              if (res.ok) {
-                const data = await res.json();
-                tracks = data.tracks?.length > 0 ? data.tracks : null;
-                console.log(`[standings] live fetch tracks=${tracks?.length ?? 0}`);
-                if (tracks) {
-                  const trackTitles = tracks.map((t) => t.title || "");
-                  await db.insert(cachedSetlists).values({ showDate: lastShowDate, setlistData: tracks, songs: trackTitles }).onConflictDoUpdate({
-                    target: cachedSetlists.showDate,
-                    set: { setlistData: tracks, songs: trackTitles, cachedAt: /* @__PURE__ */ new Date() }
-                  });
-                }
-              }
-            } catch (e) {
-              console.log(`[standings] live fetch error:`, e);
-            }
-          }
-          if (tracks) {
-            console.log(`[standings] computing lastShowPts from ${tracks.length} tracks, draftsByUser size=${draftsByUser.size}`);
+          const tracks = cachedSetlist?.setlistData;
+          if (tracks?.length) {
             const firstPosBySet = {};
             for (const t of tracks) {
               const s = t.set_name || "Set 1";
@@ -1240,21 +1212,16 @@ var init_storage_db = __esm({
                 pts += 1;
               trackPtsMap[title] = (trackPtsMap[title] ?? 0) + pts;
             }
-            console.log(`[standings] trackPtsMap keys (played):`, Object.keys(trackPtsMap).join(", "));
             for (const [userId, drafts] of draftsByUser) {
               let userLastShowPts = 0;
               for (const d of drafts) {
                 if (!d.songId)
                   continue;
                 const title = (standingSongTitleById.get(d.songId) || "").toLowerCase();
-                const pts = trackPtsMap[title] ?? 0;
-                if (pts > 0)
-                  console.log(`[standings] user=${userId} song="${title}" lastShowPts=${pts}`);
-                userLastShowPts += pts;
+                userLastShowPts += trackPtsMap[title] ?? 0;
               }
               todayPointsByUser.set(userId, userLastShowPts);
             }
-            console.log(`[standings] todayPointsByUser:`, Object.fromEntries(todayPointsByUser));
           }
         }
         const standings = [];

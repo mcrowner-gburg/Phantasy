@@ -903,7 +903,6 @@ export const storage = {
       ? new Date(league.seasonEndDate).toISOString().split('T')[0] : null;
 
     const allCachedShows = await this.getCachedShows();
-    console.log(`[standings] league=${leagueId} season=${seasonStartStr}..${seasonEndStr} allShows=${allCachedShows.length}`);
     const recentShow = allCachedShows
       .filter(s => {
         const d = new Date(s.showDate).toISOString().split('T')[0];
@@ -913,47 +912,15 @@ export const storage = {
       })
       .sort((a, b) => new Date(b.showDate).getTime() - new Date(a.showDate).getTime())[0];
 
-    console.log(`[standings] recentShow=${recentShow ? new Date(recentShow.showDate).toISOString().split('T')[0] : 'none'}`);
-
-    // Build a lastShowPoints map using the cached setlist, falling back to live phish.in fetch
+    // Build a lastShowPoints map using only the already-cached setlist.
+    // Scoring caches setlists when it runs — no live fetch here to keep response fast.
     const todayPointsByUser = new Map<number, number>();
     let lastShowDate: string | null = null;
     if (recentShow) {
       lastShowDate = new Date(recentShow.showDate).toISOString().split('T')[0];
-      let tracks: any[] | null = null;
-
       const cachedSetlist = await this.getCachedSetlist(lastShowDate);
-      console.log(`[standings] cachedSetlist for ${lastShowDate}: ${cachedSetlist ? `found, tracks=${(cachedSetlist.setlistData as any[])?.length ?? 0}` : 'not found'}`);
-      if (cachedSetlist?.setlistData) {
-        tracks = cachedSetlist.setlistData as any[];
-      } else {
-        // Not yet cached — fetch live and cache it for next time
-        try {
-          const res = await fetch(`https://phish.in/api/v2/shows/${lastShowDate}`, {
-            headers: { Accept: "application/json" },
-          });
-          console.log(`[standings] live fetch ${lastShowDate}: status=${res.status}`);
-          if (res.ok) {
-            const data = await res.json();
-            tracks = data.tracks?.length > 0 ? data.tracks : null;
-            console.log(`[standings] live fetch tracks=${tracks?.length ?? 0}`);
-            if (tracks) {
-              const trackTitles = tracks.map((t: any) => t.title || "");
-              await db.insert(cachedSetlists)
-                .values({ showDate: lastShowDate, setlistData: tracks, songs: trackTitles })
-                .onConflictDoUpdate({
-                  target: cachedSetlists.showDate,
-                  set: { setlistData: tracks, songs: trackTitles, cachedAt: new Date() },
-                });
-            }
-          }
-        } catch (e) {
-          console.log(`[standings] live fetch error:`, e);
-        }
-      }
-
-      if (tracks) {
-        console.log(`[standings] computing lastShowPts from ${tracks.length} tracks, draftsByUser size=${draftsByUser.size}`);
+      const tracks = cachedSetlist?.setlistData as any[] | null;
+      if (tracks?.length) {
         const firstPosBySet: Record<string, number> = {};
         for (const t of tracks) {
           const s = t.set_name || "Set 1";
@@ -974,19 +941,15 @@ export const storage = {
           if (mins >= 40) pts += 1;
           trackPtsMap[title] = (trackPtsMap[title] ?? 0) + pts;
         }
-        console.log(`[standings] trackPtsMap keys (played):`, Object.keys(trackPtsMap).join(", "));
         for (const [userId, drafts] of draftsByUser) {
           let userLastShowPts = 0;
           for (const d of drafts) {
             if (!d.songId) continue;
             const title = (standingSongTitleById.get(d.songId) || "").toLowerCase();
-            const pts = trackPtsMap[title] ?? 0;
-            if (pts > 0) console.log(`[standings] user=${userId} song="${title}" lastShowPts=${pts}`);
-            userLastShowPts += pts;
+            userLastShowPts += trackPtsMap[title] ?? 0;
           }
           todayPointsByUser.set(userId, userLastShowPts);
         }
-        console.log(`[standings] todayPointsByUser:`, Object.fromEntries(todayPointsByUser));
       }
     }
 
