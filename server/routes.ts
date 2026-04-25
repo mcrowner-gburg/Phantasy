@@ -24,6 +24,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
   setupAuth(app);
 
 
+  // Version probe — used to confirm Railway deployed the latest build
+  app.get("/api/version", (_req, res) => res.json({ build: "2026-04-24-v3" }));
+
   // Admin routes
   app.use("/api/admin", adminRoutes);
 
