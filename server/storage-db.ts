@@ -915,6 +915,8 @@ export const storage = {
       })
       .sort((a, b) => b.localeCompare(a))[0];
 
+    console.log(`[standings] leagueId=${leagueId} season=${seasonStartStr}→${seasonEndStr} today=${todayStr} setlistRows=${allSetlistRows.length} recentShowDate=${recentShowDate}`);
+
     // Build a lastShowPoints map using the cached setlist for the most recent show
     const todayPointsByUser = new Map<number, number>();
     if (recentShowDate) {
