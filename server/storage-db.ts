@@ -706,8 +706,11 @@ export const storage = {
     // Fetch all setlists in parallel batches of 8 — avoids sequential 200ms pauses
     // that would push large seasons past Railway's 30s request timeout.
     const BATCH = 8;
-    // Map showDate string → cachedShows.id so we can match adjustments (which store concertId)
-    const showDateToId = new Map(shows.map(s => [new Date(s.showDate).toISOString().split("T")[0], s.id]));
+    // Map cachedShows.id → showDate string (all shows, not just season) so we can resolve
+    // adj.concertId back to a date. Keying showOccurrencePts by date avoids mismatches
+    // when the DB has duplicate cachedShows rows for the same date (admin dedup picks
+    // a different id than the one scoreLeague would map to).
+    const showIdToDate = new Map(allShows.map((s: any) => [s.id, new Date(s.showDate).toISOString().split("T")[0]]));
     const showDates = shows.map(s => new Date(s.showDate).toISOString().split("T")[0]);
     const fetchedSetlists: Array<{ showDate: string; tracks: any[] } | null> = [];
 
@@ -728,9 +731,10 @@ export const storage = {
     }
 
     // Compute all point deltas in memory.
-    // showOccurrencePts[showId][titleLower][occurrence] = basePts for that specific playing.
+    // showOccurrencePts[showDateStr][titleLower][occurrence] = basePts for that specific playing.
+    // Keyed by date string to avoid ID mismatches when duplicate cachedShows rows exist.
     const pointDeltas = new Map<number, number>(); // draftedSong.id → total points earned
-    const showOccurrencePts = new Map<number, Record<string, Record<number, number>>>();
+    const showOccurrencePts = new Map<string, Record<string, Record<number, number>>>();
     let totalPoints = 0;
     let showsScored = 0;
     const setlistsToCache: Array<{ showDate: string; tracks: any[] }> = [];
@@ -738,7 +742,6 @@ export const storage = {
     for (const result of fetchedSetlists) {
       if (!result) continue;
       const { showDate, tracks: rawTracks } = result;
-      const showId = showDateToId.get(showDate);
 
       const firstPosBySet: Record<string, number> = {};
       for (const t of rawTracks) {
@@ -780,7 +783,7 @@ export const storage = {
         }
       }
 
-      if (showId !== undefined) showOccurrencePts.set(showId, thisPts);
+      showOccurrencePts.set(showDate, thisPts);
       showsScored++;
       setlistsToCache.push({ showDate, tracks: rawTracks });
     }
@@ -844,8 +847,10 @@ export const storage = {
         continue;
       }
       const occ = adj.occurrence ?? 1;
-      // Base pts this occurrence earned in its specific show
-      const showPts = showOccurrencePts.get(adj.concertId);
+      // Resolve concertId → date string, then look up per-occurrence base pts.
+      // Using date avoids ID mismatches when duplicate cachedShows rows exist.
+      const adjShowDate = showIdToDate.get(adj.concertId);
+      const showPts = adjShowDate ? showOccurrencePts.get(adjShowDate) : undefined;
       const basePtsForOcc = showPts?.[adjTitle.toLowerCase()]?.[occ] ?? 0;
       const delta = adj.adjustedPoints - basePtsForOcc;
 
