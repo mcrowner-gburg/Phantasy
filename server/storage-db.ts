@@ -703,14 +703,39 @@ export const storage = {
       titleMap[key].push(d);
     }
 
-    // Fetch all setlists in parallel batches of 8 — avoids sequential 200ms pauses
-    // that would push large seasons past Railway's 30s request timeout.
-    const BATCH = 8;
-    // Map cachedShows.id → showDate string (all shows, not just season) so we can resolve
-    // adj.concertId back to a date. Keying showOccurrencePts by date avoids mismatches
-    // when the DB has duplicate cachedShows rows for the same date (admin dedup picks
-    // a different id than the one scoreLeague would map to).
+    // Map cachedShows.id → showDate string for resolving adjustment concertIds.
+    // Use allShows (not just season-filtered) so any stored concertId can be resolved.
     const showIdToDate = new Map(allShows.map((s: any) => [s.id, new Date(s.showDate).toISOString().split("T")[0]]));
+
+    // Fetch and deduplicate adjustments before scoring so they can be applied inline.
+    // Dedup keeps the highest id per (songId, userId, concertId, occurrence).
+    const allAdjustments = await db.select().from(pointAdjustments)
+      .where(eq(pointAdjustments.leagueId, leagueId));
+    const adjDedupeMap = new Map<string, typeof allAdjustments[0]>();
+    for (const a of allAdjustments) {
+      const key = `${a.songId}-${a.userId}-${a.concertId}-${a.occurrence ?? 1}`;
+      if (!adjDedupeMap.has(key) || a.id > adjDedupeMap.get(key)!.id) adjDedupeMap.set(key, a);
+    }
+
+    // Build lookup: "showDate:titleLower:userId:occ" → adjustedPoints
+    // When a track occurrence matches this key we use the override instead of base pts.
+    const adjustmentLookup = new Map<string, number>();
+    for (const adj of adjDedupeMap.values()) {
+      if (!adj.userId) continue;
+      const adjTitle = songIdToTitle.get(adj.songId)?.toLowerCase();
+      if (!adjTitle) continue;
+      const adjShowDate = showIdToDate.get(adj.concertId);
+      if (!adjShowDate) {
+        console.log(`[scoreLeague] adj id=${adj.id} skipped — concertId=${adj.concertId} not in showIdToDate`);
+        continue;
+      }
+      const occ = adj.occurrence ?? 1;
+      adjustmentLookup.set(`${adjShowDate}:${adjTitle}:${adj.userId}:${occ}`, adj.adjustedPoints);
+      console.log(`[scoreLeague] adj id=${adj.id} queued: show=${adjShowDate} song="${adjTitle}" userId=${adj.userId} occ=${occ} → ${adj.adjustedPoints}pts`);
+    }
+
+    // Fetch setlists in parallel batches of 8.
+    const BATCH = 8;
     const showDates = shows.map(s => new Date(s.showDate).toISOString().split("T")[0]);
     const fetchedSetlists: Array<{ showDate: string; tracks: any[] } | null> = [];
 
@@ -730,11 +755,11 @@ export const storage = {
       fetchedSetlists.push(...results);
     }
 
-    // Compute all point deltas in memory.
-    // showOccurrencePts[showDateStr][titleLower][occurrence] = basePts for that specific playing.
-    // Keyed by date string to avoid ID mismatches when duplicate cachedShows rows exist.
-    const pointDeltas = new Map<number, number>(); // draftedSong.id → total points earned
-    const showOccurrencePts = new Map<string, Record<string, Record<number, number>>>();
+    // Score every track. For each drafter, check adjustmentLookup first;
+    // if an override exists for this exact (show, song, user, occurrence) use it,
+    // otherwise use the base point calculation.
+    const pointDeltas = new Map<number, number>(); // draftedSong.id → final points
+    const adjsApplied: { username: string; song: string; occ: number; base: number; override: number }[] = [];
     let totalPoints = 0;
     let showsScored = 0;
     const setlistsToCache: Array<{ showDate: string; tracks: any[] }> = [];
@@ -749,9 +774,7 @@ export const storage = {
         if (!(s in firstPosBySet) || t.position < firstPosBySet[s]) firstPosBySet[s] = t.position;
       }
 
-      // Count occurrences per title within this show for per-playing identification
       const titleOccCount: Record<string, number> = {};
-      const thisPts: Record<string, Record<number, number>> = {};
 
       for (const t of rawTracks) {
         const title = (t.title || "").toLowerCase();
@@ -764,45 +787,40 @@ export const storage = {
         const durationSecs = t.duration ? Math.round(t.duration / 1000) : 0;
         const mins = durationSecs / 60;
 
-        let pts = 1;
-        if (isSetOpener) pts += 1;
-        if (isEncore)    pts += 1;
-        if (mins >= 20)  pts += 1;
-        if (mins >= 30)  pts += 1;
-        if (mins >= 40)  pts += 1;
-
-        if (!thisPts[title]) thisPts[title] = {};
-        thisPts[title][occ] = pts;
+        let basePts = 1;
+        if (isSetOpener) basePts += 1;
+        if (isEncore)    basePts += 1;
+        if (mins >= 20)  basePts += 1;
+        if (mins >= 30)  basePts += 1;
+        if (mins >= 40)  basePts += 1;
 
         const entries = titleMap[title];
         if (entries && entries.length > 0) {
           for (const entry of entries) {
+            const adjKey = `${showDate}:${title}:${entry.userId}:${occ}`;
+            const pts = adjustmentLookup.has(adjKey) ? adjustmentLookup.get(adjKey)! : basePts;
+            if (adjustmentLookup.has(adjKey)) {
+              console.log(`[scoreLeague] override: show=${showDate} song="${title}" occ=${occ} base=${basePts} → ${pts}pts`);
+              adjsApplied.push({ username: String(entry.userId), song: title, occ, base: basePts, override: pts });
+            }
             pointDeltas.set(entry.id, (pointDeltas.get(entry.id) ?? 0) + pts);
             totalPoints += pts;
           }
         }
       }
 
-      showOccurrencePts.set(showDate, thisPts);
       showsScored++;
       setlistsToCache.push({ showDate, tracks: rawTracks });
     }
 
-    console.log(`[scoreLeague] league=${leagueId} shows=${showsScored} totalPts=${totalPoints} entries=${pointDeltas.size}`);
-    const userPtsLog: Record<number, number> = {};
+    // Write final points — one UPDATE per drafted-song entry
     const unmappedSongIds: number[] = [];
     for (const d of drafted) {
-      if (!d.userId) continue;
-      userPtsLog[d.userId] = (userPtsLog[d.userId] ?? 0) + (pointDeltas.get(d.id) ?? 0);
       if (d.songId && !songIdToTitle.has(d.songId)) unmappedSongIds.push(d.songId);
     }
-    console.log(`[scoreLeague] per-user points:`, JSON.stringify(userPtsLog));
-    if (unmappedSongIds.length) console.log(`[scoreLeague] unmapped songIds:`, unmappedSongIds);
-
-    // Write base points — one UPDATE per drafted-song entry
-    for (const [entryId, delta] of pointDeltas) {
+    for (const [entryId, pts] of pointDeltas) {
       await db.update(draftedSongs)
-        .set({ points: delta })
+        .set({ points: pts })
         .where(eq(draftedSongs.id, entryId));
     }
 
@@ -819,61 +837,16 @@ export const storage = {
       } catch { /* non-critical */ }
     }
 
-    // Re-apply manual point adjustments as per-occurrence deltas.
-    // Deduplicate by (songId, userId, concertId, occurrence) — keep highest id — so that
-    // duplicate legacy records don't compound. Each deduped adjustment replaces just that
-    // occurrence's base pts with the admin's override value.
-    const adjustments = await db.select().from(pointAdjustments)
-      .where(eq(pointAdjustments.leagueId, leagueId));
-
-    const adjDedupeMap = new Map<string, typeof adjustments[0]>();
-    for (const a of adjustments) {
-      const key = `${a.songId}-${a.userId}-${a.concertId}-${a.occurrence ?? 1}`;
-      if (!adjDedupeMap.has(key) || a.id > adjDedupeMap.get(key)!.id) adjDedupeMap.set(key, a);
+    // Build per-user breakdown for the toast summary
+    const userPtsLog: Record<number, number> = {};
+    for (const d of drafted) {
+      if (!d.userId) continue;
+      userPtsLog[d.userId] = (userPtsLog[d.userId] ?? 0) + (pointDeltas.get(d.id) ?? 0);
     }
+    console.log(`[scoreLeague] league=${leagueId} shows=${showsScored} totalPts=${totalPoints} entries=${pointDeltas.size}`);
+    console.log(`[scoreLeague] per-user points:`, JSON.stringify(userPtsLog));
+    if (unmappedSongIds.length) console.log(`[scoreLeague] unmapped songIds:`, unmappedSongIds);
 
-    const adjUserIds = [...new Set([...adjDedupeMap.values()].map(a => a.userId).filter(Boolean))] as number[];
-    const adjUserRows = adjUserIds.length
-      ? await db.select({ id: users.id, username: users.username }).from(users).where(inArray(users.id, adjUserIds))
-      : [];
-    const adjUsernameMap = new Map(adjUserRows.map(u => [u.id, u.username]));
-    const adjsApplied: { username: string; song: string; occ: number; base: number; override: number }[] = [];
-
-    for (const adj of adjDedupeMap.values()) {
-      if (!adj.userId) continue;
-      const adjTitle = songIdToTitle.get(adj.songId);
-      if (!adjTitle) {
-        console.log(`[scoreLeague] adj id=${adj.id} skipped — songId=${adj.songId} not in title map`);
-        continue;
-      }
-      const occ = adj.occurrence ?? 1;
-      // Resolve concertId → date string, then look up per-occurrence base pts.
-      // Using date avoids ID mismatches when duplicate cachedShows rows exist.
-      const adjShowDate = showIdToDate.get(adj.concertId);
-      const showPts = adjShowDate ? showOccurrencePts.get(adjShowDate) : undefined;
-      const basePtsForOcc = showPts?.[adjTitle.toLowerCase()]?.[occ] ?? 0;
-      const delta = adj.adjustedPoints - basePtsForOcc;
-
-      const userEntries = (titleMap[adjTitle.toLowerCase()] || []).filter(e => e.userId === adj.userId);
-      for (const entry of userEntries) {
-        const current = pointDeltas.get(entry.id) ?? 0;
-        const newPts = current + delta;
-        pointDeltas.set(entry.id, newPts);
-        await db.update(draftedSongs)
-          .set({ points: newPts })
-          .where(eq(draftedSongs.id, entry.id));
-      }
-      adjsApplied.push({
-        username: adjUsernameMap.get(adj.userId) ?? `user#${adj.userId}`,
-        song: adjTitle,
-        occ,
-        base: basePtsForOcc,
-        override: adj.adjustedPoints,
-      });
-      console.log(`[scoreLeague] adj id=${adj.id} user=${adj.userId} song="${adjTitle}" occ=${occ} base=${basePtsForOcc} → override=${adj.adjustedPoints}`);
-    }
-
-    // Fetch usernames to make per-user breakdown human-readable
     const scoredUserIds = Object.keys(userPtsLog).map(Number);
     const usernameRows = scoredUserIds.length
       ? await db.select({ id: users.id, username: users.username }).from(users).where(inArray(users.id, scoredUserIds))
@@ -882,6 +855,11 @@ export const storage = {
     const perUser = Object.fromEntries(
       scoredUserIds.map(uid => [usernameMap.get(uid) ?? `user#${uid}`, userPtsLog[uid]])
     );
+    // Replace userId placeholders with real usernames in adjsApplied
+    for (const a of adjsApplied) {
+      const uid = parseInt(a.username);
+      if (!isNaN(uid)) a.username = usernameMap.get(uid) ?? `user#${uid}`;
+    }
 
     return { shows: showsScored, points: totalPoints, perUser, unmappedSongIds, adjustmentsApplied: adjsApplied };
   },
