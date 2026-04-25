@@ -52,8 +52,10 @@ export default function Dashboard() {
 
   // Success: Dashboard now displays authentic Phish.net venues!
 
-  const userRank = leagueStandings?.find((standing: any) => standing.id === user?.id)?.rank || 0;
-  const todayPoints = leagueStandings?.find((standing: any) => standing.id === user?.id)?.todayPoints || 0;
+  const standingsEntry = leagueStandings?.find((standing: any) => standing.id === user?.id);
+  const userRank = standingsEntry?.rank || 0;
+  const todayPoints = standingsEntry?.todayPoints || 0;
+  const totalPoints = standingsEntry?.totalPoints ?? user?.totalPoints ?? 0;
 
   return (
     <div className="flex min-h-screen">
@@ -125,7 +127,7 @@ export default function Dashboard() {
                 <div className="flex items-center justify-between">
                   <div>
                     <p className="phish-text text-sm font-medium">Total Points</p>
-                    <p className="text-2xl font-bold phish-gold">{user?.totalPoints?.toLocaleString() || 0}</p>
+                    <p className="text-2xl font-bold phish-gold">{totalPoints?.toLocaleString() || 0}</p>
                   </div>
                   <div className="w-12 h-12 score-gradient rounded-lg flex items-center justify-center">
                     <Star className="text-white" size={20} />
