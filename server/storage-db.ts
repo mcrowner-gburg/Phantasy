@@ -674,13 +674,20 @@ export const storage = {
     // Reset points for this league to zero before recomputing
     await db.update(draftedSongs).set({ points: 0 }).where(eq(draftedSongs.leagueId, leagueId));
 
-    // Build title → draftedSong[] map (using songs table for title lookup)
+    // Batch-fetch song titles instead of N+1
+    const draftSongIds = [...new Set(drafted.map(d => d.songId).filter(Boolean))] as number[];
+    const draftSongRows = draftSongIds.length
+      ? await db.select({ id: songs.id, title: songs.title }).from(songs).where(inArray(songs.id, draftSongIds))
+      : [];
+    const songIdToTitle = new Map(draftSongRows.map(s => [s.id, s.title]));
+
+    // Build title → draftedSong[] map
     const titleMap: Record<string, typeof drafted> = {};
     for (const d of drafted) {
       if (!d.songId) continue;
-      const [song] = await db.select({ title: songs.title }).from(songs).where(eq(songs.id, d.songId)).limit(1);
-      if (!song) continue;
-      const key = song.title.toLowerCase();
+      const title = songIdToTitle.get(d.songId);
+      if (!title) continue;
+      const key = title.toLowerCase();
       if (!titleMap[key]) titleMap[key] = [];
       titleMap[key].push(d);
     }
@@ -732,6 +739,17 @@ export const storage = {
           }
         }
         showsScored++;
+
+        // Cache the setlist so standings can compute todayPoints without extra API calls
+        try {
+          const trackTitles = rawTracks.map((t: any) => t.title || "");
+          await db.insert(cachedSetlists)
+            .values({ showDate, setlistData: rawTracks, songs: trackTitles })
+            .onConflictDoUpdate({
+              target: cachedSetlists.showDate,
+              set: { setlistData: rawTracks, songs: trackTitles, cachedAt: new Date() },
+            });
+        } catch { /* non-critical */ }
       } catch { /* skip shows that fail */ }
 
       // Brief pause to avoid hammering phish.in
@@ -776,23 +794,96 @@ export const storage = {
   // ==================== LEADERBOARD ====================
 
   async getLeagueStandings(leagueId: number): Promise<(User & { rank: number; todayPoints: number; songCount: number })[]> {
-    const members = await this.getLeagueMembers(leagueId);
+    const [members, allDrafts, league] = await Promise.all([
+      this.getLeagueMembers(leagueId),
+      db.select().from(draftedSongs).where(eq(draftedSongs.leagueId, leagueId)),
+      this.getLeague(leagueId),
+    ]);
+
+    // Group drafts by userId
+    const draftsByUser = new Map<number, typeof allDrafts>();
+    for (const d of allDrafts) {
+      if (!d.userId) continue;
+      if (!draftsByUser.has(d.userId)) draftsByUser.set(d.userId, []);
+      draftsByUser.get(d.userId)!.push(d);
+    }
+
+    // Batch-fetch song titles for todayPoints calculation
+    const standingSongIds = [...new Set(allDrafts.map(d => d.songId).filter(Boolean))] as number[];
+    const standingSongRows = standingSongIds.length
+      ? await db.select({ id: songs.id, title: songs.title }).from(songs).where(inArray(songs.id, standingSongIds))
+      : [];
+    const standingSongTitleById = new Map(standingSongRows.map(s => [s.id, s.title]));
+
+    // Find the most recent completed show in the league's season to compute todayPoints
+    const seasonStartStr = league?.seasonStartDate
+      ? new Date(league.seasonStartDate).toISOString().split('T')[0] : null;
+    const seasonEndStr = league?.seasonEndDate
+      ? new Date(league.seasonEndDate).toISOString().split('T')[0] : null;
+    const todayStr = new Date().toISOString().split('T')[0];
+
+    const allCachedShows = await this.getCachedShows();
+    const recentShow = allCachedShows
+      .filter(s => {
+        const d = new Date(s.showDate).toISOString().split('T')[0];
+        if (seasonStartStr && d < seasonStartStr) return false;
+        if (seasonEndStr && d > seasonEndStr) return false;
+        if (d >= todayStr) return false;
+        return true;
+      })
+      .sort((a, b) => new Date(b.showDate).getTime() - new Date(a.showDate).getTime())[0];
+
+    // Build a todayPoints map using the cached setlist for the most recent show
+    const todayPointsByUser = new Map<number, number>();
+    if (recentShow) {
+      const recentShowDate = new Date(recentShow.showDate).toISOString().split('T')[0];
+      const cachedSetlist = await this.getCachedSetlist(recentShowDate);
+      if (cachedSetlist?.setlistData) {
+        const tracks = cachedSetlist.setlistData as any[];
+        const firstPosBySet: Record<string, number> = {};
+        for (const t of tracks) {
+          const s = t.set_name || "Set 1";
+          if (!(s in firstPosBySet) || t.position < firstPosBySet[s]) firstPosBySet[s] = t.position;
+        }
+        const trackPtsMap: Record<string, number> = {};
+        for (const t of tracks) {
+          const title = (t.title || "").toLowerCase();
+          const setKey = t.set_name || "Set 1";
+          const isEncore = setKey.toLowerCase().includes("encore");
+          const isSetOpener = !isEncore && t.position === firstPosBySet[setKey];
+          const mins = t.duration ? Math.round(t.duration / 1000) / 60 : 0;
+          let pts = 1;
+          if (isSetOpener) pts += 1;
+          if (isEncore) pts += 1;
+          if (mins >= 20) pts += 1;
+          if (mins >= 30) pts += 1;
+          if (mins >= 40) pts += 1;
+          trackPtsMap[title] = pts;
+        }
+        for (const [userId, drafts] of draftsByUser) {
+          let userTodayPts = 0;
+          for (const d of drafts) {
+            if (!d.songId) continue;
+            const title = (standingSongTitleById.get(d.songId) || "").toLowerCase();
+            userTodayPts += trackPtsMap[title] ?? 0;
+          }
+          todayPointsByUser.set(userId, userTodayPts);
+        }
+      }
+    }
+
     const standings = [];
     for (const member of members) {
-      const drafts = await db.select().from(draftedSongs).where(
-        and(eq(draftedSongs.userId, member.userId!), eq(draftedSongs.leagueId, leagueId))
-      );
-      // Exclude members who never made a draft pick (e.g. league owner who didn't play)
+      if (!member.userId) continue;
+      const drafts = draftsByUser.get(member.userId) || [];
       if (drafts.length === 0) continue;
       const draftedPointsSum = drafts.reduce((sum, d) => sum + (d.points ?? 0), 0);
-      // Fall back to the user-level totalPoints when per-song points haven't been
-      // scored yet (e.g. scoreLeague reset them but recompute hasn't run).
       const totalPoints = draftedPointsSum > 0 ? draftedPointsSum : (member.user?.totalPoints ?? 0);
       standings.push({
         ...member.user,
         totalPoints,
         rank: 0,
-        todayPoints: 0,
+        todayPoints: todayPointsByUser.get(member.userId) ?? 0,
         songCount: drafts.length,
       });
     }
