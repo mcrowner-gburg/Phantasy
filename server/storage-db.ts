@@ -757,6 +757,15 @@ export const storage = {
       setlistsToCache.push({ showDate, tracks: rawTracks });
     }
 
+    console.log(`[scoreLeague] league=${leagueId} shows=${showsScored} totalPts=${totalPoints} entries=${pointDeltas.size}`);
+    // Log per-user totals to help diagnose zero-point players
+    const userPtsLog: Record<number, number> = {};
+    for (const d of drafted) {
+      if (!d.userId) continue;
+      userPtsLog[d.userId] = (userPtsLog[d.userId] ?? 0) + (pointDeltas.get(d.id) ?? 0);
+    }
+    console.log(`[scoreLeague] per-user points:`, JSON.stringify(userPtsLog));
+
     // Write final points — one UPDATE per drafted-song entry (not per track)
     for (const [entryId, delta] of pointDeltas) {
       await db.update(draftedSongs)
