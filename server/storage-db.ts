@@ -681,6 +681,14 @@ export const storage = {
       : [];
     const songIdToTitle = new Map(draftSongRows.map(s => [s.id, s.title]));
 
+    // Fallback: IDs not found in songs table may be cachedSongs IDs (wrong namespace)
+    const missingSongIds = draftSongIds.filter(id => !songIdToTitle.has(id));
+    if (missingSongIds.length > 0) {
+      const cachedRows = await db.select({ id: cachedSongs.id, title: cachedSongs.title })
+        .from(cachedSongs).where(inArray(cachedSongs.id, missingSongIds));
+      for (const r of cachedRows) songIdToTitle.set(r.id, r.title);
+    }
+
     // Build title → draftedSong[] map
     const titleMap: Record<string, typeof drafted> = {};
     for (const d of drafted) {
@@ -786,19 +794,22 @@ export const storage = {
       } catch { /* non-critical */ }
     }
 
-    // Re-apply any manual point adjustments (scoring reset wiped them)
+    // Re-apply any manual point adjustments (scoring reset wiped them).
+    // Match by title rather than songId — the stored songId may be from a different namespace
+    // (cachedSongs vs songs), so a songId WHERE clause would silently miss the row.
     const adjustments = await db.select().from(pointAdjustments)
       .where(eq(pointAdjustments.leagueId, leagueId));
     for (const adj of adjustments) {
       const delta = adj.adjustedPoints - adj.originalPoints;
       if (delta === 0 || !adj.userId) continue;
-      await db.update(draftedSongs)
-        .set({ points: sql`${draftedSongs.points} + ${delta}` })
-        .where(and(
-          eq(draftedSongs.userId, adj.userId),
-          eq(draftedSongs.leagueId, adj.leagueId),
-          eq(draftedSongs.songId, adj.songId),
-        ));
+      const adjTitle = songIdToTitle.get(adj.songId);
+      if (!adjTitle) continue;
+      const userEntries = (titleMap[adjTitle.toLowerCase()] || []).filter(e => e.userId === adj.userId);
+      for (const entry of userEntries) {
+        await db.update(draftedSongs)
+          .set({ points: sql`${draftedSongs.points} + ${delta}` })
+          .where(eq(draftedSongs.id, entry.id));
+      }
     }
 
     return { shows: showsScored, points: totalPoints };
@@ -844,6 +855,14 @@ export const storage = {
       ? await db.select({ id: songs.id, title: songs.title }).from(songs).where(inArray(songs.id, standingSongIds))
       : [];
     const standingSongTitleById = new Map(standingSongRows.map(s => [s.id, s.title]));
+
+    // Fallback for IDs that weren't in songs table (may be cachedSongs IDs)
+    const standingMissingIds = standingSongIds.filter(id => !standingSongTitleById.has(id));
+    if (standingMissingIds.length > 0) {
+      const cachedRows = await db.select({ id: cachedSongs.id, title: cachedSongs.title })
+        .from(cachedSongs).where(inArray(cachedSongs.id, standingMissingIds));
+      for (const r of cachedRows) standingSongTitleById.set(r.id, r.title);
+    }
 
     // Find the most recent completed show in the league's season to compute todayPoints
     const seasonStartStr = league?.seasonStartDate
