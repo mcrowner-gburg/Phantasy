@@ -1170,6 +1170,7 @@ var init_storage_db = __esm({
         }
         const seasonStartStr = league?.seasonStartDate ? new Date(league.seasonStartDate).toISOString().split("T")[0] : null;
         const seasonEndStr = league?.seasonEndDate ? new Date(league.seasonEndDate).toISOString().split("T")[0] : null;
+        const todayStr = (/* @__PURE__ */ new Date()).toISOString().split("T")[0];
         const allCachedShows = await this.getCachedShows();
         const recentShow = allCachedShows.filter((s) => {
           const d = new Date(s.showDate).toISOString().split("T")[0];
@@ -1177,15 +1178,16 @@ var init_storage_db = __esm({
             return false;
           if (seasonEndStr && d > seasonEndStr)
             return false;
+          if (d >= todayStr)
+            return false;
           return true;
         }).sort((a, b) => new Date(b.showDate).getTime() - new Date(a.showDate).getTime())[0];
         const todayPointsByUser = /* @__PURE__ */ new Map();
-        let lastShowDate = null;
         if (recentShow) {
-          lastShowDate = new Date(recentShow.showDate).toISOString().split("T")[0];
-          const cachedSetlist = await this.getCachedSetlist(lastShowDate);
-          const tracks = cachedSetlist?.setlistData;
-          if (tracks?.length) {
+          const recentShowDate = new Date(recentShow.showDate).toISOString().split("T")[0];
+          const cachedSetlist = await this.getCachedSetlist(recentShowDate);
+          if (cachedSetlist?.setlistData) {
+            const tracks = cachedSetlist.setlistData;
             const firstPosBySet = {};
             for (const t of tracks) {
               const s = t.set_name || "Set 1";
@@ -1213,14 +1215,14 @@ var init_storage_db = __esm({
               trackPtsMap[title] = (trackPtsMap[title] ?? 0) + pts;
             }
             for (const [userId, drafts] of draftsByUser) {
-              let userLastShowPts = 0;
+              let userTodayPts = 0;
               for (const d of drafts) {
                 if (!d.songId)
                   continue;
                 const title = (standingSongTitleById.get(d.songId) || "").toLowerCase();
-                userLastShowPts += trackPtsMap[title] ?? 0;
+                userTodayPts += trackPtsMap[title] ?? 0;
               }
-              todayPointsByUser.set(userId, userLastShowPts);
+              todayPointsByUser.set(userId, userTodayPts);
             }
           }
         }
@@ -1238,7 +1240,6 @@ var init_storage_db = __esm({
             totalPoints,
             rank: 0,
             todayPoints: todayPointsByUser.get(member.userId) ?? 0,
-            lastShowDate,
             songCount: drafts.length
           });
         }

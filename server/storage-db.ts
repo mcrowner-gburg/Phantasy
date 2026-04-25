@@ -895,12 +895,12 @@ export const storage = {
       for (const r of cachedRows) standingSongTitleById.set(r.id, r.title);
     }
 
-    // Find the most recent show in the league's season to compute lastShowPoints.
-    // Include today's shows — no cutoff at "today" since we want the most recent available.
+    // Find the most recent completed show in the league's season to compute todayPoints
     const seasonStartStr = league?.seasonStartDate
       ? new Date(league.seasonStartDate).toISOString().split('T')[0] : null;
     const seasonEndStr = league?.seasonEndDate
       ? new Date(league.seasonEndDate).toISOString().split('T')[0] : null;
+    const todayStr = new Date().toISOString().split('T')[0];
 
     const allCachedShows = await this.getCachedShows();
     const recentShow = allCachedShows
@@ -908,19 +908,18 @@ export const storage = {
         const d = new Date(s.showDate).toISOString().split('T')[0];
         if (seasonStartStr && d < seasonStartStr) return false;
         if (seasonEndStr && d > seasonEndStr) return false;
+        if (d >= todayStr) return false;
         return true;
       })
       .sort((a, b) => new Date(b.showDate).getTime() - new Date(a.showDate).getTime())[0];
 
-    // Build a lastShowPoints map using only the already-cached setlist.
-    // Scoring caches setlists when it runs — no live fetch here to keep response fast.
+    // Build a todayPoints map using the cached setlist for the most recent show
     const todayPointsByUser = new Map<number, number>();
-    let lastShowDate: string | null = null;
     if (recentShow) {
-      lastShowDate = new Date(recentShow.showDate).toISOString().split('T')[0];
-      const cachedSetlist = await this.getCachedSetlist(lastShowDate);
-      const tracks = cachedSetlist?.setlistData as any[] | null;
-      if (tracks?.length) {
+      const recentShowDate = new Date(recentShow.showDate).toISOString().split('T')[0];
+      const cachedSetlist = await this.getCachedSetlist(recentShowDate);
+      if (cachedSetlist?.setlistData) {
+        const tracks = cachedSetlist.setlistData as any[];
         const firstPosBySet: Record<string, number> = {};
         for (const t of tracks) {
           const s = t.set_name || "Set 1";
@@ -942,13 +941,13 @@ export const storage = {
           trackPtsMap[title] = (trackPtsMap[title] ?? 0) + pts;
         }
         for (const [userId, drafts] of draftsByUser) {
-          let userLastShowPts = 0;
+          let userTodayPts = 0;
           for (const d of drafts) {
             if (!d.songId) continue;
             const title = (standingSongTitleById.get(d.songId) || "").toLowerCase();
-            userLastShowPts += trackPtsMap[title] ?? 0;
+            userTodayPts += trackPtsMap[title] ?? 0;
           }
-          todayPointsByUser.set(userId, userLastShowPts);
+          todayPointsByUser.set(userId, userTodayPts);
         }
       }
     }
@@ -965,7 +964,6 @@ export const storage = {
         totalPoints,
         rank: 0,
         todayPoints: todayPointsByUser.get(member.userId) ?? 0,
-        lastShowDate,
         songCount: drafts.length,
       });
     }
