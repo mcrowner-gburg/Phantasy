@@ -1098,16 +1098,29 @@ var init_storage_db = __esm({
           }
         }
         const adjustments = await db.select().from(pointAdjustments).where((0, import_drizzle_orm.eq)(pointAdjustments.leagueId, leagueId));
+        const adjsApplied = [];
+        const adjUserIds = [...new Set(adjustments.map((a) => a.userId).filter(Boolean))];
+        const adjUserRows = adjUserIds.length ? await db.select({ id: users.id, username: users.username }).from(users).where((0, import_drizzle_orm.inArray)(users.id, adjUserIds)) : [];
+        const adjUsernameMap = new Map(adjUserRows.map((u) => [u.id, u.username]));
         for (const adj of adjustments) {
-          const delta = adj.adjustedPoints - adj.originalPoints;
-          if (delta === 0 || !adj.userId)
+          if (!adj.userId)
             continue;
           const adjTitle = songIdToTitle.get(adj.songId);
-          if (!adjTitle)
+          if (!adjTitle) {
+            console.log(`[scoreLeague] adjustment id=${adj.id} skipped \u2014 songId=${adj.songId} not in title map`);
             continue;
+          }
           const userEntries = (titleMap[adjTitle.toLowerCase()] || []).filter((e) => e.userId === adj.userId);
           for (const entry of userEntries) {
-            await db.update(draftedSongs).set({ points: import_drizzle_orm.sql`${draftedSongs.points} + ${delta}` }).where((0, import_drizzle_orm.eq)(draftedSongs.id, entry.id));
+            const basePoints = pointDeltas.get(entry.id) ?? 0;
+            await db.update(draftedSongs).set({ points: adj.adjustedPoints }).where((0, import_drizzle_orm.eq)(draftedSongs.id, entry.id));
+            adjsApplied.push({
+              username: adjUsernameMap.get(adj.userId) ?? `user#${adj.userId}`,
+              song: adjTitle,
+              base: basePoints,
+              override: adj.adjustedPoints
+            });
+            console.log(`[scoreLeague] adj id=${adj.id} user=${adj.userId} song="${adjTitle}" base=${basePoints} \u2192 override=${adj.adjustedPoints}`);
           }
         }
         const scoredUserIds = Object.keys(userPtsLog).map(Number);
@@ -1116,7 +1129,7 @@ var init_storage_db = __esm({
         const perUser = Object.fromEntries(
           scoredUserIds.map((uid) => [usernameMap.get(uid) ?? `user#${uid}`, userPtsLog[uid]])
         );
-        return { shows: showsScored, points: totalPoints, perUser, unmappedSongIds };
+        return { shows: showsScored, points: totalPoints, perUser, unmappedSongIds, adjustmentsApplied: adjsApplied };
       },
       // ==================== ACTIVITIES ====================
       async getUserActivities(userId, leagueId) {
@@ -1157,24 +1170,50 @@ var init_storage_db = __esm({
         }
         const seasonStartStr = league?.seasonStartDate ? new Date(league.seasonStartDate).toISOString().split("T")[0] : null;
         const seasonEndStr = league?.seasonEndDate ? new Date(league.seasonEndDate).toISOString().split("T")[0] : null;
-        const todayStr = (/* @__PURE__ */ new Date()).toISOString().split("T")[0];
         const allCachedShows = await this.getCachedShows();
+        console.log(`[standings] league=${leagueId} season=${seasonStartStr}..${seasonEndStr} allShows=${allCachedShows.length}`);
         const recentShow = allCachedShows.filter((s) => {
           const d = new Date(s.showDate).toISOString().split("T")[0];
           if (seasonStartStr && d < seasonStartStr)
             return false;
           if (seasonEndStr && d > seasonEndStr)
             return false;
-          if (d >= todayStr)
-            return false;
           return true;
         }).sort((a, b) => new Date(b.showDate).getTime() - new Date(a.showDate).getTime())[0];
+        console.log(`[standings] recentShow=${recentShow ? new Date(recentShow.showDate).toISOString().split("T")[0] : "none"}`);
         const todayPointsByUser = /* @__PURE__ */ new Map();
+        let lastShowDate = null;
         if (recentShow) {
-          const recentShowDate = new Date(recentShow.showDate).toISOString().split("T")[0];
-          const cachedSetlist = await this.getCachedSetlist(recentShowDate);
+          lastShowDate = new Date(recentShow.showDate).toISOString().split("T")[0];
+          let tracks = null;
+          const cachedSetlist = await this.getCachedSetlist(lastShowDate);
+          console.log(`[standings] cachedSetlist for ${lastShowDate}: ${cachedSetlist ? `found, tracks=${cachedSetlist.setlistData?.length ?? 0}` : "not found"}`);
           if (cachedSetlist?.setlistData) {
-            const tracks = cachedSetlist.setlistData;
+            tracks = cachedSetlist.setlistData;
+          } else {
+            try {
+              const res = await fetch(`https://phish.in/api/v2/shows/${lastShowDate}`, {
+                headers: { Accept: "application/json" }
+              });
+              console.log(`[standings] live fetch ${lastShowDate}: status=${res.status}`);
+              if (res.ok) {
+                const data = await res.json();
+                tracks = data.tracks?.length > 0 ? data.tracks : null;
+                console.log(`[standings] live fetch tracks=${tracks?.length ?? 0}`);
+                if (tracks) {
+                  const trackTitles = tracks.map((t) => t.title || "");
+                  await db.insert(cachedSetlists).values({ showDate: lastShowDate, setlistData: tracks, songs: trackTitles }).onConflictDoUpdate({
+                    target: cachedSetlists.showDate,
+                    set: { setlistData: tracks, songs: trackTitles, cachedAt: /* @__PURE__ */ new Date() }
+                  });
+                }
+              }
+            } catch (e) {
+              console.log(`[standings] live fetch error:`, e);
+            }
+          }
+          if (tracks) {
+            console.log(`[standings] computing lastShowPts from ${tracks.length} tracks, draftsByUser size=${draftsByUser.size}`);
             const firstPosBySet = {};
             for (const t of tracks) {
               const s = t.set_name || "Set 1";
@@ -1201,16 +1240,21 @@ var init_storage_db = __esm({
                 pts += 1;
               trackPtsMap[title] = (trackPtsMap[title] ?? 0) + pts;
             }
+            console.log(`[standings] trackPtsMap keys (played):`, Object.keys(trackPtsMap).join(", "));
             for (const [userId, drafts] of draftsByUser) {
-              let userTodayPts = 0;
+              let userLastShowPts = 0;
               for (const d of drafts) {
                 if (!d.songId)
                   continue;
                 const title = (standingSongTitleById.get(d.songId) || "").toLowerCase();
-                userTodayPts += trackPtsMap[title] ?? 0;
+                const pts = trackPtsMap[title] ?? 0;
+                if (pts > 0)
+                  console.log(`[standings] user=${userId} song="${title}" lastShowPts=${pts}`);
+                userLastShowPts += pts;
               }
-              todayPointsByUser.set(userId, userTodayPts);
+              todayPointsByUser.set(userId, userLastShowPts);
             }
+            console.log(`[standings] todayPointsByUser:`, Object.fromEntries(todayPointsByUser));
           }
         }
         const standings = [];
@@ -1227,6 +1271,7 @@ var init_storage_db = __esm({
             totalPoints,
             rank: 0,
             todayPoints: todayPointsByUser.get(member.userId) ?? 0,
+            lastShowDate,
             songCount: drafts.length
           });
         }
@@ -15893,6 +15938,17 @@ router.get("/adjustments/league/:leagueId", async (req, res) => {
     res.json(adjustments);
   } catch (e) {
     res.status(500).json({ message: e.message || "Failed to fetch adjustments" });
+  }
+});
+router.delete("/adjustments/:id", requireLeagueAdmin, async (req, res) => {
+  try {
+    const id = parseInt(req.params.id);
+    if (isNaN(id))
+      return res.status(400).json({ message: "Invalid id" });
+    await db.delete(pointAdjustments).where((0, import_drizzle_orm3.eq)(pointAdjustments.id, id));
+    res.json({ message: "Adjustment deleted" });
+  } catch (e) {
+    res.status(500).json({ message: e.message || "Failed to delete adjustment" });
   }
 });
 router.get("/my-leagues", async (req, res) => {
