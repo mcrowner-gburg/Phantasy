@@ -858,7 +858,7 @@ export const storage = {
           if (mins >= 20) pts += 1;
           if (mins >= 30) pts += 1;
           if (mins >= 40) pts += 1;
-          trackPtsMap[title] = pts;
+          trackPtsMap[title] = (trackPtsMap[title] ?? 0) + pts;
         }
         for (const [userId, drafts] of draftsByUser) {
           let userTodayPts = 0;
