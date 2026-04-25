@@ -1552,15 +1552,22 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Get league standings
       const leagueStandings = await storage.getLeagueStandings(currentLeague.id);
 
+      // Always include the requesting user's standings entry even if outside top 10
+      const top10 = leagueStandings.slice(0, 10);
+      const userInTop10 = top10.some((s: any) => s.id === userId);
+      const standingsForDashboard = userInTop10
+        ? top10
+        : [...top10, leagueStandings.find((s: any) => s.id === userId)].filter(Boolean);
+
       res.json({
         user: { id: user.id, username: user.username, totalPoints: user.totalPoints },
         tour: activeTour,
         league: currentLeague,
-        draftedSongs: draftedSongs.slice(0, 10), // Limit for display
+        draftedSongs: draftedSongs.slice(0, 10),
         recentActivities: recentActivities.slice(0, 5),
-        recentConcerts: recentConcerts, // Last 3 completed shows
-        upcomingConcerts: upcomingConcerts, // Next 3 upcoming shows
-        leagueStandings: leagueStandings.slice(0, 10)
+        recentConcerts: recentConcerts,
+        upcomingConcerts: upcomingConcerts,
+        leagueStandings: standingsForDashboard
       });
     } catch (error) {
       res.status(500).json({ message: "Failed to fetch dashboard data" });
