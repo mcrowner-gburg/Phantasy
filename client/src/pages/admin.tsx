@@ -855,22 +855,6 @@ export default function Admin() {
               
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
                 <div>
-                  <Label htmlFor="concert" className="text-white mb-2 block">Concert</Label>
-                  <Select onValueChange={(value) => setSelectedConcert(parseInt(value))}>
-                    <SelectTrigger className="bg-black border-gray-600 text-white">
-                      <SelectValue placeholder="Select a concert..." />
-                    </SelectTrigger>
-                    <SelectContent className="bg-gray-900 border-gray-600">
-                      {concerts?.map((concert: any) => (
-                        <SelectItem key={concert.id} value={concert.id.toString()}>
-                          {concert.venue} - {format(parseISO(String(concert.date).substring(0, 10)), "MMM dd, yyyy")}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-
-                <div>
                   <Label htmlFor="league" className="text-white mb-2 block">League</Label>
                   <Select onValueChange={(value) => setSelectedLeague(parseInt(value))}>
                     <SelectTrigger className="bg-black border-gray-600 text-white">
@@ -880,6 +864,22 @@ export default function Admin() {
                       {leagues?.map((league: any) => (
                         <SelectItem key={league.id} value={league.id.toString()}>
                           {league.name}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                <div>
+                  <Label htmlFor="concert" className="text-white mb-2 block">Concert</Label>
+                  <Select onValueChange={(value) => setSelectedConcert(parseInt(value))}>
+                    <SelectTrigger className="bg-black border-gray-600 text-white">
+                      <SelectValue placeholder="Select a concert..." />
+                    </SelectTrigger>
+                    <SelectContent className="bg-gray-900 border-gray-600">
+                      {concerts?.map((concert: any) => (
+                        <SelectItem key={concert.id} value={concert.id.toString()}>
+                          {concert.venue} - {format(parseISO(String(concert.date).substring(0, 10)), "MMM dd, yyyy")}
                         </SelectItem>
                       ))}
                     </SelectContent>
