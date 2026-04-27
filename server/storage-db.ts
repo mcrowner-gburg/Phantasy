@@ -687,23 +687,21 @@ export const storage = {
       .where(eq(pointAdjustments.leagueId, leagueId));
     const adjustmentLookup = new Map<string, number>();
     const adjustmentIdLookup = new Map<string, number>();
+    const adjDiag: string[] = [];
     for (const adj of allAdjustments) {
-      if (!adj.userId) continue;
+      if (!adj.userId) { adjDiag.push(`id=${adj.id} SKIP:noUserId`); continue; }
       const adjTitle = songIdToTitle.get(adj.songId)?.toLowerCase();
-      if (!adjTitle) continue;
+      if (!adjTitle) { adjDiag.push(`id=${adj.id} SKIP:songId=${adj.songId} notInTitleMap`); continue; }
       const adjShowDate = showIdToDate.get(adj.concertId);
-      if (!adjShowDate) {
-        console.log(`[scoreLeague] adj id=${adj.id} skipped — concertId=${adj.concertId} not in showIdToDate`);
-        continue;
-      }
+      if (!adjShowDate) { adjDiag.push(`id=${adj.id} SKIP:concertId=${adj.concertId} notInShowIdToDate(size=${showIdToDate.size})`); continue; }
       const key = `${adjShowDate}:${adjTitle}:${adj.userId}`;
-      // Keep highest-id record in case of duplicates
       if (!adjustmentIdLookup.has(key) || adj.id > adjustmentIdLookup.get(key)!) {
         adjustmentLookup.set(key, adj.adjustedPoints);
         adjustmentIdLookup.set(key, adj.id);
-        console.log(`[scoreLeague] adj id=${adj.id} queued: key=${key} → ${adj.adjustedPoints}pts`);
+        adjDiag.push(`id=${adj.id} OK:key=${key} pts=${adj.adjustedPoints}`);
       }
     }
+    console.log(`[scoreLeague] adjustments(${allAdjustments.length}):`, adjDiag.join(" | "));
 
     // Fetch setlists in parallel batches of 8.
     const BATCH = 8;
@@ -847,7 +845,7 @@ export const storage = {
       if (!isNaN(uid)) a.username = usernameMap.get(uid) ?? `user#${uid}`;
     }
 
-    return { shows: showsScored, points: totalPoints, perUser, unmappedSongIds, adjustmentsApplied: adjsApplied };
+    return { shows: showsScored, points: totalPoints, perUser, unmappedSongIds, adjustmentsApplied: adjsApplied, adjDiag };
   },
 
   // ==================== ACTIVITIES ====================

@@ -997,24 +997,30 @@ var init_storage_db = __esm({
         const allAdjustments = await db.select().from(pointAdjustments).where((0, import_drizzle_orm.eq)(pointAdjustments.leagueId, leagueId));
         const adjustmentLookup = /* @__PURE__ */ new Map();
         const adjustmentIdLookup = /* @__PURE__ */ new Map();
+        const adjDiag = [];
         for (const adj of allAdjustments) {
-          if (!adj.userId)
+          if (!adj.userId) {
+            adjDiag.push(`id=${adj.id} SKIP:noUserId`);
             continue;
+          }
           const adjTitle = songIdToTitle.get(adj.songId)?.toLowerCase();
-          if (!adjTitle)
+          if (!adjTitle) {
+            adjDiag.push(`id=${adj.id} SKIP:songId=${adj.songId} notInTitleMap`);
             continue;
+          }
           const adjShowDate = showIdToDate.get(adj.concertId);
           if (!adjShowDate) {
-            console.log(`[scoreLeague] adj id=${adj.id} skipped \u2014 concertId=${adj.concertId} not in showIdToDate`);
+            adjDiag.push(`id=${adj.id} SKIP:concertId=${adj.concertId} notInShowIdToDate(size=${showIdToDate.size})`);
             continue;
           }
           const key = `${adjShowDate}:${adjTitle}:${adj.userId}`;
           if (!adjustmentIdLookup.has(key) || adj.id > adjustmentIdLookup.get(key)) {
             adjustmentLookup.set(key, adj.adjustedPoints);
             adjustmentIdLookup.set(key, adj.id);
-            console.log(`[scoreLeague] adj id=${adj.id} queued: key=${key} \u2192 ${adj.adjustedPoints}pts`);
+            adjDiag.push(`id=${adj.id} OK:key=${key} pts=${adj.adjustedPoints}`);
           }
         }
+        console.log(`[scoreLeague] adjustments(${allAdjustments.length}):`, adjDiag.join(" | "));
         const BATCH = 8;
         const showDates = [...new Set(shows.map((s) => new Date(s.showDate).toISOString().split("T")[0]))];
         const fetchedSetlists = [];
@@ -1138,7 +1144,7 @@ var init_storage_db = __esm({
           if (!isNaN(uid))
             a.username = usernameMap.get(uid) ?? `user#${uid}`;
         }
-        return { shows: showsScored, points: totalPoints, perUser, unmappedSongIds, adjustmentsApplied: adjsApplied };
+        return { shows: showsScored, points: totalPoints, perUser, unmappedSongIds, adjustmentsApplied: adjsApplied, adjDiag };
       },
       // ==================== ACTIVITIES ====================
       async getUserActivities(userId, leagueId) {

@@ -352,12 +352,12 @@ export default function Admin() {
     onSuccess: (data: any) => {
       queryClient.invalidateQueries({ queryKey: [`/api/leagues/${selectedLeague}/standings`] });
       queryClient.invalidateQueries({ queryKey: ["/api/admin/adjustments/league", selectedLeague] });
-      const unmapped = data.unmappedSongIds?.length ? ` ⚠️ ${data.unmappedSongIds.length} unmapped song IDs.` : "";
-      const perUser = data.perUser ? ` Base: ${Object.entries(data.perUser).map(([u, p]) => `${u}=${p}`).join(", ")}` : "";
+      const unmapped = data.unmappedSongIds?.length ? ` ⚠️ ${data.unmappedSongIds.length} unmapped.` : "";
       const adjs = data.adjustmentsApplied?.length
-        ? ` Overrides: ${data.adjustmentsApplied.map((a: any) => `${a.username}/${a.song} ${a.base}→${a.override}`).join(", ")}`
-        : "";
-      toast({ title: "Scores recalculated", description: `${data.shows} shows scored, ${data.points} total points.${unmapped}${perUser}${adjs}` });
+        ? ` Overrides applied: ${data.adjustmentsApplied.map((a: any) => `${a.username}/${a.song} ${a.base}→${a.override}`).join(", ")}`
+        : " No overrides applied.";
+      const diag = data.adjDiag?.length ? ` [adj diag: ${data.adjDiag.join(" | ")}]` : " [no adj records]";
+      toast({ title: "Scores recalculated", description: `${data.shows} shows, ${data.points} pts.${unmapped}${adjs}${diag}` });
     },
     onError: (error: any) => {
       toast({ title: "Failed to recalculate scores", description: error.message, variant: "destructive" });
