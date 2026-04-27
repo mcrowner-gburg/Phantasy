@@ -93,48 +93,22 @@ export const storage = {
     concertId: number;
     songId: number;
     userId: number;
-    occurrence?: number;
     originalPoints: number;
     adjustedPoints: number;
     reason: string;
     adjustedBy: number;
   }) {
-    const occ = data.occurrence ?? 1;
-    const [existing] = await db.select().from(pointAdjustments)
-      .where(and(
-        eq(pointAdjustments.leagueId, data.leagueId),
-        eq(pointAdjustments.concertId, data.concertId),
-        eq(pointAdjustments.songId, data.songId),
-        eq(pointAdjustments.userId, data.userId),
-        eq(pointAdjustments.occurrence, occ),
-      )).limit(1);
-
-    const prevAdjusted = existing?.adjustedPoints ?? data.originalPoints;
-    const delta = data.adjustedPoints - prevAdjusted;
-
-    let record;
-    if (existing) {
-      const [updated] = await db.update(pointAdjustments)
-        .set({ adjustedPoints: data.adjustedPoints, reason: data.reason, adjustedBy: data.adjustedBy })
-        .where(eq(pointAdjustments.id, existing.id))
-        .returning();
-      record = updated;
-    } else {
-      const [created] = await db.insert(pointAdjustments).values({ ...data, occurrence: occ }).returning();
-      record = created;
-    }
-
-    // Apply the delta immediately to the player's drafted song total
-    if (delta !== 0) {
-      await db.update(draftedSongs)
-        .set({ points: sql`${draftedSongs.points} + ${delta}` })
-        .where(and(
-          eq(draftedSongs.userId, data.userId),
-          eq(draftedSongs.leagueId, data.leagueId),
-          eq(draftedSongs.songId, data.songId),
-        ));
-    }
-
+    // One total-override record per (league, concert, song, user).
+    // Delete any existing records (including stale per-occurrence rows) then insert fresh.
+    await db.delete(pointAdjustments).where(and(
+      eq(pointAdjustments.leagueId, data.leagueId),
+      eq(pointAdjustments.concertId, data.concertId),
+      eq(pointAdjustments.songId, data.songId),
+      eq(pointAdjustments.userId, data.userId),
+    ));
+    const [record] = await db.insert(pointAdjustments)
+      .values({ ...data, occurrence: 1 })
+      .returning();
     return record;
   },
 
@@ -707,20 +681,13 @@ export const storage = {
     // Use allShows (not just season-filtered) so any stored concertId can be resolved.
     const showIdToDate = new Map(allShows.map((s: any) => [s.id, new Date(s.showDate).toISOString().split("T")[0]]));
 
-    // Fetch and deduplicate adjustments before scoring so they can be applied inline.
-    // Dedup keeps the highest id per (songId, userId, concertId, occurrence).
+    // Build total-override lookup: "showDate:titleLower:userId" → adjustedPoints
+    // Each record represents the TOTAL points for all playings of that song at the show.
     const allAdjustments = await db.select().from(pointAdjustments)
       .where(eq(pointAdjustments.leagueId, leagueId));
-    const adjDedupeMap = new Map<string, typeof allAdjustments[0]>();
-    for (const a of allAdjustments) {
-      const key = `${a.songId}-${a.userId}-${a.concertId}-${a.occurrence ?? 1}`;
-      if (!adjDedupeMap.has(key) || a.id > adjDedupeMap.get(key)!.id) adjDedupeMap.set(key, a);
-    }
-
-    // Build lookup: "showDate:titleLower:userId:occ" → adjustedPoints
-    // When a track occurrence matches this key we use the override instead of base pts.
     const adjustmentLookup = new Map<string, number>();
-    for (const adj of adjDedupeMap.values()) {
+    const adjustmentIdLookup = new Map<string, number>();
+    for (const adj of allAdjustments) {
       if (!adj.userId) continue;
       const adjTitle = songIdToTitle.get(adj.songId)?.toLowerCase();
       if (!adjTitle) continue;
@@ -729,9 +696,13 @@ export const storage = {
         console.log(`[scoreLeague] adj id=${adj.id} skipped — concertId=${adj.concertId} not in showIdToDate`);
         continue;
       }
-      const occ = adj.occurrence ?? 1;
-      adjustmentLookup.set(`${adjShowDate}:${adjTitle}:${adj.userId}:${occ}`, adj.adjustedPoints);
-      console.log(`[scoreLeague] adj id=${adj.id} queued: show=${adjShowDate} song="${adjTitle}" userId=${adj.userId} occ=${occ} → ${adj.adjustedPoints}pts`);
+      const key = `${adjShowDate}:${adjTitle}:${adj.userId}`;
+      // Keep highest-id record in case of duplicates
+      if (!adjustmentIdLookup.has(key) || adj.id > adjustmentIdLookup.get(key)!) {
+        adjustmentLookup.set(key, adj.adjustedPoints);
+        adjustmentIdLookup.set(key, adj.id);
+        console.log(`[scoreLeague] adj id=${adj.id} queued: key=${key} → ${adj.adjustedPoints}pts`);
+      }
     }
 
     // Fetch setlists in parallel batches of 8.
@@ -758,11 +729,10 @@ export const storage = {
       fetchedSetlists.push(...results);
     }
 
-    // Score every track. For each drafter, check adjustmentLookup first;
-    // if an override exists for this exact (show, song, user, occurrence) use it,
-    // otherwise use the base point calculation.
+    // Score every show. Accumulate base pts per (song, drafter) across all occurrences,
+    // then apply total override if one exists — one override covers all playings of a song.
     const pointDeltas = new Map<number, number>(); // draftedSong.id → final points
-    const adjsApplied: { username: string; song: string; occ: number; base: number; override: number }[] = [];
+    const adjsApplied: { username: string; song: string; base: number; override: number }[] = [];
     let totalPoints = 0;
     let showsScored = 0;
     const setlistsToCache: Array<{ showDate: string; tracks: any[] }> = [];
@@ -777,13 +747,12 @@ export const storage = {
         if (!(s in firstPosBySet) || t.position < firstPosBySet[s]) firstPosBySet[s] = t.position;
       }
 
-      const titleOccCount: Record<string, number> = {};
+      // Accumulate base pts per (title, drafter) across every occurrence in this show
+      // key: `${title}\0${userId}` → { entryId, basePts }
+      const songUserBase = new Map<string, { entryId: number; basePts: number }>();
 
       for (const t of rawTracks) {
         const title = (t.title || "").toLowerCase();
-        titleOccCount[title] = (titleOccCount[title] ?? 0) + 1;
-        const occ = titleOccCount[title];
-
         const setKey = t.set_name || "Set 1";
         const isEncore = setKey.toLowerCase().includes("encore");
         const isSetOpener = !isEncore && t.position === firstPosBySet[setKey];
@@ -800,16 +769,30 @@ export const storage = {
         const entries = titleMap[title];
         if (entries && entries.length > 0) {
           for (const entry of entries) {
-            const adjKey = `${showDate}:${title}:${entry.userId}:${occ}`;
-            const pts = adjustmentLookup.has(adjKey) ? adjustmentLookup.get(adjKey)! : basePts;
-            if (adjustmentLookup.has(adjKey)) {
-              console.log(`[scoreLeague] override: show=${showDate} song="${title}" occ=${occ} base=${basePts} → ${pts}pts`);
-              adjsApplied.push({ username: String(entry.userId), song: title, occ, base: basePts, override: pts });
+            const accumKey = `${title}\0${entry.userId}`;
+            const existing = songUserBase.get(accumKey);
+            if (existing) {
+              existing.basePts += basePts;
+            } else {
+              songUserBase.set(accumKey, { entryId: entry.id, basePts });
             }
-            pointDeltas.set(entry.id, (pointDeltas.get(entry.id) ?? 0) + pts);
-            totalPoints += pts;
           }
         }
+      }
+
+      // Apply total overrides: if admin set a total for (show, song, user), use it; else use accumulated base
+      for (const [accumKey, { entryId, basePts }] of songUserBase) {
+        const nullIdx = accumKey.indexOf("\0");
+        const title = accumKey.slice(0, nullIdx);
+        const userId = parseInt(accumKey.slice(nullIdx + 1));
+        const overrideKey = `${showDate}:${title}:${userId}`;
+        const pts = adjustmentLookup.has(overrideKey) ? adjustmentLookup.get(overrideKey)! : basePts;
+        if (adjustmentLookup.has(overrideKey)) {
+          console.log(`[scoreLeague] override: show=${showDate} song="${title}" user=${userId} base=${basePts} → ${pts}pts`);
+          adjsApplied.push({ username: String(userId), song: title, base: basePts, override: pts });
+        }
+        pointDeltas.set(entryId, (pointDeltas.get(entryId) ?? 0) + pts);
+        totalPoints += pts;
       }
 
       showsScored++;

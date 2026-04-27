@@ -40,7 +40,6 @@ export default function Admin() {
   const [adjustmentForm, setAdjustmentForm] = useState({
     songId: 0,
     userId: 0,
-    occurrence: 1,
     originalPoints: 0,
     adjustedPoints: 0,
     reason: ""
@@ -111,10 +110,10 @@ export default function Admin() {
       const data = await response.json();
       const adjustmentsArray = Array.isArray(data) ? data : [];
       
-      // Remove duplicates — keep the highest id for each (songId, userId, concertId, occurrence) combo
+      // One record per (songId, userId, concertId) — keep highest id if somehow duplicated
       const adjDedupeMap = new Map<string, any>();
       for (const a of adjustmentsArray) {
-        const key = `${a.songId}-${a.userId}-${a.concertId}-${a.occurrence ?? 1}`;
+        const key = `${a.songId}-${a.userId}-${a.concertId}`;
         if (!adjDedupeMap.has(key) || a.id > adjDedupeMap.get(key).id) adjDedupeMap.set(key, a);
       }
       const uniqueAdjustments = Array.from(adjDedupeMap.values());
@@ -223,7 +222,7 @@ export default function Admin() {
       queryClient.invalidateQueries({ queryKey: [`/api/leagues/${selectedLeague}/standings`] });
       
       setIsAdjustmentDialogOpen(false);
-      setAdjustmentForm({ songId: 0, userId: 0, occurrence: 1, originalPoints: 0, adjustedPoints: 0, reason: "" });
+      setAdjustmentForm({ songId: 0, userId: 0, originalPoints: 0, adjustedPoints: 0, reason: "" });
       toast({
         title: "Point adjustment created",
         description: "Points have been successfully adjusted.",
@@ -382,38 +381,33 @@ export default function Admin() {
     return points;
   }
 
-  // Calculate adjusted points for a specific user and song performance
-  const calculateAdjustedPoints = (performance: any, userId: number) => {
-    if (!adjustments || !Array.isArray(adjustments)) return calculateOriginalPoints(performance);
-    const occ = performance.occurrence ?? 1;
-    const adjustment = adjustments.find((adj: any) =>
-      Number(adj.songId) === Number(performance.song.id) &&
-      Number(adj.userId) === Number(userId) &&
-      Number(adj.concertId) === Number(selectedConcert) &&
-      (adj.occurrence ?? 1) === occ
-    );
-    return adjustment ? adjustment.adjustedPoints : calculateOriginalPoints(performance);
-  };
-
+  // Find the total-override adjustment for a song/user (one record covers all playings)
   const getAdjustmentInfo = (performance: any, userId: number) => {
     if (!adjustments || !Array.isArray(adjustments)) return null;
-    const occ = performance.occurrence ?? 1;
     return adjustments.find((adj: any) =>
       Number(adj.songId) === Number(performance.song.id) &&
       Number(adj.userId) === Number(userId) &&
-      Number(adj.concertId) === Number(selectedConcert) &&
-      (adj.occurrence ?? 1) === occ
-    );
+      Number(adj.concertId) === Number(selectedConcert)
+    ) ?? null;
+  };
+
+  // For display: show adjusted total on first occurrence row, 0 on subsequent rows
+  const calculateAdjustedPoints = (performance: any, userId: number) => {
+    const adj = getAdjustmentInfo(performance, userId);
+    if (!adj) return calculateOriginalPoints(performance);
+    // Total override applies once (first occurrence); additional occurrences show 0
+    return (performance.occurrence ?? 1) === 1 ? adj.adjustedPoints : 0;
   };
 
   const openAdjustmentDialog = (performance: any, drafter: any) => {
+    // originalPoints = sum of base pts across all occurrences of this song at the show
+    // For simplicity show the per-occurrence base; admin sets the total they want
     const originalPoints = calculateOriginalPoints(performance);
     setAdjustmentForm({
       songId: performance.song?.id || performance.songId,
       userId: drafter.userId,
-      occurrence: performance.occurrence ?? 1,
       originalPoints,
-      adjustedPoints: originalPoints,
+      adjustedPoints: getAdjustmentInfo(performance, drafter.userId)?.adjustedPoints ?? originalPoints,
       reason: ""
     });
     setIsAdjustmentDialogOpen(true);
@@ -1516,9 +1510,7 @@ export default function Admin() {
           <DialogHeader>
             <DialogTitle className="text-white">Adjust Points</DialogTitle>
             <DialogDescription className="text-gray-400">
-              {adjustmentForm.occurrence > 1
-                ? `Adjusting the ${ordinal(adjustmentForm.occurrence)} playing of this song.`
-                : "Manually adjust the points awarded for this song performance."}
+              Set total points for all playings of this song at this show.
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-4">
