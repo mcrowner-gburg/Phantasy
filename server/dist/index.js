@@ -248,6 +248,8 @@ var init_schema = __esm({
       songId: (0, import_pg_core.integer)("song_id").references(() => songs.id).notNull(),
       userId: (0, import_pg_core.integer)("user_id").references(() => users.id),
       // User who drafted the song
+      occurrence: (0, import_pg_core.integer)("occurrence").notNull().default(1),
+      // Which playing of the song in the show (1 = first, 2 = second, etc.)
       originalPoints: (0, import_pg_core.integer)("original_points").default(0),
       adjustedPoints: (0, import_pg_core.integer)("adjusted_points").default(0),
       reason: (0, import_pg_core.text)("reason"),
@@ -546,11 +548,13 @@ var init_storage_db = __esm({
       },
       // ==================== POINT ADJUSTMENTS ====================
       async createPointAdjustment(data) {
+        const occ = data.occurrence ?? 1;
         const [existing] = await db.select().from(pointAdjustments).where((0, import_drizzle_orm.and)(
           (0, import_drizzle_orm.eq)(pointAdjustments.leagueId, data.leagueId),
           (0, import_drizzle_orm.eq)(pointAdjustments.concertId, data.concertId),
           (0, import_drizzle_orm.eq)(pointAdjustments.songId, data.songId),
-          (0, import_drizzle_orm.eq)(pointAdjustments.userId, data.userId)
+          (0, import_drizzle_orm.eq)(pointAdjustments.userId, data.userId),
+          (0, import_drizzle_orm.eq)(pointAdjustments.occurrence, occ)
         )).limit(1);
         const prevAdjusted = existing?.adjustedPoints ?? data.originalPoints;
         const delta = data.adjustedPoints - prevAdjusted;
@@ -559,7 +563,7 @@ var init_storage_db = __esm({
           const [updated] = await db.update(pointAdjustments).set({ adjustedPoints: data.adjustedPoints, reason: data.reason, adjustedBy: data.adjustedBy }).where((0, import_drizzle_orm.eq)(pointAdjustments.id, existing.id)).returning();
           record = updated;
         } else {
-          const [created] = await db.insert(pointAdjustments).values(data).returning();
+          const [created] = await db.insert(pointAdjustments).values({ ...data, occurrence: occ }).returning();
           record = created;
         }
         if (delta !== 0) {
@@ -1007,8 +1011,32 @@ var init_storage_db = __esm({
             titleMap[key] = [];
           titleMap[key].push(d);
         }
+        const showIdToDate = new Map(allShows.map((s) => [s.id, new Date(s.showDate).toISOString().split("T")[0]]));
+        const allAdjustments = await db.select().from(pointAdjustments).where((0, import_drizzle_orm.eq)(pointAdjustments.leagueId, leagueId));
+        const adjDedupeMap = /* @__PURE__ */ new Map();
+        for (const a of allAdjustments) {
+          const key = `${a.songId}-${a.userId}-${a.concertId}-${a.occurrence ?? 1}`;
+          if (!adjDedupeMap.has(key) || a.id > adjDedupeMap.get(key).id)
+            adjDedupeMap.set(key, a);
+        }
+        const adjustmentLookup = /* @__PURE__ */ new Map();
+        for (const adj of adjDedupeMap.values()) {
+          if (!adj.userId)
+            continue;
+          const adjTitle = songIdToTitle.get(adj.songId)?.toLowerCase();
+          if (!adjTitle)
+            continue;
+          const adjShowDate = showIdToDate.get(adj.concertId);
+          if (!adjShowDate) {
+            console.log(`[scoreLeague] adj id=${adj.id} skipped \u2014 concertId=${adj.concertId} not in showIdToDate`);
+            continue;
+          }
+          const occ = adj.occurrence ?? 1;
+          adjustmentLookup.set(`${adjShowDate}:${adjTitle}:${adj.userId}:${occ}`, adj.adjustedPoints);
+          console.log(`[scoreLeague] adj id=${adj.id} queued: show=${adjShowDate} song="${adjTitle}" userId=${adj.userId} occ=${occ} \u2192 ${adj.adjustedPoints}pts`);
+        }
         const BATCH = 8;
-        const showDates = shows.map((s) => new Date(s.showDate).toISOString().split("T")[0]);
+        const showDates = [...new Set(shows.map((s) => new Date(s.showDate).toISOString().split("T")[0]))];
         const fetchedSetlists = [];
         for (let i = 0; i < showDates.length; i += BATCH) {
           const chunk = showDates.slice(i, i + BATCH);
@@ -1029,6 +1057,7 @@ var init_storage_db = __esm({
           fetchedSetlists.push(...results);
         }
         const pointDeltas = /* @__PURE__ */ new Map();
+        const adjsApplied = [];
         let totalPoints = 0;
         let showsScored = 0;
         const setlistsToCache = [];
@@ -1042,50 +1071,51 @@ var init_storage_db = __esm({
             if (!(s in firstPosBySet) || t.position < firstPosBySet[s])
               firstPosBySet[s] = t.position;
           }
+          const titleOccCount = {};
           for (const t of rawTracks) {
             const title = (t.title || "").toLowerCase();
-            const entries = titleMap[title];
-            if (!entries || entries.length === 0)
-              continue;
+            titleOccCount[title] = (titleOccCount[title] ?? 0) + 1;
+            const occ = titleOccCount[title];
             const setKey = t.set_name || "Set 1";
             const isEncore = setKey.toLowerCase().includes("encore");
             const isSetOpener = !isEncore && t.position === firstPosBySet[setKey];
             const durationSecs = t.duration ? Math.round(t.duration / 1e3) : 0;
             const mins = durationSecs / 60;
-            let pts = 1;
+            let basePts = 1;
             if (isSetOpener)
-              pts += 1;
+              basePts += 1;
             if (isEncore)
-              pts += 1;
+              basePts += 1;
             if (mins >= 20)
-              pts += 1;
+              basePts += 1;
             if (mins >= 30)
-              pts += 1;
+              basePts += 1;
             if (mins >= 40)
-              pts += 1;
-            for (const entry of entries) {
-              pointDeltas.set(entry.id, (pointDeltas.get(entry.id) ?? 0) + pts);
-              totalPoints += pts;
+              basePts += 1;
+            const entries = titleMap[title];
+            if (entries && entries.length > 0) {
+              for (const entry of entries) {
+                const adjKey = `${showDate}:${title}:${entry.userId}:${occ}`;
+                const pts = adjustmentLookup.has(adjKey) ? adjustmentLookup.get(adjKey) : basePts;
+                if (adjustmentLookup.has(adjKey)) {
+                  console.log(`[scoreLeague] override: show=${showDate} song="${title}" occ=${occ} base=${basePts} \u2192 ${pts}pts`);
+                  adjsApplied.push({ username: String(entry.userId), song: title, occ, base: basePts, override: pts });
+                }
+                pointDeltas.set(entry.id, (pointDeltas.get(entry.id) ?? 0) + pts);
+                totalPoints += pts;
+              }
             }
           }
           showsScored++;
           setlistsToCache.push({ showDate, tracks: rawTracks });
         }
-        console.log(`[scoreLeague] league=${leagueId} shows=${showsScored} totalPts=${totalPoints} entries=${pointDeltas.size}`);
-        const userPtsLog = {};
         const unmappedSongIds = [];
         for (const d of drafted) {
-          if (!d.userId)
-            continue;
-          userPtsLog[d.userId] = (userPtsLog[d.userId] ?? 0) + (pointDeltas.get(d.id) ?? 0);
           if (d.songId && !songIdToTitle.has(d.songId))
             unmappedSongIds.push(d.songId);
         }
-        console.log(`[scoreLeague] per-user points:`, JSON.stringify(userPtsLog));
-        if (unmappedSongIds.length)
-          console.log(`[scoreLeague] unmapped songIds:`, unmappedSongIds);
-        for (const [entryId, delta] of pointDeltas) {
-          await db.update(draftedSongs).set({ points: delta }).where((0, import_drizzle_orm.eq)(draftedSongs.id, entryId));
+        for (const [entryId, pts] of pointDeltas) {
+          await db.update(draftedSongs).set({ points: pts }).where((0, import_drizzle_orm.eq)(draftedSongs.id, entryId));
         }
         for (const { showDate, tracks } of setlistsToCache) {
           try {
@@ -1097,38 +1127,27 @@ var init_storage_db = __esm({
           } catch {
           }
         }
-        const adjustments = await db.select().from(pointAdjustments).where((0, import_drizzle_orm.eq)(pointAdjustments.leagueId, leagueId));
-        const adjsApplied = [];
-        const adjUserIds = [...new Set(adjustments.map((a) => a.userId).filter(Boolean))];
-        const adjUserRows = adjUserIds.length ? await db.select({ id: users.id, username: users.username }).from(users).where((0, import_drizzle_orm.inArray)(users.id, adjUserIds)) : [];
-        const adjUsernameMap = new Map(adjUserRows.map((u) => [u.id, u.username]));
-        for (const adj of adjustments) {
-          if (!adj.userId)
+        const userPtsLog = {};
+        for (const d of drafted) {
+          if (!d.userId)
             continue;
-          const adjTitle = songIdToTitle.get(adj.songId);
-          if (!adjTitle) {
-            console.log(`[scoreLeague] adjustment id=${adj.id} skipped \u2014 songId=${adj.songId} not in title map`);
-            continue;
-          }
-          const userEntries = (titleMap[adjTitle.toLowerCase()] || []).filter((e) => e.userId === adj.userId);
-          for (const entry of userEntries) {
-            const basePoints = pointDeltas.get(entry.id) ?? 0;
-            await db.update(draftedSongs).set({ points: adj.adjustedPoints }).where((0, import_drizzle_orm.eq)(draftedSongs.id, entry.id));
-            adjsApplied.push({
-              username: adjUsernameMap.get(adj.userId) ?? `user#${adj.userId}`,
-              song: adjTitle,
-              base: basePoints,
-              override: adj.adjustedPoints
-            });
-            console.log(`[scoreLeague] adj id=${adj.id} user=${adj.userId} song="${adjTitle}" base=${basePoints} \u2192 override=${adj.adjustedPoints}`);
-          }
+          userPtsLog[d.userId] = (userPtsLog[d.userId] ?? 0) + (pointDeltas.get(d.id) ?? 0);
         }
+        console.log(`[scoreLeague] league=${leagueId} shows=${showsScored} totalPts=${totalPoints} entries=${pointDeltas.size}`);
+        console.log(`[scoreLeague] per-user points:`, JSON.stringify(userPtsLog));
+        if (unmappedSongIds.length)
+          console.log(`[scoreLeague] unmapped songIds:`, unmappedSongIds);
         const scoredUserIds = Object.keys(userPtsLog).map(Number);
         const usernameRows = scoredUserIds.length ? await db.select({ id: users.id, username: users.username }).from(users).where((0, import_drizzle_orm.inArray)(users.id, scoredUserIds)) : [];
         const usernameMap = new Map(usernameRows.map((u) => [u.id, u.username]));
         const perUser = Object.fromEntries(
           scoredUserIds.map((uid) => [usernameMap.get(uid) ?? `user#${uid}`, userPtsLog[uid]])
         );
+        for (const a of adjsApplied) {
+          const uid = parseInt(a.username);
+          if (!isNaN(uid))
+            a.username = usernameMap.get(uid) ?? `user#${uid}`;
+        }
         return { shows: showsScored, points: totalPoints, perUser, unmappedSongIds, adjustmentsApplied: adjsApplied };
       },
       // ==================== ACTIVITIES ====================
@@ -1171,21 +1190,21 @@ var init_storage_db = __esm({
         const seasonStartStr = league?.seasonStartDate ? new Date(league.seasonStartDate).toISOString().split("T")[0] : null;
         const seasonEndStr = league?.seasonEndDate ? new Date(league.seasonEndDate).toISOString().split("T")[0] : null;
         const todayStr = (/* @__PURE__ */ new Date()).toISOString().split("T")[0];
-        const allCachedShows = await this.getCachedShows();
-        const recentShow = allCachedShows.filter((s) => {
-          const d = new Date(s.showDate).toISOString().split("T")[0];
+        const allSetlistRows = await db.select({ showDate: cachedSetlists.showDate }).from(cachedSetlists).where(import_drizzle_orm.sql`jsonb_array_length(${cachedSetlists.setlistData}) > 0`);
+        const recentShowDate = allSetlistRows.map((r) => r.showDate).filter((d) => {
           if (seasonStartStr && d < seasonStartStr)
             return false;
           if (seasonEndStr && d > seasonEndStr)
             return false;
-          if (d >= todayStr)
+          if (d > todayStr)
             return false;
           return true;
-        }).sort((a, b) => new Date(b.showDate).getTime() - new Date(a.showDate).getTime())[0];
+        }).sort((a, b) => b.localeCompare(a))[0];
+        console.log(`[standings] leagueId=${leagueId} season=${seasonStartStr}\u2192${seasonEndStr} today=${todayStr} setlistRows=${allSetlistRows.length} recentShowDate=${recentShowDate}`);
         const todayPointsByUser = /* @__PURE__ */ new Map();
-        if (recentShow) {
-          const recentShowDate = new Date(recentShow.showDate).toISOString().split("T")[0];
+        if (recentShowDate) {
           const cachedSetlist = await this.getCachedSetlist(recentShowDate);
+          console.log(`[standings] setlistData=${cachedSetlist ? Array.isArray(cachedSetlist.setlistData) ? cachedSetlist.setlistData.length + " tracks" : typeof cachedSetlist.setlistData : "null"}`);
           if (cachedSetlist?.setlistData) {
             const tracks = cachedSetlist.setlistData;
             const firstPosBySet = {};
@@ -1214,6 +1233,7 @@ var init_storage_db = __esm({
                 pts += 1;
               trackPtsMap[title] = (trackPtsMap[title] ?? 0) + pts;
             }
+            console.log(`[standings] trackPtsMap keys: ${Object.keys(trackPtsMap).join(", ")}`);
             for (const [userId, drafts] of draftsByUser) {
               let userTodayPts = 0;
               for (const d of drafts) {
@@ -15843,16 +15863,21 @@ router.get("/shows/:concertId/league/:leagueId", async (req, res) => {
         firstPositionBySet[setKey] = pos;
       }
     }
+    const titleOccCount = {};
     const songPerformances2 = tracks.map((track, idx) => {
       const title = track.song || track.title || "";
-      const draftedBy = draftersByTitle[title.toLowerCase()] || [];
-      const setKey = track.set || "Set 1";
+      const titleKey = title.toLowerCase();
+      titleOccCount[titleKey] = (titleOccCount[titleKey] ?? 0) + 1;
+      const occurrence = titleOccCount[titleKey];
+      const draftedBy = draftersByTitle[titleKey] || [];
+      const setKey = track.set || track.set_name || "Set 1";
       const isEncore = track.isEncore || setKey.toLowerCase().includes("encore");
       const isSetOpener = !isEncore && track.position === firstPositionBySet[setKey];
       const durationSeconds = track.duration ? Math.round(track.duration / 1e3) : 0;
       return {
         id: idx,
-        song: { title, id: titleToSongId[title.toLowerCase()] },
+        song: { title, id: titleToSongId[titleKey] },
+        occurrence,
         setNumber: setKey,
         position: track.position || idx + 1,
         isSetOpener,
@@ -15872,7 +15897,7 @@ router.get("/shows/:concertId/league/:leagueId", async (req, res) => {
 });
 router.post("/adjustments", requireLeagueAdmin, async (req, res) => {
   try {
-    const { leagueId, concertId, songId, userId, originalPoints, adjustedPoints, reason } = req.body;
+    const { leagueId, concertId, songId, userId, occurrence, originalPoints, adjustedPoints, reason } = req.body;
     if (!leagueId || !concertId || !songId || !userId) {
       return res.status(400).json({ message: "leagueId, concertId, songId, userId are required" });
     }
@@ -15881,6 +15906,7 @@ router.post("/adjustments", requireLeagueAdmin, async (req, res) => {
       concertId,
       songId,
       userId,
+      occurrence: occurrence ?? 1,
       originalPoints: originalPoints ?? 0,
       adjustedPoints: adjustedPoints ?? 0,
       reason: reason || "",
@@ -15906,6 +15932,25 @@ router.get("/adjustments/league/:leagueId", async (req, res) => {
     res.json(adjustments);
   } catch (e) {
     res.status(500).json({ message: e.message || "Failed to fetch adjustments" });
+  }
+});
+router.delete("/adjustments/by-song", requireLeagueAdmin, async (req, res) => {
+  try {
+    const { leagueId, concertId, songId, userId } = req.body;
+    if (!leagueId || !concertId || !songId || !userId) {
+      return res.status(400).json({ message: "leagueId, concertId, songId, userId are required" });
+    }
+    await db.delete(pointAdjustments).where(
+      (0, import_drizzle_orm3.and)(
+        (0, import_drizzle_orm3.eq)(pointAdjustments.leagueId, leagueId),
+        (0, import_drizzle_orm3.eq)(pointAdjustments.concertId, concertId),
+        (0, import_drizzle_orm3.eq)(pointAdjustments.songId, songId),
+        (0, import_drizzle_orm3.eq)(pointAdjustments.userId, userId)
+      )
+    );
+    res.json({ message: "All adjustments for song deleted" });
+  } catch (e) {
+    res.status(500).json({ message: e.message || "Failed to delete adjustments" });
   }
 });
 router.delete("/adjustments/:id", requireLeagueAdmin, async (req, res) => {
@@ -17252,18 +17297,18 @@ async function registerRoutes(app2) {
         isCompleted: false
       })).sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime()).slice(0, 3);
       const leagueStandings = await storage.getLeagueStandings(currentLeague.id);
+      const top10 = leagueStandings.slice(0, 10);
+      const userInTop10 = top10.some((s) => s.id === userId);
+      const standingsForDashboard = userInTop10 ? top10 : [...top10, leagueStandings.find((s) => s.id === userId)].filter(Boolean);
       res.json({
         user: { id: user.id, username: user.username, totalPoints: user.totalPoints },
         tour: activeTour,
         league: currentLeague,
         draftedSongs: draftedSongs2.slice(0, 10),
-        // Limit for display
         recentActivities: recentActivities.slice(0, 5),
         recentConcerts,
-        // Last 3 completed shows
         upcomingConcerts,
-        // Next 3 upcoming shows
-        leagueStandings: leagueStandings.slice(0, 10)
+        leagueStandings: standingsForDashboard
       });
     } catch (error) {
       res.status(500).json({ message: "Failed to fetch dashboard data" });
@@ -17381,6 +17426,7 @@ async function runMigrations() {
         created_at timestamptz DEFAULT now()
       );
       ALTER TABLE point_adjustments DROP CONSTRAINT IF EXISTS point_adjustments_concert_id_fkey;
+      ALTER TABLE point_adjustments ADD COLUMN IF NOT EXISTS occurrence integer NOT NULL DEFAULT 1;
       UPDATE users SET role = 'superadmin' WHERE username = 'mcrowner';
     `);
     console.log("Migrations complete");
