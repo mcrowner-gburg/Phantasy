@@ -16057,6 +16057,43 @@ router.put("/users/:id/role", requireSuperAdmin, async (req, res) => {
     res.status(500).json({ message: e.message || "Failed to update role" });
   }
 });
+router.get("/debug/adjustments", async (req, res) => {
+  try {
+    const leagueId = req.query.leagueId ? parseInt(req.query.leagueId) : null;
+    if (!leagueId)
+      return res.status(400).json({ message: "leagueId required" });
+    const allShows = await storage.getCachedShows();
+    const showIdToDate = new Map(allShows.map((s) => [s.id, new Date(s.showDate).toISOString().split("T")[0]]));
+    const adjs = await db.select().from(pointAdjustments).where((0, import_drizzle_orm3.eq)(pointAdjustments.leagueId, leagueId));
+    const songIds = [...new Set(adjs.map((a) => a.songId).filter(Boolean))];
+    const userIds = [...new Set(adjs.map((a) => a.userId).filter(Boolean))];
+    const [songRows, userRows] = await Promise.all([
+      songIds.length ? db.select({ id: songs.id, title: songs.title }).from(songs).where((0, import_drizzle_orm3.inArray)(songs.id, songIds)) : [],
+      userIds.length ? db.select({ id: users.id, username: users.username }).from(users).where((0, import_drizzle_orm3.inArray)(users.id, userIds)) : []
+    ]);
+    const songMap = new Map(songRows.map((s) => [s.id, s.title]));
+    const userMap = new Map(userRows.map((u) => [u.id, u.username]));
+    const result = adjs.map((a) => {
+      const showDate = showIdToDate.get(a.concertId);
+      const songTitle = songMap.get(a.songId) ?? "(not found)";
+      const username = a.userId ? userMap.get(a.userId) ?? "(not found)" : null;
+      return {
+        id: a.id,
+        concertId: a.concertId,
+        resolvedShowDate: showDate ?? "STALE \u2014 not in cachedShows",
+        songId: a.songId,
+        songTitle,
+        userId: a.userId,
+        username,
+        adjustedPoints: a.adjustedPoints,
+        overrideKey: showDate && songTitle !== "(not found)" && a.userId ? `${showDate}:${songTitle.toLowerCase()}:${a.userId}` : "CANNOT BUILD \u2014 missing data"
+      };
+    });
+    res.json({ leagueId, adjustmentCount: adjs.length, adjustments: result });
+  } catch (e) {
+    res.status(500).json({ message: e.message || "Debug query failed" });
+  }
+});
 router.get("/debug/player", async (req, res) => {
   try {
     const username = String(req.query.username || "");

@@ -341,6 +341,52 @@ router.put("/users/:id/role", requireSuperAdmin, async (req: any, res: any) => {
   }
 });
 
+// GET /api/admin/debug/adjustments?leagueId=26
+// Shows all adjustment records + whether each concertId resolves to a show date.
+router.get("/debug/adjustments", async (req: any, res: any) => {
+  try {
+    const leagueId = req.query.leagueId ? parseInt(req.query.leagueId) : null;
+    if (!leagueId) return res.status(400).json({ message: "leagueId required" });
+
+    const allShows = await storage.getCachedShows();
+    const showIdToDate = new Map(allShows.map((s: any) => [s.id, new Date(s.showDate).toISOString().split("T")[0]]));
+
+    const adjs = await db.select().from(pointAdjustments).where(eq(pointAdjustments.leagueId, leagueId));
+
+    const songIds = [...new Set(adjs.map(a => a.songId).filter(Boolean))] as number[];
+    const userIds = [...new Set(adjs.map(a => a.userId).filter(Boolean))] as number[];
+    const [songRows, userRows] = await Promise.all([
+      songIds.length ? db.select({ id: songs.id, title: songs.title }).from(songs).where(inArray(songs.id, songIds)) : [],
+      userIds.length ? db.select({ id: users.id, username: users.username }).from(users).where(inArray(users.id, userIds)) : [],
+    ]);
+    const songMap = new Map(songRows.map(s => [s.id, s.title]));
+    const userMap = new Map(userRows.map(u => [u.id, u.username]));
+
+    const result = adjs.map(a => {
+      const showDate = showIdToDate.get(a.concertId);
+      const songTitle = songMap.get(a.songId) ?? "(not found)";
+      const username = a.userId ? (userMap.get(a.userId) ?? "(not found)") : null;
+      return {
+        id: a.id,
+        concertId: a.concertId,
+        resolvedShowDate: showDate ?? "STALE — not in cachedShows",
+        songId: a.songId,
+        songTitle,
+        userId: a.userId,
+        username,
+        adjustedPoints: a.adjustedPoints,
+        overrideKey: showDate && songTitle !== "(not found)" && a.userId
+          ? `${showDate}:${songTitle.toLowerCase()}:${a.userId}`
+          : "CANNOT BUILD — missing data",
+      };
+    });
+
+    res.json({ leagueId, adjustmentCount: adjs.length, adjustments: result });
+  } catch (e: any) {
+    res.status(500).json({ message: e.message || "Debug query failed" });
+  }
+});
+
 // GET /api/admin/debug/player?username=pjmgagill&leagueId=26
 // Diagnoses why a player might have 0 points — no extra auth middleware so it
 // works from a plain browser URL (the app already requires login to load).
