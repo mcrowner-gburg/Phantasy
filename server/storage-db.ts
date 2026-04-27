@@ -736,7 +736,10 @@ export const storage = {
 
     // Fetch setlists in parallel batches of 8.
     const BATCH = 8;
-    const showDates = shows.map(s => new Date(s.showDate).toISOString().split("T")[0]);
+    // Deduplicate by date — getCachedShows returns all rows and the DB can have multiple
+    // rows for the same date. Without dedup, a duplicate row causes phish.in to be fetched
+    // twice for the same show and every song's points to be double-counted.
+    const showDates = [...new Set(shows.map(s => new Date(s.showDate).toISOString().split("T")[0]))];
     const fetchedSetlists: Array<{ showDate: string; tracks: any[] } | null> = [];
 
     for (let i = 0; i < showDates.length; i += BATCH) {
