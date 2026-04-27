@@ -241,11 +241,26 @@ export class CacheService {
           isCompleted: show.showdate < new Date().toISOString().split('T')[0],
         }));
 
-        // Clear and re-insert to remove stale cross-API duplicates with wrong dates
-        await db.delete(cachedShows);
+        // Upsert on phishNetId so existing row IDs are preserved.
+        // Preserving IDs is critical — pointAdjustments.concertId references these rows.
         const batchSize = 50;
         for (let i = 0; i < insertData.length; i += batchSize) {
-          await db.insert(cachedShows).values(insertData.slice(i, i + batchSize)).onConflictDoNothing();
+          await db.insert(cachedShows)
+            .values(insertData.slice(i, i + batchSize))
+            .onConflictDoUpdate({
+              target: cachedShows.phishNetId,
+              set: {
+                showDate: sql`EXCLUDED.show_date`,
+                venue: sql`EXCLUDED.venue`,
+                city: sql`EXCLUDED.city`,
+                state: sql`EXCLUDED.state`,
+                country: sql`EXCLUDED.country`,
+                tourid: sql`EXCLUDED.tourid`,
+                setlistdata: sql`EXCLUDED.setlistdata`,
+                isCompleted: sql`EXCLUDED.is_completed`,
+                cachedAt: new Date(),
+              },
+            });
         }
 
         await this.updateCacheMetadata('shows', uniqueShows.length);

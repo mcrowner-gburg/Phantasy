@@ -83,6 +83,8 @@ async function runMigrations() {
       ALTER TABLE point_adjustments DROP CONSTRAINT IF EXISTS point_adjustments_concert_id_fkey;
       ALTER TABLE point_adjustments ADD COLUMN IF NOT EXISTS occurrence integer NOT NULL DEFAULT 1;
       UPDATE users SET role = 'superadmin' WHERE username = 'mcrowner';
+      DELETE FROM point_adjustments
+        WHERE concert_id NOT IN (SELECT id FROM cached_shows);
     `);
     console.log("Migrations complete");
   } finally {
