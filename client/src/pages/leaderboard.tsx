@@ -34,6 +34,8 @@ export default function Leaderboard() {
     queryKey: [`/api/leagues/${leagueId}/standings`],
     enabled: !!leagueId,
     staleTime: 0,
+    refetchInterval: 60000,
+    refetchOnWindowFocus: true,
   });
 
   const { data: leagueInfo } = useQuery<any>({
@@ -157,7 +159,15 @@ export default function Leaderboard() {
               <CardContent className="p-6">
                 <div className="flex items-center justify-between mb-6">
                   <h3 className="text-xl font-bold">Full Standings</h3>
-                  <p className="phish-text text-sm">{standings?.length || 0} players</p>
+                  <div className="flex items-center gap-3">
+                    <p className="phish-text text-sm">{standings?.length || 0} players</p>
+                    <button
+                      onClick={() => refetchStandings()}
+                      className="text-xs text-gray-400 hover:text-white border border-gray-600 hover:border-gray-400 rounded px-2 py-1 transition-colors"
+                    >
+                      Refresh
+                    </button>
+                  </div>
                 </div>
 
                 {isLoading ? (
