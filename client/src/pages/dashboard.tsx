@@ -83,7 +83,7 @@ export default function Dashboard() {
           </div>
         </header>
 
-        <main className="p-4 lg:p-8 space-y-6 lg:space-y-8">
+        <main className="p-4 lg:p-8 pb-20 lg:pb-8 space-y-6 lg:space-y-8">
           {/* Scoring System Info */}
           <Card className="glassmorphism border-gray-600 mb-6">
             <CardContent className="p-4">

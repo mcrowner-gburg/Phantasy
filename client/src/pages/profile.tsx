@@ -107,7 +107,7 @@ export default function Profile() {
           </div>
         </header>
 
-        <main className="p-4 lg:p-8 space-y-6">
+        <main className="p-4 lg:p-8 pb-20 lg:pb-8 space-y-6">
           {/* Profile Information */}
           <Card className="glassmorphism border-gray-600">
             <CardHeader>

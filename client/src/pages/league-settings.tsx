@@ -198,7 +198,7 @@ export default function LeagueSettings() {
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 dark:from-gray-900 dark:to-gray-800">
       <NavigationSidebar />
-      <div className="lg:ml-64 p-4">
+      <div className="lg:ml-64 p-4 pb-20 lg:pb-4">
         <div className="max-w-4xl mx-auto space-y-6">
           {/* Header */}
           <Card>

@@ -1,8 +1,6 @@
 import { Link, useLocation } from "wouter";
-import { Music, Home, Trophy, Calendar, Users, User, Menu, X, Settings } from "lucide-react";
-import { Button } from "@/components/ui/button";
+import { Music, Home, Trophy, Calendar, Users, User, Settings } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
-import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
 import { useState } from "react";
 import UserMenu from "@/components/user-menu";
 import { useAuth } from "@/hooks/useAuth";
@@ -87,19 +85,27 @@ export function NavigationSidebar({ user }: NavigationSidebarProps) {
 
   return (
     <>
-      {/* Mobile Menu Button */}
-      <div className="lg:hidden fixed top-4 left-4 z-50">
-        <Sheet open={isOpen} onOpenChange={setIsOpen}>
-          <SheetTrigger asChild>
-            <Button variant="outline" size="icon" className="bg-black border-gray-700 text-white hover:bg-gray-800">
-              <Menu size={20} />
-            </Button>
-          </SheetTrigger>
-          <SheetContent side="left" className="w-64 bg-black text-white p-0 border-gray-700">
-            <SidebarContent />
-          </SheetContent>
-        </Sheet>
-      </div>
+      {/* Mobile Bottom Tab Bar */}
+      <nav
+        className="lg:hidden fixed bottom-0 left-0 right-0 z-50 bg-black border-t border-gray-800 flex"
+        style={{ paddingBottom: "env(safe-area-inset-bottom)" }}
+      >
+        {navItems.map((item) => {
+          const isActive = location === item.path || (item.path !== "/" && location.startsWith(item.path));
+          return (
+            <Link
+              key={item.path}
+              href={item.path}
+              className={`flex-1 flex flex-col items-center justify-center py-2 gap-0.5 transition-colors ${
+                isActive ? "text-green-500" : "text-gray-500"
+              }`}
+            >
+              <item.icon size={22} />
+              <span className="text-[10px] font-medium leading-tight">{item.label}</span>
+            </Link>
+          );
+        })}
+      </nav>
 
       {/* Desktop Sidebar */}
       <div className="hidden lg:block w-64 bg-black h-screen fixed left-0 top-0 z-40 overflow-y-auto">

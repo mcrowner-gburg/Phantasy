@@ -468,7 +468,7 @@ export default function Admin() {
           </div>
         </header>
 
-        <main className="p-8 space-y-8">
+        <main className="p-8 pb-20 lg:pb-8 space-y-8">
           {/* User Management Section - Super Admin Only */}
           {isSuperAdmin && (
           <Card className="glassmorphism border-purple-600">
