@@ -136,11 +136,40 @@ async function runDraftAutomation() {
   }
 }
 
+// ---------- AUTO-SCORE LOOP ----------
+// Runs every 2 hours: refreshes shows cache from phish.net, then rescores all
+// completed leagues so the leaderboard stays current without manual admin steps.
+async function runAutoScore() {
+  try {
+    const { cacheService } = await import("./services/cache-service");
+    const { storage } = await import("./storage-db");
+    const { db } = await import("./db");
+    const { leagues } = await import("../shared/schema");
+    const { eq } = await import("drizzle-orm");
+
+    await cacheService.refreshShowsCache();
+
+    const activeLeagues = await db.select().from(leagues).where(eq(leagues.draftStatus, "completed"));
+    for (const league of activeLeagues) {
+      try {
+        await storage.scoreLeague(league.id);
+        console.log(`[AutoScore] Scored league ${league.id} (${league.name})`);
+      } catch (e) {
+        console.error(`[AutoScore] Failed to score league ${league.id}:`, e);
+      }
+    }
+  } catch (e) {
+    console.error("[AutoScore] Loop error:", e);
+  }
+}
+
 // ---------- REGISTER ALL API ROUTES ----------
 const httpServer = createServer(app);
 runMigrations().then(() => registerRoutes(app)).then(() => {
   // Start draft automation loop every 30 seconds
   setInterval(runDraftAutomation, 30_000);
+  // Auto-refresh shows + rescore all completed leagues every 2 hours
+  setInterval(runAutoScore, 2 * 60 * 60 * 1000);
   // ---------- SPA FALLBACK ----------
   app.get("*", (_req, res) => {
     res.sendFile(path.join(clientDistPath, "index.html"));

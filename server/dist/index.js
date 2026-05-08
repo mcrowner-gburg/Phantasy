@@ -480,6 +480,304 @@ var init_db = __esm({
   }
 });
 
+// services/phish-api.ts
+var phish_api_exports = {};
+__export(phish_api_exports, {
+  PhishNetService: () => PhishNetService,
+  phishApi: () => phishApi
+});
+var SONGS_CACHE_DURATION, PhishNetService, phishApi;
+var init_phish_api = __esm({
+  "services/phish-api.ts"() {
+    "use strict";
+    SONGS_CACHE_DURATION = 60 * 60 * 1e3;
+    PhishNetService = class {
+      constructor() {
+        this.phishInUrl = "https://phish.in/api/v2";
+        this.phishNetUrl = "https://api.phish.net/v5";
+        this.apiKey = process.env.PHISH_NET_API_KEY || process.env.PHISH_API_KEY || "6F27E04F96EAC8C2C21B";
+        console.log(`Phish.net API initialized with key: ${this.apiKey ? "PRESENT" : "MISSING"}`);
+        console.log(`Using API key: ${this.apiKey.substring(0, 8)}...`);
+      }
+      async getUpcomingShows() {
+        return this.getUpcomingShowsPhishNet();
+      }
+      async getUpcomingShowsPhishNet() {
+        try {
+          const currentYear = (/* @__PURE__ */ new Date()).getFullYear();
+          const response = await fetch(
+            `${this.phishNetUrl}/shows/showyear/${currentYear}.json?apikey=${this.apiKey}&order_by=showdate&direction=asc`
+          );
+          if (!response.ok)
+            throw new Error(`Phish.net API error: ${response.statusText}`);
+          const data = await response.json();
+          const shows = data.data || [];
+          const todayStr = (/* @__PURE__ */ new Date()).toISOString().split("T")[0];
+          return shows.filter((show) => show.showdate >= todayStr);
+        } catch (error) {
+          console.error("Error fetching upcoming shows from Phish.net:", error);
+          return [];
+        }
+      }
+      async getRecentShows(limit = 20) {
+        try {
+          const currentYear = (/* @__PURE__ */ new Date()).getFullYear();
+          const response = await fetch(
+            `${this.phishNetUrl}/shows/showyear/${currentYear}.json?apikey=${this.apiKey}&order_by=showdate&direction=desc`
+          );
+          if (!response.ok)
+            throw new Error(`Phish.net API error: ${response.statusText}`);
+          const data = await response.json();
+          const shows = data.data || [];
+          const todayStr = (/* @__PURE__ */ new Date()).toISOString().split("T")[0];
+          return shows.filter((show) => show.showdate < todayStr).slice(0, limit).map((show) => ({
+            showid: show.showid,
+            showdate: show.showdate,
+            venue: show.venue || "Unknown Venue",
+            city: show.city || "Unknown City",
+            state: show.state || null,
+            country: show.country || "USA"
+          }));
+        } catch (error) {
+          console.error("Error fetching recent shows from Phish.net:", error);
+          return [];
+        }
+      }
+      async getShowsByYear(year) {
+        try {
+          const response = await fetch(
+            `${this.phishNetUrl}/shows/showyear/${year}.json?apikey=${this.apiKey}&order_by=showdate&direction=asc`
+          );
+          if (!response.ok)
+            throw new Error(`Phish.net API error: ${response.statusText}`);
+          const data = await response.json();
+          return (data.data || []).map((show) => ({
+            showid: show.showid,
+            showdate: show.showdate,
+            venue: show.venue || "Unknown Venue",
+            city: show.city || "Unknown City",
+            state: show.state || null,
+            country: show.country || "USA",
+            tourid: show.tourid || null
+          }));
+        } catch (error) {
+          console.error(`Error fetching shows for year ${year} from Phish.net:`, error);
+          return [];
+        }
+      }
+      async getShowsLast24Months() {
+        try {
+          const currentYear = (/* @__PURE__ */ new Date()).getFullYear();
+          const years = [currentYear, currentYear - 1, currentYear - 2];
+          const allShows = [];
+          for (const year of years) {
+            const shows = await this.getShowsByYear(year);
+            allShows.push(...shows);
+          }
+          const twentyFourMonthsAgo = /* @__PURE__ */ new Date();
+          twentyFourMonthsAgo.setMonth(twentyFourMonthsAgo.getMonth() - 24);
+          return allShows.filter(
+            (show) => new Date(show.showdate) >= twentyFourMonthsAgo && new Date(show.showdate) <= /* @__PURE__ */ new Date()
+          );
+        } catch (error) {
+          console.error("Error fetching last 24 months of shows:", error);
+          return [];
+        }
+      }
+      async getSetlist(showDate) {
+        return this.getSetlistPhishNet(showDate);
+      }
+      async getSetlistPhishNet(showDate) {
+        try {
+          const response = await fetch(
+            `${this.phishNetUrl}/setlists/showdate/${showDate}.json?apikey=${this.apiKey}`
+          );
+          if (!response.ok)
+            throw new Error(`Phish.net API error: ${response.statusText}`);
+          const data = await response.json();
+          return (data.data || []).map((row) => ({
+            title: row.song,
+            set_name: row.set === "e" ? "Encore" : row.set === "e2" ? "Encore 2" : `Set ${row.set}`,
+            position: row.position
+          }));
+        } catch (error) {
+          console.error("Error fetching setlist from Phish.net:", error);
+          return null;
+        }
+      }
+      async getAllSongsForDraft() {
+        try {
+          console.log("\u{1F3B5} Fetching complete song catalog from Phish.in API...");
+          let allSongs = [];
+          let page = 1;
+          let hasMore = true;
+          while (hasMore) {
+            const response = await fetch(
+              `${this.phishInUrl}/songs?per_page=100&page=${page}`,
+              { headers: { "Accept": "application/json" } }
+            );
+            if (!response.ok)
+              throw new Error(`Phish.in API error: ${response.statusText}`);
+            const data = await response.json();
+            const songs2 = data.data || [];
+            allSongs = [...allSongs, ...songs2];
+            hasMore = data.meta?.next_page !== null && songs2.length === 100;
+            page++;
+            if (page > 20)
+              break;
+          }
+          console.log(`\u2705 Fetched ${allSongs.length} songs from Phish.in`);
+          return allSongs.map((song) => ({
+            songid: String(song.id || song.slug),
+            song: song.title,
+            times_played: song.times_played || 0,
+            last_played: song.last_played_at || null,
+            gap: song.gap || 0,
+            debut_date: song.debut_at || null,
+            original_artist: song.original_artist || null,
+            slug: song.slug
+          }));
+        } catch (error) {
+          console.error("\u{1F4A5} Error fetching from Phish.in, falling back to Phish.net:", error);
+          return this.getAllSongsPhishNet();
+        }
+      }
+      async getAllSongsPhishNet() {
+        try {
+          console.log("\u{1F504} Falling back to Phish.net for songs...");
+          const response = await fetch(
+            `${this.phishNetUrl}/songs.json?apikey=${this.apiKey}&limit=10000`
+          );
+          if (!response.ok)
+            throw new Error(`Phish.net API error: ${response.statusText}`);
+          const data = await response.json();
+          const songs2 = data?.data || [];
+          console.log(`\u2705 Got ${songs2.length} songs from Phish.net fallback`);
+          return songs2.map((song) => ({
+            songid: String(song.songid || song.id),
+            song: song.song || song.title,
+            times_played: song.times_played || 0,
+            last_played: song.last_played || null,
+            gap: song.gap || 0,
+            debut_date: song.debut_date || null,
+            original_artist: song.original_artist || null
+          }));
+        } catch (error) {
+          console.error("Error fetching from Phish.net fallback:", error);
+          return this.getFallbackSongs().map((song) => ({
+            songid: String(song.id),
+            song: song.title,
+            times_played: song.total_plays,
+            last_played: null,
+            gap: 50,
+            debut_date: null,
+            original_artist: null
+          }));
+        }
+      }
+      async getSongStats(songName) {
+        try {
+          const response = await fetch(
+            `${this.phishNetUrl}/songs/stats.json?apikey=${this.apiKey}&song=${encodeURIComponent(songName)}`
+          );
+          if (!response.ok)
+            throw new Error(`Phish.net API error: ${response.statusText}`);
+          const data = await response.json();
+          return data.response?.data || null;
+        } catch (error) {
+          console.error("Error fetching song stats:", error);
+          return null;
+        }
+      }
+      async getShowWithDurations(showDate) {
+        try {
+          const response = await fetch(
+            `${this.phishInUrl}/shows/${showDate}`,
+            { headers: { "Accept": "application/json" } }
+          );
+          if (!response.ok)
+            throw new Error(`Phish.in API error: ${response.statusText}`);
+          return await response.json();
+        } catch (error) {
+          console.error(`Error fetching show with durations for ${showDate}:`, error);
+          return null;
+        }
+      }
+      categoryzeSong(title) {
+        const titleLower = title.toLowerCase();
+        if (["tweezer", "ghost", "simple", "you enjoy myself", "david bowie", "wolfmans brother", "mike song", "piper", "weekapaug groove"].some((j) => titleLower.includes(j)))
+          return "jam";
+        if (["fluffhead", "harry hood", "slave to the traffic light", "run like an antelope"].some((e) => titleLower.includes(e)))
+          return "epic";
+        if (["divided sky", "reba", "foam", "theme from the bottom"].some((c) => titleLower.includes(c)))
+          return "composed";
+        if (["possum", "stash", "maze", "chalk dust torture", "julius", "suzy greenberg"].some((r) => titleLower.includes(r)))
+          return "rock";
+        if (["mercury", "thread", "sigma oasis", "ruby waves", "everything's right", "blaze on", "fuego", "waves"].some((m) => titleLower.includes(m)))
+          return "modern";
+        if (["the sloth", "contact", "oh kee pa", "harpua", "icculus", "gamehendge"].some((r) => titleLower.includes(r)))
+          return "rare";
+        return "classic";
+      }
+      calculateRarityScore(totalPlays) {
+        if (totalPlays > 300)
+          return 5;
+        if (totalPlays > 200)
+          return 15;
+        if (totalPlays > 100)
+          return 30;
+        if (totalPlays > 50)
+          return 50;
+        if (totalPlays > 10)
+          return 70;
+        return 90;
+      }
+      getFallbackSongs() {
+        return [
+          { id: 1001, title: "Tweezer", category: "jam", rarity_score: 5, total_plays: 411, plays_24_months: 22 },
+          { id: 1002, title: "You Enjoy Myself", category: "jam", rarity_score: 15, total_plays: 350, plays_24_months: 20 },
+          { id: 1003, title: "Ghost", category: "jam", rarity_score: 15, total_plays: 290, plays_24_months: 17 },
+          { id: 1004, title: "Harry Hood", category: "epic", rarity_score: 20, total_plays: 275, plays_24_months: 15 },
+          { id: 1005, title: "Fluffhead", category: "epic", rarity_score: 30, total_plays: 286, plays_24_months: 10 },
+          { id: 1006, title: "Divided Sky", category: "composed", rarity_score: 35, total_plays: 250, plays_24_months: 8 },
+          { id: 1007, title: "Possum", category: "rock", rarity_score: 15, total_plays: 310, plays_24_months: 18 },
+          { id: 1008, title: "Wilson", category: "classic", rarity_score: 25, total_plays: 300, plays_24_months: 11 },
+          { id: 1009, title: "Character Zero", category: "rock", rarity_score: 18, total_plays: 275, plays_24_months: 13 },
+          { id: 1010, title: "Down with Disease", category: "funk", rarity_score: 12, total_plays: 310, plays_24_months: 17 }
+        ];
+      }
+      async getSongById(songId) {
+        const songs2 = await this.getAllSongsForDraft();
+        return songs2.find((song) => song.id === songId) || null;
+      }
+      async saveSongToDatabase(songData) {
+        const { db: db2 } = await Promise.resolve().then(() => (init_db(), db_exports));
+        const { songs: songs2 } = await Promise.resolve().then(() => (init_schema(), schema_exports));
+        try {
+          const [savedSong] = await db2.insert(songs2).values({
+            title: songData.title,
+            category: songData.category,
+            rarityScore: songData.rarity_score || 50,
+            totalPlays: songData.total_plays || 0,
+            lastPlayed: songData.last_played || null
+          }).onConflictDoUpdate({
+            target: [songs2.title],
+            set: {
+              totalPlays: songData.total_plays || 0,
+              lastPlayed: songData.last_played || null
+            }
+          }).returning();
+          return savedSong;
+        } catch (error) {
+          console.error("Error saving song to database:", error);
+          throw error;
+        }
+      }
+    };
+    phishApi = new PhishNetService();
+  }
+});
+
 // storage-db.ts
 var storage_db_exports = {};
 __export(storage_db_exports, {
@@ -1024,18 +1322,13 @@ var init_storage_db = __esm({
         const BATCH = 8;
         const showDates = [...new Set(shows.map((s) => new Date(s.showDate).toISOString().split("T")[0]))];
         const fetchedSetlists = [];
+        const { phishApi: phishApi2 } = await Promise.resolve().then(() => (init_phish_api(), phish_api_exports));
         for (let i = 0; i < showDates.length; i += BATCH) {
           const chunk = showDates.slice(i, i + BATCH);
           const results = await Promise.all(chunk.map(async (showDate) => {
             try {
-              const res = await fetch(`https://phish.in/api/v2/shows/${showDate}`, {
-                headers: { Accept: "application/json" }
-              });
-              if (!res.ok)
-                return null;
-              const data = await res.json();
-              const tracks = data.tracks || [];
-              return tracks.length > 0 ? { showDate, tracks } : null;
+              const tracks = await phishApi2.getSetlist(showDate);
+              return tracks && tracks.length > 0 ? { showDate, tracks } : null;
             } catch {
               return null;
             }
@@ -1063,18 +1356,10 @@ var init_storage_db = __esm({
             const setKey = t.set_name || "Set 1";
             const isEncore = setKey.toLowerCase().includes("encore");
             const isSetOpener = !isEncore && t.position === firstPosBySet[setKey];
-            const durationSecs = t.duration ? Math.round(t.duration / 1e3) : 0;
-            const mins = durationSecs / 60;
             let basePts = 1;
             if (isSetOpener)
               basePts += 1;
             if (isEncore)
-              basePts += 1;
-            if (mins >= 20)
-              basePts += 1;
-            if (mins >= 30)
-              basePts += 1;
-            if (mins >= 40)
               basePts += 1;
             const entries = titleMap[title];
             if (entries && entries.length > 0) {
@@ -1275,318 +1560,6 @@ var init_storage_db = __esm({
         return result[0];
       }
     };
-  }
-});
-
-// services/phish-api.ts
-var SONGS_CACHE_DURATION, PhishNetService, phishApi;
-var init_phish_api = __esm({
-  "services/phish-api.ts"() {
-    "use strict";
-    SONGS_CACHE_DURATION = 60 * 60 * 1e3;
-    PhishNetService = class {
-      constructor() {
-        this.phishInUrl = "https://phish.in/api/v2";
-        this.phishNetUrl = "https://api.phish.net/v5";
-        this.apiKey = process.env.PHISH_NET_API_KEY || process.env.PHISH_API_KEY || "6F27E04F96EAC8C2C21B";
-        console.log(`Phish.net API initialized with key: ${this.apiKey ? "PRESENT" : "MISSING"}`);
-        console.log(`Using API key: ${this.apiKey.substring(0, 8)}...`);
-      }
-      async getUpcomingShows() {
-        return this.getUpcomingShowsPhishNet();
-      }
-      async getUpcomingShowsPhishNet() {
-        try {
-          const currentYear = (/* @__PURE__ */ new Date()).getFullYear();
-          const response = await fetch(
-            `${this.phishNetUrl}/shows/showyear/${currentYear}.json?apikey=${this.apiKey}&order_by=showdate&direction=asc`
-          );
-          if (!response.ok)
-            throw new Error(`Phish.net API error: ${response.statusText}`);
-          const data = await response.json();
-          const shows = data.data || [];
-          const todayStr = (/* @__PURE__ */ new Date()).toISOString().split("T")[0];
-          return shows.filter((show) => show.showdate >= todayStr);
-        } catch (error) {
-          console.error("Error fetching upcoming shows from Phish.net:", error);
-          return [];
-        }
-      }
-      async getRecentShows(limit = 20) {
-        try {
-          const currentYear = (/* @__PURE__ */ new Date()).getFullYear();
-          const response = await fetch(
-            `${this.phishNetUrl}/shows/showyear/${currentYear}.json?apikey=${this.apiKey}&order_by=showdate&direction=desc`
-          );
-          if (!response.ok)
-            throw new Error(`Phish.net API error: ${response.statusText}`);
-          const data = await response.json();
-          const shows = data.data || [];
-          const todayStr = (/* @__PURE__ */ new Date()).toISOString().split("T")[0];
-          return shows.filter((show) => show.showdate < todayStr).slice(0, limit).map((show) => ({
-            showid: show.showid,
-            showdate: show.showdate,
-            venue: show.venue || "Unknown Venue",
-            city: show.city || "Unknown City",
-            state: show.state || null,
-            country: show.country || "USA"
-          }));
-        } catch (error) {
-          console.error("Error fetching recent shows from Phish.net:", error);
-          return [];
-        }
-      }
-      async getShowsByYear(year) {
-        try {
-          const response = await fetch(
-            `${this.phishNetUrl}/shows/showyear/${year}.json?apikey=${this.apiKey}&order_by=showdate&direction=asc`
-          );
-          if (!response.ok)
-            throw new Error(`Phish.net API error: ${response.statusText}`);
-          const data = await response.json();
-          return (data.data || []).map((show) => ({
-            showid: show.showid,
-            showdate: show.showdate,
-            venue: show.venue || "Unknown Venue",
-            city: show.city || "Unknown City",
-            state: show.state || null,
-            country: show.country || "USA",
-            tourid: show.tourid || null
-          }));
-        } catch (error) {
-          console.error(`Error fetching shows for year ${year} from Phish.net:`, error);
-          return [];
-        }
-      }
-      async getShowsLast24Months() {
-        try {
-          const currentYear = (/* @__PURE__ */ new Date()).getFullYear();
-          const years = [currentYear, currentYear - 1, currentYear - 2];
-          const allShows = [];
-          for (const year of years) {
-            const shows = await this.getShowsByYear(year);
-            allShows.push(...shows);
-          }
-          const twentyFourMonthsAgo = /* @__PURE__ */ new Date();
-          twentyFourMonthsAgo.setMonth(twentyFourMonthsAgo.getMonth() - 24);
-          return allShows.filter(
-            (show) => new Date(show.showdate) >= twentyFourMonthsAgo && new Date(show.showdate) <= /* @__PURE__ */ new Date()
-          );
-        } catch (error) {
-          console.error("Error fetching last 24 months of shows:", error);
-          return [];
-        }
-      }
-      async getSetlist(showDate) {
-        try {
-          const response = await fetch(
-            `${this.phishInUrl}/shows/${showDate}`,
-            { headers: { "Accept": "application/json" } }
-          );
-          if (!response.ok)
-            throw new Error(`Phish.in API error: ${response.statusText}`);
-          const data = await response.json();
-          const tracks = [];
-          for (const track of data.tracks || []) {
-            tracks.push({
-              song: track.title,
-              duration: track.duration,
-              // duration in seconds
-              position: track.position,
-              set: track.set_name,
-              isEncore: track.set_name?.toLowerCase().includes("encore")
-            });
-          }
-          return tracks;
-        } catch (error) {
-          console.error("Error fetching setlist from Phish.in, trying Phish.net:", error);
-          return this.getSetlistPhishNet(showDate);
-        }
-      }
-      async getSetlistPhishNet(showDate) {
-        try {
-          const response = await fetch(
-            `${this.phishNetUrl}/setlists/showdate/${showDate}.json?apikey=${this.apiKey}`
-          );
-          if (!response.ok)
-            throw new Error(`Phish.net API error: ${response.statusText}`);
-          const data = await response.json();
-          return data.data || null;
-        } catch (error) {
-          console.error("Error fetching setlist from Phish.net:", error);
-          return null;
-        }
-      }
-      async getAllSongsForDraft() {
-        try {
-          console.log("\u{1F3B5} Fetching complete song catalog from Phish.in API...");
-          let allSongs = [];
-          let page = 1;
-          let hasMore = true;
-          while (hasMore) {
-            const response = await fetch(
-              `${this.phishInUrl}/songs?per_page=100&page=${page}`,
-              { headers: { "Accept": "application/json" } }
-            );
-            if (!response.ok)
-              throw new Error(`Phish.in API error: ${response.statusText}`);
-            const data = await response.json();
-            const songs2 = data.data || [];
-            allSongs = [...allSongs, ...songs2];
-            hasMore = data.meta?.next_page !== null && songs2.length === 100;
-            page++;
-            if (page > 20)
-              break;
-          }
-          console.log(`\u2705 Fetched ${allSongs.length} songs from Phish.in`);
-          return allSongs.map((song) => ({
-            songid: String(song.id || song.slug),
-            song: song.title,
-            times_played: song.times_played || 0,
-            last_played: song.last_played_at || null,
-            gap: song.gap || 0,
-            debut_date: song.debut_at || null,
-            original_artist: song.original_artist || null,
-            slug: song.slug
-          }));
-        } catch (error) {
-          console.error("\u{1F4A5} Error fetching from Phish.in, falling back to Phish.net:", error);
-          return this.getAllSongsPhishNet();
-        }
-      }
-      async getAllSongsPhishNet() {
-        try {
-          console.log("\u{1F504} Falling back to Phish.net for songs...");
-          const response = await fetch(
-            `${this.phishNetUrl}/songs.json?apikey=${this.apiKey}&limit=10000`
-          );
-          if (!response.ok)
-            throw new Error(`Phish.net API error: ${response.statusText}`);
-          const data = await response.json();
-          const songs2 = data?.data || [];
-          console.log(`\u2705 Got ${songs2.length} songs from Phish.net fallback`);
-          return songs2.map((song) => ({
-            songid: String(song.songid || song.id),
-            song: song.song || song.title,
-            times_played: song.times_played || 0,
-            last_played: song.last_played || null,
-            gap: song.gap || 0,
-            debut_date: song.debut_date || null,
-            original_artist: song.original_artist || null
-          }));
-        } catch (error) {
-          console.error("Error fetching from Phish.net fallback:", error);
-          return this.getFallbackSongs().map((song) => ({
-            songid: String(song.id),
-            song: song.title,
-            times_played: song.total_plays,
-            last_played: null,
-            gap: 50,
-            debut_date: null,
-            original_artist: null
-          }));
-        }
-      }
-      async getSongStats(songName) {
-        try {
-          const response = await fetch(
-            `${this.phishNetUrl}/songs/stats.json?apikey=${this.apiKey}&song=${encodeURIComponent(songName)}`
-          );
-          if (!response.ok)
-            throw new Error(`Phish.net API error: ${response.statusText}`);
-          const data = await response.json();
-          return data.response?.data || null;
-        } catch (error) {
-          console.error("Error fetching song stats:", error);
-          return null;
-        }
-      }
-      async getShowWithDurations(showDate) {
-        try {
-          const response = await fetch(
-            `${this.phishInUrl}/shows/${showDate}`,
-            { headers: { "Accept": "application/json" } }
-          );
-          if (!response.ok)
-            throw new Error(`Phish.in API error: ${response.statusText}`);
-          return await response.json();
-        } catch (error) {
-          console.error(`Error fetching show with durations for ${showDate}:`, error);
-          return null;
-        }
-      }
-      categoryzeSong(title) {
-        const titleLower = title.toLowerCase();
-        if (["tweezer", "ghost", "simple", "you enjoy myself", "david bowie", "wolfmans brother", "mike song", "piper", "weekapaug groove"].some((j) => titleLower.includes(j)))
-          return "jam";
-        if (["fluffhead", "harry hood", "slave to the traffic light", "run like an antelope"].some((e) => titleLower.includes(e)))
-          return "epic";
-        if (["divided sky", "reba", "foam", "theme from the bottom"].some((c) => titleLower.includes(c)))
-          return "composed";
-        if (["possum", "stash", "maze", "chalk dust torture", "julius", "suzy greenberg"].some((r) => titleLower.includes(r)))
-          return "rock";
-        if (["mercury", "thread", "sigma oasis", "ruby waves", "everything's right", "blaze on", "fuego", "waves"].some((m) => titleLower.includes(m)))
-          return "modern";
-        if (["the sloth", "contact", "oh kee pa", "harpua", "icculus", "gamehendge"].some((r) => titleLower.includes(r)))
-          return "rare";
-        return "classic";
-      }
-      calculateRarityScore(totalPlays) {
-        if (totalPlays > 300)
-          return 5;
-        if (totalPlays > 200)
-          return 15;
-        if (totalPlays > 100)
-          return 30;
-        if (totalPlays > 50)
-          return 50;
-        if (totalPlays > 10)
-          return 70;
-        return 90;
-      }
-      getFallbackSongs() {
-        return [
-          { id: 1001, title: "Tweezer", category: "jam", rarity_score: 5, total_plays: 411, plays_24_months: 22 },
-          { id: 1002, title: "You Enjoy Myself", category: "jam", rarity_score: 15, total_plays: 350, plays_24_months: 20 },
-          { id: 1003, title: "Ghost", category: "jam", rarity_score: 15, total_plays: 290, plays_24_months: 17 },
-          { id: 1004, title: "Harry Hood", category: "epic", rarity_score: 20, total_plays: 275, plays_24_months: 15 },
-          { id: 1005, title: "Fluffhead", category: "epic", rarity_score: 30, total_plays: 286, plays_24_months: 10 },
-          { id: 1006, title: "Divided Sky", category: "composed", rarity_score: 35, total_plays: 250, plays_24_months: 8 },
-          { id: 1007, title: "Possum", category: "rock", rarity_score: 15, total_plays: 310, plays_24_months: 18 },
-          { id: 1008, title: "Wilson", category: "classic", rarity_score: 25, total_plays: 300, plays_24_months: 11 },
-          { id: 1009, title: "Character Zero", category: "rock", rarity_score: 18, total_plays: 275, plays_24_months: 13 },
-          { id: 1010, title: "Down with Disease", category: "funk", rarity_score: 12, total_plays: 310, plays_24_months: 17 }
-        ];
-      }
-      async getSongById(songId) {
-        const songs2 = await this.getAllSongsForDraft();
-        return songs2.find((song) => song.id === songId) || null;
-      }
-      async saveSongToDatabase(songData) {
-        const { db: db2 } = await Promise.resolve().then(() => (init_db(), db_exports));
-        const { songs: songs2 } = await Promise.resolve().then(() => (init_schema(), schema_exports));
-        try {
-          const [savedSong] = await db2.insert(songs2).values({
-            title: songData.title,
-            category: songData.category,
-            rarityScore: songData.rarity_score || 50,
-            totalPlays: songData.total_plays || 0,
-            lastPlayed: songData.last_played || null
-          }).onConflictDoUpdate({
-            target: [songs2.title],
-            set: {
-              totalPlays: songData.total_plays || 0,
-              lastPlayed: songData.last_played || null
-            }
-          }).returning();
-          return savedSong;
-        } catch (error) {
-          console.error("Error saving song to database:", error);
-          throw error;
-        }
-      }
-    };
-    phishApi = new PhishNetService();
   }
 });
 
@@ -17519,9 +17492,31 @@ async function runDraftAutomation() {
     console.error("[DraftAuto] Loop error:", e);
   }
 }
+async function runAutoScore() {
+  try {
+    const { cacheService: cacheService2 } = await Promise.resolve().then(() => (init_cache_service(), cache_service_exports));
+    const { storage: storage2 } = await Promise.resolve().then(() => (init_storage_db(), storage_db_exports));
+    const { db: db2 } = await Promise.resolve().then(() => (init_db(), db_exports));
+    const { leagues: leagues2 } = await Promise.resolve().then(() => (init_schema(), schema_exports));
+    const { eq: eq5 } = await import("drizzle-orm");
+    await cacheService2.refreshShowsCache();
+    const activeLeagues = await db2.select().from(leagues2).where(eq5(leagues2.draftStatus, "completed"));
+    for (const league of activeLeagues) {
+      try {
+        await storage2.scoreLeague(league.id);
+        console.log(`[AutoScore] Scored league ${league.id} (${league.name})`);
+      } catch (e) {
+        console.error(`[AutoScore] Failed to score league ${league.id}:`, e);
+      }
+    }
+  } catch (e) {
+    console.error("[AutoScore] Loop error:", e);
+  }
+}
 var httpServer = (0, import_http2.createServer)(app);
 runMigrations().then(() => registerRoutes(app)).then(() => {
   setInterval(runDraftAutomation, 3e4);
+  setInterval(runAutoScore, 2 * 60 * 60 * 1e3);
   app.get("*", (_req, res) => {
     res.sendFile(import_path.default.join(clientDistPath, "index.html"));
   });

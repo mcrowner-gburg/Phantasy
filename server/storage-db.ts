@@ -711,17 +711,15 @@ export const storage = {
     const showDates = [...new Set(shows.map(s => new Date(s.showDate).toISOString().split("T")[0]))];
     const fetchedSetlists: Array<{ showDate: string; tracks: any[] } | null> = [];
 
+    // Use phishApi.getSetlist() so we get the phish.net fallback when phish.in
+    // hasn't indexed a recent show yet (phish.in can lag 1-2 days behind phish.net).
+    const { phishApi } = await import("./services/phish-api");
     for (let i = 0; i < showDates.length; i += BATCH) {
       const chunk = showDates.slice(i, i + BATCH);
       const results = await Promise.all(chunk.map(async (showDate) => {
         try {
-          const res = await fetch(`https://phish.in/api/v2/shows/${showDate}`, {
-            headers: { Accept: "application/json" },
-          });
-          if (!res.ok) return null;
-          const data = await res.json();
-          const tracks: any[] = data.tracks || [];
-          return tracks.length > 0 ? { showDate, tracks } : null;
+          const tracks = await phishApi.getSetlist(showDate);
+          return tracks && tracks.length > 0 ? { showDate, tracks } : null;
         } catch { return null; }
       }));
       fetchedSetlists.push(...results);
@@ -754,15 +752,17 @@ export const storage = {
         const setKey = t.set_name || "Set 1";
         const isEncore = setKey.toLowerCase().includes("encore");
         const isSetOpener = !isEncore && t.position === firstPosBySet[setKey];
+        /* PHISH.IN DURATION BONUSES — preserved for future use
         const durationSecs = t.duration ? Math.round(t.duration / 1000) : 0;
         const mins = durationSecs / 60;
+        if (mins >= 20)  basePts += 1;
+        if (mins >= 30)  basePts += 1;
+        if (mins >= 40)  basePts += 1;
+        */
 
         let basePts = 1;
         if (isSetOpener) basePts += 1;
         if (isEncore)    basePts += 1;
-        if (mins >= 20)  basePts += 1;
-        if (mins >= 30)  basePts += 1;
-        if (mins >= 40)  basePts += 1;
 
         const entries = titleMap[title];
         if (entries && entries.length > 0) {

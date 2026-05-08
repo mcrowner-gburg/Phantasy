@@ -137,6 +137,7 @@ export class PhishNetService {
   }
 
   async getSetlist(showDate: string): Promise<any> {
+    /* PHISH.IN — preserved for future use (duration-based bonus points)
     try {
       const response = await fetch(
         `${this.phishInUrl}/shows/${showDate}`,
@@ -144,16 +145,13 @@ export class PhishNetService {
       );
       if (!response.ok) throw new Error(`Phish.in API error: ${response.statusText}`);
       const data = await response.json();
-      
-      // Flatten tracks — phish.in v2 returns tracks directly on the show with set_name per track
       const tracks: any[] = [];
       for (const track of data.tracks || []) {
         tracks.push({
-          song: track.title,
-          duration: track.duration, // duration in seconds
+          title: track.title,
+          duration: track.duration, // ms — used for duration bonus pts
           position: track.position,
-          set: track.set_name,
-          isEncore: track.set_name?.toLowerCase().includes('encore'),
+          set_name: track.set_name,
         });
       }
       return tracks;
@@ -161,16 +159,27 @@ export class PhishNetService {
       console.error("Error fetching setlist from Phish.in, trying Phish.net:", error);
       return this.getSetlistPhishNet(showDate);
     }
+    */
+    return this.getSetlistPhishNet(showDate);
   }
 
-  private async getSetlistPhishNet(showDate: string): Promise<any> {
+  async getSetlistPhishNet(showDate: string): Promise<any> {
     try {
       const response = await fetch(
         `${this.phishNetUrl}/setlists/showdate/${showDate}.json?apikey=${this.apiKey}`
       );
       if (!response.ok) throw new Error(`Phish.net API error: ${response.statusText}`);
       const data = await response.json();
-      return data.data || null;
+      // Normalize phish.net fields to match the scoring loop's expected shape:
+      //   song → title, set ("1"/"2"/"e") → set_name ("Set 1"/"Set 2"/"Encore")
+      // No duration field — duration bonuses are handled via manual point adjustments.
+      return (data.data || []).map((row: any) => ({
+        title: row.song,
+        set_name: row.set === "e"  ? "Encore"
+                : row.set === "e2" ? "Encore 2"
+                : `Set ${row.set}`,
+        position: row.position,
+      }));
     } catch (error) {
       console.error("Error fetching setlist from Phish.net:", error);
       return null;
