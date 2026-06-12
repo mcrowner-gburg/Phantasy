@@ -23,8 +23,8 @@ app.use(urlencoded({ extended: true }));
 // do not add a second express-session here, the two stores conflict.
 
 // ---------- HEALTH / VERSION ----------
-app.get("/health", (_req, res) => res.json({ status: "ok", build: "2026-04-24-v3" }));
-app.get("/api/version", (_req, res) => res.json({ build: "2026-04-24-v3" }));
+app.get("/health", (_req, res) => res.json({ status: "ok", build: "2026-06-12-refactor" }));
+app.get("/api/version", (_req, res) => res.json({ build: "2026-06-12-refactor" }));
 
 // ---------- SERVE FRONTEND ----------
 // Try server/dist/client first, fall back to client/dist (in case build phase
