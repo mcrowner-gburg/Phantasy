@@ -33,9 +33,12 @@ export class PhishNetService {
     this.apiKey =
       process.env.PHISH_NET_API_KEY ||
       process.env.PHISH_API_KEY ||
-      "6F27E04F96EAC8C2C21B";
-    console.log(`Phish.net API initialized with key: ${this.apiKey ? 'PRESENT' : 'MISSING'}`);
-    console.log(`Using API key: ${this.apiKey.substring(0, 8)}...`);
+      "";
+    if (!this.apiKey) {
+      console.error("FATAL: PHISH_NET_API_KEY is not set — setlist fetching and scoring will fail");
+    } else {
+      console.log(`Phish.net API initialized with key: ${this.apiKey.substring(0, 4)}…`);
+    }
   }
 
   async getUpcomingShows(): Promise<any[]> {

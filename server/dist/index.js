@@ -495,9 +495,12 @@ var init_phish_api = __esm({
       constructor() {
         this.phishInUrl = "https://phish.in/api/v2";
         this.phishNetUrl = "https://api.phish.net/v5";
-        this.apiKey = process.env.PHISH_NET_API_KEY || process.env.PHISH_API_KEY || "6F27E04F96EAC8C2C21B";
-        console.log(`Phish.net API initialized with key: ${this.apiKey ? "PRESENT" : "MISSING"}`);
-        console.log(`Using API key: ${this.apiKey.substring(0, 8)}...`);
+        this.apiKey = process.env.PHISH_NET_API_KEY || process.env.PHISH_API_KEY || "";
+        if (!this.apiKey) {
+          console.error("FATAL: PHISH_NET_API_KEY is not set \u2014 setlist fetching and scoring will fail");
+        } else {
+          console.log(`Phish.net API initialized with key: ${this.apiKey.substring(0, 4)}\u2026`);
+        }
       }
       async getUpcomingShows() {
         return this.getUpcomingShowsPhishNet();
@@ -10418,10 +10421,8 @@ var init_cache_service = __esm({
 
 // index.ts
 var import_express2 = __toESM(require("express"));
-var import_express_session2 = __toESM(require("express-session"));
 var import_serverless2 = require("@neondatabase/serverless");
 var import_ws2 = __toESM(require("ws"));
-var import_connect_pg_simple2 = __toESM(require("connect-pg-simple"));
 var import_path = __toESM(require("path"));
 var import_http2 = require("http");
 
@@ -15730,6 +15731,20 @@ var requireSuperAdmin = async (req, res, next) => {
     res.status(500).json({ message: "Server error" });
   }
 };
+var requireAdmin = async (req, res, next) => {
+  try {
+    const userId = getSessionUserId(req);
+    if (!userId)
+      return res.status(401).json({ message: "Not authenticated" });
+    const isAdmin = await storage.isUserAdmin(userId);
+    if (!isAdmin)
+      return res.status(403).json({ message: "Admin access required" });
+    next();
+  } catch (error) {
+    console.error("Admin middleware error:", error);
+    res.status(500).json({ message: "Server error" });
+  }
+};
 var requireLeagueAdmin = async (req, res, next) => {
   try {
     const userId = getSessionUserId(req);
@@ -15752,10 +15767,16 @@ var requireLeagueAdmin = async (req, res, next) => {
 
 // routes/admin.ts
 var router = (0, import_express.Router)();
-router.post("/users", createUser);
-router.get("/users", getUsers);
-router.put("/users/:id", updateUser);
-router.delete("/users/:id", deleteUser);
+router.use((req, res, next) => {
+  const userId = req.session?.user?.id || req.session?.userId;
+  if (!userId)
+    return res.status(401).json({ message: "Not authenticated" });
+  next();
+});
+router.post("/users", requireSuperAdmin, createUser);
+router.get("/users", requireAdmin, getUsers);
+router.put("/users/:id", requireSuperAdmin, updateUser);
+router.delete("/users/:id", requireSuperAdmin, deleteUser);
 router.get("/concerts", async (_req, res) => {
   try {
     const shows = await storage.getCachedShows();
@@ -15791,7 +15812,7 @@ router.post("/refresh-shows", async (_req, res) => {
     res.status(500).json({ message: e.message || "Failed to refresh shows cache" });
   }
 });
-router.get("/leagues", async (_req, res) => {
+router.get("/leagues", requireAdmin, async (_req, res) => {
   try {
     const leagues2 = await storage.getAllLeagues();
     res.json(leagues2);
@@ -15799,7 +15820,7 @@ router.get("/leagues", async (_req, res) => {
     res.status(500).json({ message: e.message || "Failed to fetch leagues" });
   }
 });
-router.get("/shows/:concertId/league/:leagueId", async (req, res) => {
+router.get("/shows/:concertId/league/:leagueId", requireLeagueAdmin, async (req, res) => {
   try {
     const concertId = parseInt(req.params.concertId);
     const leagueId = parseInt(req.params.leagueId);
@@ -16036,7 +16057,7 @@ router.put("/users/:id/role", requireSuperAdmin, async (req, res) => {
     res.status(500).json({ message: e.message || "Failed to update role" });
   }
 });
-router.get("/debug/adjustments", async (req, res) => {
+router.get("/debug/adjustments", requireAdmin, async (req, res) => {
   try {
     const leagueId = req.query.leagueId ? parseInt(req.query.leagueId) : null;
     if (!leagueId)
@@ -16073,7 +16094,7 @@ router.get("/debug/adjustments", async (req, res) => {
     res.status(500).json({ message: e.message || "Debug query failed" });
   }
 });
-router.get("/debug/player", async (req, res) => {
+router.get("/debug/player", requireAdmin, async (req, res) => {
   try {
     const username = String(req.query.username || "");
     const leagueId = req.query.leagueId ? parseInt(req.query.leagueId) : null;
@@ -16113,6 +16134,24 @@ var admin_default = router;
 init_cache_service();
 init_db();
 var import_drizzle_orm4 = require("drizzle-orm");
+async function requireLeagueOwnerOrAdmin(req, res, next) {
+  try {
+    const userId = req.session?.userId || req.session?.user?.id;
+    if (!userId)
+      return res.status(401).json({ message: "Authentication required" });
+    const leagueId = parseInt(req.params.id);
+    if (isNaN(leagueId))
+      return res.status(400).json({ message: "Invalid league id" });
+    if (await storage.isUserAdmin(userId))
+      return next();
+    if (await storage.isUserLeagueAdmin(userId, leagueId))
+      return next();
+    return res.status(403).json({ message: "League owner or admin access required" });
+  } catch (e) {
+    console.error("League owner middleware error:", e);
+    return res.status(500).json({ message: "Server error" });
+  }
+}
 var serverAutoDraftEnabled = /* @__PURE__ */ new Set();
 var serverAutoDraftRegistry = /* @__PURE__ */ new Map();
 async function registerRoutes(app2) {
@@ -16162,7 +16201,7 @@ async function registerRoutes(app2) {
       res.status(500).json({ message: "Failed to fetch tour" });
     }
   });
-  app2.post("/api/tours", async (req, res) => {
+  app2.post("/api/tours", requireAuth, requireAdmin, async (req, res) => {
     try {
       const tourData = insertTourSchema.parse(req.body);
       const tour = await storage.createTour(tourData);
@@ -16197,7 +16236,7 @@ async function registerRoutes(app2) {
       res.status(500).json({ message: "Failed to fetch leagues" });
     }
   });
-  app2.post("/api/leagues", async (req, res) => {
+  app2.post("/api/leagues", requireAuth, async (req, res) => {
     try {
       const body = { ...req.body };
       if (body.seasonStartDate)
@@ -16205,10 +16244,7 @@ async function registerRoutes(app2) {
       if (body.seasonEndDate)
         body.seasonEndDate = new Date(body.seasonEndDate);
       const leagueData = insertLeagueSchema.partial({ tourId: true, seasonStartDate: true, seasonEndDate: true }).parse(body);
-      const { ownerId } = req.body;
-      if (!ownerId) {
-        return res.status(400).json({ message: "Owner ID required" });
-      }
+      const ownerId = req.userId;
       const league = await storage.createLeague({ ...leagueData, ownerId });
       res.json(league);
     } catch (error) {
@@ -16297,7 +16333,7 @@ async function registerRoutes(app2) {
       res.status(500).json({ message: "Failed to join league" });
     }
   });
-  app2.post("/api/leagues/:id/join", async (req, res) => {
+  app2.post("/api/leagues/:id/join", requireAuth, async (req, res) => {
     try {
       const leagueId = parseInt(req.params.id);
       const { userId } = req.body;
@@ -16310,7 +16346,7 @@ async function registerRoutes(app2) {
       res.status(400).json({ message: error.message || "Failed to join league" });
     }
   });
-  app2.post("/api/leagues/:id/invite", async (req, res) => {
+  app2.post("/api/leagues/:id/invite", requireAuth, requireLeagueOwnerOrAdmin, async (req, res) => {
     try {
       const leagueId = parseInt(req.params.id);
       const createdBy = req.session?.user?.id || req.session?.userId || req.body?.createdBy;
@@ -16328,18 +16364,6 @@ async function registerRoutes(app2) {
       res.json({ inviteCode, joinUrl: `/join/${inviteCode}` });
     } catch (error) {
       res.status(500).json({ message: error.message || "Failed to create invite" });
-    }
-  });
-  app2.get("/api/leagues/:id", async (req, res) => {
-    try {
-      const leagueId = parseInt(req.params.id);
-      const league = await storage.getLeague(leagueId);
-      if (!league) {
-        return res.status(404).json({ message: "League not found" });
-      }
-      res.json(league);
-    } catch (error) {
-      res.status(500).json({ message: "Failed to fetch league" });
     }
   });
   app2.get("/api/leagues/:id/members", async (req, res) => {
@@ -16418,7 +16442,7 @@ async function registerRoutes(app2) {
       res.status(500).json({ message: "Failed to export picks" });
     }
   });
-  app2.get("/api/songs/debug", async (req, res) => {
+  app2.get("/api/songs/debug", requireAuth, requireAdmin, async (req, res) => {
     try {
       console.log("\u{1F527} DEBUG: Testing direct Phish.net API call...");
       const apiKey = process.env.PHISH_NET_API_KEY;
@@ -16437,7 +16461,7 @@ async function registerRoutes(app2) {
       res.json({ error: error.message });
     }
   });
-  app2.post("/api/cache/refresh", async (req, res) => {
+  app2.post("/api/cache/refresh", requireAuth, requireAdmin, async (req, res) => {
     try {
       console.log("\u{1F504} Force refreshing all caches...");
       await storage.getCachedShows(true);
@@ -16447,7 +16471,7 @@ async function registerRoutes(app2) {
       res.status(500).json({ error: error.message });
     }
   });
-  app2.post("/api/cache/fetch-historical", async (req, res) => {
+  app2.post("/api/cache/fetch-historical", requireAuth, requireAdmin, async (req, res) => {
     console.log("\u{1F3B8} Historical fetch endpoint HIT!");
     try {
       console.log("\u{1F4C5} Fetching historical shows from 2023-2024...");
@@ -16512,7 +16536,7 @@ async function registerRoutes(app2) {
       res.status(500).json({ error: error.message });
     }
   });
-  app2.post("/api/cache/fetch-missing-setlists", async (req, res) => {
+  app2.post("/api/cache/fetch-missing-setlists", requireAuth, requireAdmin, async (req, res) => {
     try {
       console.log("\u{1F3B5} Fetching missing setlists...");
       const API_KEY = process.env.PHISH_NET_API_KEY || "6F27E04F96EAC8C2C21B";
@@ -16615,7 +16639,7 @@ async function registerRoutes(app2) {
       res.status(500).json({ message: "Failed to search songs" });
     }
   });
-  app2.post("/api/leagues/:id/schedule-draft", async (req, res) => {
+  app2.post("/api/leagues/:id/schedule-draft", requireAuth, requireLeagueOwnerOrAdmin, async (req, res) => {
     try {
       const leagueId = parseInt(req.params.id);
       const { draftDate, draftRounds, pickTimeLimit } = req.body;
@@ -16633,7 +16657,7 @@ async function registerRoutes(app2) {
       res.status(500).json({ message: error.message || "Failed to schedule draft" });
     }
   });
-  app2.post("/api/leagues/:id/start-draft", async (req, res) => {
+  app2.post("/api/leagues/:id/start-draft", requireAuth, requireLeagueOwnerOrAdmin, async (req, res) => {
     try {
       const leagueId = parseInt(req.params.id);
       await storage.startDraft(leagueId);
@@ -16642,10 +16666,13 @@ async function registerRoutes(app2) {
       res.status(500).json({ message: error.message || "Failed to start draft" });
     }
   });
-  app2.post("/api/leagues/:id/auto-pick", async (req, res) => {
+  app2.post("/api/leagues/:id/auto-pick", requireAuth, async (req, res) => {
     try {
       const leagueId = parseInt(req.params.id);
       const { userId, preferredSongIds } = req.body;
+      if (userId !== req.userId) {
+        return res.status(403).json({ message: "You can only auto-pick for yourself" });
+      }
       const league = await storage.getDraftStatus(leagueId);
       if (!league || league.draftStatus !== "active") {
         return res.status(400).json({ message: "Draft is not active" });
@@ -16758,7 +16785,7 @@ async function registerRoutes(app2) {
       res.status(500).json({ message: error.message || "Failed to fetch setlist" });
     }
   });
-  app2.post("/api/leagues/:id/score", async (req, res) => {
+  app2.post("/api/leagues/:id/score", requireAuth, requireLeagueOwnerOrAdmin, async (req, res) => {
     try {
       const leagueId = parseInt(req.params.id);
       await cacheService.getCachedShows(true);
@@ -16808,7 +16835,7 @@ async function registerRoutes(app2) {
       res.status(500).json({ message: "Failed to get draft order" });
     }
   });
-  app2.post("/api/leagues/:id/draft-order", async (req, res) => {
+  app2.post("/api/leagues/:id/draft-order", requireAuth, requireLeagueOwnerOrAdmin, async (req, res) => {
     try {
       const leagueId = parseInt(req.params.id);
       const { userIds } = req.body;
@@ -16994,12 +17021,15 @@ async function registerRoutes(app2) {
       res.status(500).json({ message: error.message || "Failed to add pick" });
     }
   });
-  app2.post("/api/leagues/:id/draft-pick", async (req, res) => {
+  app2.post("/api/leagues/:id/draft-pick", requireAuth, async (req, res) => {
     try {
       const leagueId = parseInt(req.params.id);
       const { userId, songId, timeUsed } = req.body;
       if (!userId || !songId) {
         return res.status(400).json({ message: "userId and songId are required" });
+      }
+      if (userId !== req.userId) {
+        return res.status(403).json({ message: "You can only pick for yourself" });
       }
       const league = await storage.getDraftStatus(leagueId);
       if (league?.currentPlayer !== userId) {
@@ -17033,7 +17063,7 @@ async function registerRoutes(app2) {
       res.status(500).json({ message: "Failed to fetch drafted songs" });
     }
   });
-  app2.post("/api/draft", async (req, res) => {
+  app2.post("/api/draft", requireAuth, async (req, res) => {
     try {
       const draftData = insertDraftedSongSchema.parse(req.body);
       const isSongTaken = await storage.isSongDraftedInLeague(draftData.songId, draftData.leagueId);
@@ -17188,7 +17218,7 @@ async function registerRoutes(app2) {
       res.status(500).json({ message: "Failed to fetch setlist" });
     }
   });
-  app2.post("/api/admin/cache/refresh", async (req, res) => {
+  app2.post("/api/admin/cache/refresh", requireAuth, requireAdmin, async (req, res) => {
     try {
       const { cacheService: cacheService2 } = await Promise.resolve().then(() => (init_cache_service(), cache_service_exports));
       await cacheService2.refreshAllCaches();
@@ -17198,7 +17228,7 @@ async function registerRoutes(app2) {
       res.status(500).json({ message: "Failed to refresh caches" });
     }
   });
-  app2.post("/api/admin/cache/refresh-songs", async (req, res) => {
+  app2.post("/api/admin/cache/refresh-songs", requireAuth, requireAdmin, async (req, res) => {
     try {
       const { cacheService: cacheService2 } = await Promise.resolve().then(() => (init_cache_service(), cache_service_exports));
       await cacheService2.getCachedSongs(true);
@@ -17208,7 +17238,7 @@ async function registerRoutes(app2) {
       res.status(500).json({ message: "Failed to refresh songs cache" });
     }
   });
-  app2.post("/api/admin/cache/refresh-shows", async (req, res) => {
+  app2.post("/api/admin/cache/refresh-shows", requireAuth, requireAdmin, async (req, res) => {
     try {
       const { cacheService: cacheService2 } = await Promise.resolve().then(() => (init_cache_service(), cache_service_exports));
       await cacheService2.getCachedShows(true);
@@ -17218,7 +17248,7 @@ async function registerRoutes(app2) {
       res.status(500).json({ message: "Failed to refresh shows cache" });
     }
   });
-  app2.get("/api/admin/cache/stats", async (req, res) => {
+  app2.get("/api/admin/cache/stats", requireAuth, requireAdmin, async (req, res) => {
     try {
       const { cacheService: cacheService2 } = await Promise.resolve().then(() => (init_cache_service(), cache_service_exports));
       const stats = await cacheService2.getCacheStats();
@@ -17241,7 +17271,7 @@ async function registerRoutes(app2) {
       res.status(500).json({ message: "Failed to fetch activities" });
     }
   });
-  app2.post("/api/performances", async (req, res) => {
+  app2.post("/api/performances", requireAuth, requireAdmin, async (req, res) => {
     try {
       const performanceData = insertSongPerformanceSchema.parse(req.body);
       const performance = await storage.createSongPerformance(performanceData);
@@ -17382,7 +17412,6 @@ async function registerRoutes(app2) {
       res.status(500).json({ message: "Failed to reset password" });
     }
   });
-  app2.use("/api/admin", admin_default);
   const httpServer2 = (0, import_http.createServer)(app2);
   return httpServer2;
 }
@@ -17397,23 +17426,6 @@ var app = (0, import_express2.default)();
 app.set("trust proxy", 1);
 app.use((0, import_express2.json)());
 app.use((0, import_express2.urlencoded)({ extended: true }));
-var PgSession = (0, import_connect_pg_simple2.default)(import_express_session2.default);
-app.use(
-  (0, import_express_session2.default)({
-    store: new PgSession({
-      pool: pool2,
-      pruneSessionInterval: 0
-    }),
-    secret: process.env.SESSION_SECRET || "secret",
-    resave: false,
-    saveUninitialized: false,
-    cookie: {
-      secure: process.env.NODE_ENV === "production",
-      maxAge: 1e3 * 60 * 60 * 24,
-      sameSite: "lax"
-    }
-  })
-);
 app.get("/health", (_req, res) => res.json({ status: "ok", build: "2026-04-24-v3" }));
 app.get("/api/version", (_req, res) => res.json({ build: "2026-04-24-v3" }));
 var preferredPath = process.env.CLIENT_DIST || import_path.default.resolve(process.cwd(), "server/dist/client");

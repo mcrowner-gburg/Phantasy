@@ -1,8 +1,6 @@
 import express, { json, urlencoded } from "express";
-import session from "express-session";
 import { Pool, neonConfig } from "@neondatabase/serverless";
 import ws from "ws";
-import connectPgSimple from "connect-pg-simple";
 import path from "path";
 import { createServer } from "http";
 import { registerRoutes } from "./routes";
@@ -21,24 +19,8 @@ app.set("trust proxy", 1);
 app.use(json());
 app.use(urlencoded({ extended: true }));
 
-// ---------- SESSION SETUP ----------
-const PgSession = connectPgSimple(session);
-app.use(
-  session({
-    store: new PgSession({
-      pool,
-      pruneSessionInterval: 0,
-    }),
-    secret: process.env.SESSION_SECRET || "secret",
-    resave: false,
-    saveUninitialized: false,
-    cookie: {
-      secure: process.env.NODE_ENV === "production",
-      maxAge: 1000 * 60 * 60 * 24,
-      sameSite: "lax",
-    },
-  })
-);
+// Session middleware is installed by setupAuth() inside registerRoutes —
+// do not add a second express-session here, the two stores conflict.
 
 // ---------- HEALTH / VERSION ----------
 app.get("/health", (_req, res) => res.json({ status: "ok", build: "2026-04-24-v3" }));

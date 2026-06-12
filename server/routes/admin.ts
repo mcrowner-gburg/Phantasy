@@ -11,14 +11,23 @@ import { cacheService } from "../services/cache-service";
 import { db } from "../db";
 import { draftedSongs, songs, leagueMembers, users, pointAdjustments } from "../../shared/schema";
 import { eq, and, inArray } from "drizzle-orm";
-import { requireLeagueAdmin, requireSuperAdmin } from "../middleware/admin";
+import { requireAdmin, requireLeagueAdmin, requireSuperAdmin } from "../middleware/admin";
 
 const router = Router();
 
-router.post("/users", createUser);
-router.get("/users", getUsers);
-router.put("/users/:id", updateUser);
-router.delete("/users/:id", deleteUser);
+// Baseline: every /api/admin route requires a logged-in session.
+// League-owner routes (/my-leagues, /concerts, adjustments, members) do their
+// own finer-grained checks; everything else layers requireAdmin/requireSuperAdmin.
+router.use((req: any, res, next) => {
+  const userId = req.session?.user?.id || req.session?.userId;
+  if (!userId) return res.status(401).json({ message: "Not authenticated" });
+  next();
+});
+
+router.post("/users", requireSuperAdmin, createUser);
+router.get("/users", requireAdmin, getUsers);
+router.put("/users/:id", requireSuperAdmin, updateUser);
+router.delete("/users/:id", requireSuperAdmin, deleteUser);
 
 router.get("/concerts", async (_req, res) => {
   try {
@@ -63,7 +72,7 @@ router.post("/refresh-shows", async (_req, res) => {
   }
 });
 
-router.get("/leagues", async (_req, res) => {
+router.get("/leagues", requireAdmin, async (_req, res) => {
   try {
     const leagues = await storage.getAllLeagues();
     res.json(leagues);
@@ -74,7 +83,7 @@ router.get("/leagues", async (_req, res) => {
 
 // GET /api/admin/shows/:concertId/league/:leagueId
 // Returns the phish.in setlist for a show + which league members drafted each song
-router.get("/shows/:concertId/league/:leagueId", async (req, res) => {
+router.get("/shows/:concertId/league/:leagueId", requireLeagueAdmin, async (req, res) => {
   try {
     const concertId = parseInt(req.params.concertId);
     const leagueId = parseInt(req.params.leagueId);
@@ -343,7 +352,7 @@ router.put("/users/:id/role", requireSuperAdmin, async (req: any, res: any) => {
 
 // GET /api/admin/debug/adjustments?leagueId=26
 // Shows all adjustment records + whether each concertId resolves to a show date.
-router.get("/debug/adjustments", async (req: any, res: any) => {
+router.get("/debug/adjustments", requireAdmin, async (req: any, res: any) => {
   try {
     const leagueId = req.query.leagueId ? parseInt(req.query.leagueId) : null;
     if (!leagueId) return res.status(400).json({ message: "leagueId required" });
@@ -388,9 +397,8 @@ router.get("/debug/adjustments", async (req: any, res: any) => {
 });
 
 // GET /api/admin/debug/player?username=pjmgagill&leagueId=26
-// Diagnoses why a player might have 0 points — no extra auth middleware so it
-// works from a plain browser URL (the app already requires login to load).
-router.get("/debug/player", async (req: any, res: any) => {
+// Diagnoses why a player might have 0 points.
+router.get("/debug/player", requireAdmin, async (req: any, res: any) => {
   try {
     const username = String(req.query.username || "");
     const leagueId = req.query.leagueId ? parseInt(req.query.leagueId) : null;

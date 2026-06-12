@@ -9,9 +9,28 @@ import { sendPasswordResetEmail } from "./services/email";
 import { nanoid } from "nanoid";
 import bcrypt from "bcrypt";
 import adminRoutes from "./routes/admin";
+import { requireAdmin } from "./middleware/admin";
 import { cacheService } from "./services/cache-service";
 import { db } from "./db";
 import { sql, eq, and } from "drizzle-orm";
+import type { Request, Response, NextFunction } from "express";
+
+// Allows league owner, league admin, or global admin/superadmin.
+// For routes shaped /api/leagues/:id/... — reads the league id from req.params.id.
+async function requireLeagueOwnerOrAdmin(req: Request, res: Response, next: NextFunction) {
+  try {
+    const userId = (req.session as any)?.userId || (req.session as any)?.user?.id;
+    if (!userId) return res.status(401).json({ message: "Authentication required" });
+    const leagueId = parseInt(req.params.id);
+    if (isNaN(leagueId)) return res.status(400).json({ message: "Invalid league id" });
+    if (await storage.isUserAdmin(userId)) return next();
+    if (await storage.isUserLeagueAdmin(userId, leagueId)) return next();
+    return res.status(403).json({ message: "League owner or admin access required" });
+  } catch (e) {
+    console.error("League owner middleware error:", e);
+    return res.status(500).json({ message: "Server error" });
+  }
+}
 
 // In-memory server-side auto-draft registry (resets on server restart).
 // Enables specific users to have their picks made automatically by the server.
@@ -83,7 +102,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.post("/api/tours", async (req, res) => {
+  app.post("/api/tours", requireAuth, requireAdmin, async (req, res) => {
     try {
       const tourData = insertTourSchema.parse(req.body);
       const tour = await storage.createTour(tourData);
@@ -123,18 +142,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.post("/api/leagues", async (req, res) => {
+  app.post("/api/leagues", requireAuth, async (req, res) => {
     try {
       const body = { ...req.body };
       // Coerce date strings to Date objects for Zod timestamp fields
       if (body.seasonStartDate) body.seasonStartDate = new Date(body.seasonStartDate);
       if (body.seasonEndDate)   body.seasonEndDate   = new Date(body.seasonEndDate);
       const leagueData = insertLeagueSchema.partial({ tourId: true, seasonStartDate: true, seasonEndDate: true }).parse(body);
-      const { ownerId } = req.body;
-
-      if (!ownerId) {
-        return res.status(400).json({ message: "Owner ID required" });
-      }
+      // Owner is always the logged-in user — never trust a client-supplied ownerId
+      const ownerId = (req as any).userId;
 
       const league = await storage.createLeague({ ...leagueData, ownerId });
       res.json(league);
@@ -250,7 +266,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.post("/api/leagues/:id/join", async (req, res) => {
+  app.post("/api/leagues/:id/join", requireAuth, async (req, res) => {
     try {
       const leagueId = parseInt(req.params.id);
       const { userId } = req.body;
@@ -267,7 +283,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Create an invite code for a league
-  app.post("/api/leagues/:id/invite", async (req: any, res: any) => {
+  app.post("/api/leagues/:id/invite", requireAuth, requireLeagueOwnerOrAdmin, async (req: any, res: any) => {
     try {
       const leagueId = parseInt(req.params.id);
       const createdBy = req.session?.user?.id || req.session?.userId || req.body?.createdBy;
@@ -285,21 +301,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.json({ inviteCode, joinUrl: `/join/${inviteCode}` });
     } catch (error: any) {
       res.status(500).json({ message: error.message || "Failed to create invite" });
-    }
-  });
-
-  app.get("/api/leagues/:id", async (req, res) => {
-    try {
-      const leagueId = parseInt(req.params.id);
-      const league = await storage.getLeague(leagueId);
-      
-      if (!league) {
-        return res.status(404).json({ message: "League not found" });
-      }
-      
-      res.json(league);
-    } catch (error) {
-      res.status(500).json({ message: "Failed to fetch league" });
     }
   });
 
@@ -417,7 +418,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Debug API endpoint to test direct API call - MUST BE BEFORE general songs route
-  app.get("/api/songs/debug", async (req, res) => {
+  app.get("/api/songs/debug", requireAuth, requireAdmin, async (req, res) => {
     try {
       console.log('🔧 DEBUG: Testing direct Phish.net API call...');
       
@@ -441,7 +442,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Force refresh cache endpoint
-  app.post("/api/cache/refresh", async (req, res) => {
+  app.post("/api/cache/refresh", requireAuth, requireAdmin, async (req, res) => {
     try {
       console.log('🔄 Force refreshing all caches...');
       await storage.getCachedShows(true); // Force refresh shows
@@ -453,7 +454,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Fetch historical shows and setlists
-  app.post("/api/cache/fetch-historical", async (req, res) => {
+  app.post("/api/cache/fetch-historical", requireAuth, requireAdmin, async (req, res) => {
     console.log('🎸 Historical fetch endpoint HIT!');
     try {
       console.log('📅 Fetching historical shows from 2023-2024...');
@@ -538,7 +539,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Fetch missing setlists for shows that don't have them
-  app.post("/api/cache/fetch-missing-setlists", async (req, res) => {
+  app.post("/api/cache/fetch-missing-setlists", requireAuth, requireAdmin, async (req, res) => {
     try {
       console.log('🎵 Fetching missing setlists...');
       
@@ -675,7 +676,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Draft management routes
-  app.post("/api/leagues/:id/schedule-draft", async (req, res) => {
+  app.post("/api/leagues/:id/schedule-draft", requireAuth, requireLeagueOwnerOrAdmin, async (req, res) => {
     try {
       const leagueId = parseInt(req.params.id);
       const { draftDate, draftRounds, pickTimeLimit } = req.body;
@@ -697,7 +698,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.post("/api/leagues/:id/start-draft", async (req, res) => {
+  app.post("/api/leagues/:id/start-draft", requireAuth, requireLeagueOwnerOrAdmin, async (req, res) => {
     try {
       const leagueId = parseInt(req.params.id);
       await storage.startDraft(leagueId);
@@ -707,10 +708,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.post("/api/leagues/:id/auto-pick", async (req, res) => {
+  app.post("/api/leagues/:id/auto-pick", requireAuth, async (req, res) => {
     try {
       const leagueId = parseInt(req.params.id);
       const { userId, preferredSongIds } = req.body;
+      if (userId !== (req as any).userId) {
+        return res.status(403).json({ message: "You can only auto-pick for yourself" });
+      }
 
       const league = await storage.getDraftStatus(leagueId);
       if (!league || league.draftStatus !== "active") {
@@ -842,7 +846,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // POST /api/leagues/:id/score
   // Fetches every phish.in show in the league's season window, calculates
   // points for all drafted songs, and persists the totals to the database.
-  app.post("/api/leagues/:id/score", async (req: any, res: any) => {
+  app.post("/api/leagues/:id/score", requireAuth, requireLeagueOwnerOrAdmin, async (req: any, res: any) => {
     try {
       const leagueId = parseInt(req.params.id);
       // Refresh shows cache first so recent shows are included in scoring
@@ -900,7 +904,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.post("/api/leagues/:id/draft-order", async (req, res) => {
+  app.post("/api/leagues/:id/draft-order", requireAuth, requireLeagueOwnerOrAdmin, async (req, res) => {
     try {
       const leagueId = parseInt(req.params.id);
       const { userIds } = req.body;
@@ -1127,13 +1131,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.post("/api/leagues/:id/draft-pick", async (req, res) => {
+  app.post("/api/leagues/:id/draft-pick", requireAuth, async (req, res) => {
     try {
       const leagueId = parseInt(req.params.id);
       const { userId, songId, timeUsed } = req.body;
-      
+
       if (!userId || !songId) {
         return res.status(400).json({ message: "userId and songId are required" });
+      }
+      if (userId !== (req as any).userId) {
+        return res.status(403).json({ message: "You can only pick for yourself" });
       }
       
       // Verify it's the user's turn
@@ -1179,7 +1186,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.post("/api/draft", async (req, res) => {
+  app.post("/api/draft", requireAuth, async (req, res) => {
     try {
       const draftData = insertDraftedSongSchema.parse(req.body);
       
@@ -1375,7 +1382,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Cache management routes (admin only)
-  app.post("/api/admin/cache/refresh", async (req, res) => {
+  app.post("/api/admin/cache/refresh", requireAuth, requireAdmin, async (req, res) => {
     try {
       // TODO: Add admin authentication check here
       // if (!req.user || req.user.role !== 'admin') {
@@ -1392,7 +1399,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.post("/api/admin/cache/refresh-songs", async (req, res) => {
+  app.post("/api/admin/cache/refresh-songs", requireAuth, requireAdmin, async (req, res) => {
     try {
       // TODO: Add admin authentication check here
       const { cacheService } = await import('./services/cache-service');
@@ -1405,7 +1412,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.post("/api/admin/cache/refresh-shows", async (req, res) => {
+  app.post("/api/admin/cache/refresh-shows", requireAuth, requireAdmin, async (req, res) => {
     try {
       // TODO: Add admin authentication check here
       const { cacheService } = await import('./services/cache-service');
@@ -1418,7 +1425,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.get("/api/admin/cache/stats", async (req, res) => {
+  app.get("/api/admin/cache/stats", requireAuth, requireAdmin, async (req, res) => {
     try {
       // TODO: Add admin authentication check here
       const { cacheService } = await import('./services/cache-service');
@@ -1449,7 +1456,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Song Performance routes
-  app.post("/api/performances", async (req, res) => {
+  app.post("/api/performances", requireAuth, requireAdmin, async (req, res) => {
     try {
       const performanceData = insertSongPerformanceSchema.parse(req.body);
       const performance = await storage.createSongPerformance(performanceData);
@@ -1645,9 +1652,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.status(500).json({ message: "Failed to reset password" });
     }
   });
-
-  // Admin routes for managing rarity scores
-  app.use("/api/admin", adminRoutes);
 
   const httpServer = createServer(app);
   return httpServer;
