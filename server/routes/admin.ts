@@ -180,13 +180,12 @@ router.get("/shows/:concertId/league/:leagueId", requireLeagueAdmin, async (req,
 // Requires the caller to be superadmin, global admin, or owner/admin of the league
 router.post("/adjustments", requireLeagueAdmin, async (req: any, res: any) => {
   try {
-    const { leagueId, concertId, songId, userId, occurrence, originalPoints, adjustedPoints, reason } = req.body;
+    const { leagueId, concertId, songId, userId, originalPoints, adjustedPoints, reason } = req.body;
     if (!leagueId || !concertId || !songId || !userId) {
       return res.status(400).json({ message: "leagueId, concertId, songId, userId are required" });
     }
     const adjustment = await storage.createPointAdjustment({
       leagueId, concertId, songId, userId,
-      occurrence: occurrence ?? 1,
       originalPoints: originalPoints ?? 0,
       adjustedPoints: adjustedPoints ?? 0,
       reason: reason || "",

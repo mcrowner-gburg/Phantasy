@@ -77,3 +77,22 @@ export const requireLeagueAdmin = async (req: AuthenticatedRequest, res: Respons
     res.status(500).json({ message: 'Server error' });
   }
 };
+// Same as requireLeagueAdmin, but for routes shaped /api/leagues/:id/...
+// where the league id lives in req.params.id.
+export const requireLeagueOwnerOrAdmin = async (req: AuthenticatedRequest, res: Response, next: NextFunction) => {
+  try {
+    const userId = getSessionUserId(req);
+    if (!userId) return res.status(401).json({ message: 'Authentication required' });
+
+    const leagueId = parseInt(req.params.id);
+    if (isNaN(leagueId)) return res.status(400).json({ message: 'Invalid league id' });
+
+    if (await storage.isUserAdmin(userId)) return next();
+    if (await storage.isUserLeagueAdmin(userId, leagueId)) return next();
+
+    return res.status(403).json({ message: 'League owner or admin access required' });
+  } catch (error) {
+    console.error('League owner middleware error:', error);
+    res.status(500).json({ message: 'Server error' });
+  }
+};

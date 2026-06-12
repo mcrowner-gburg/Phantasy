@@ -12,7 +12,7 @@ import {
   type InsertCachedSetlist,
   type InsertCacheMetadata
 } from "@shared/schema";
-import { eq, desc, and } from "drizzle-orm";
+import { eq, desc, and, sql } from "drizzle-orm";
 import { PhishNetService } from "./phish-api";
 
 export class CacheService {
@@ -200,7 +200,8 @@ export class CacheService {
   }
 
   // Refresh shows cache from Phish.net API
-  private async refreshShowsCache(): Promise<void> {
+  // Public — also called by the auto-score job in index.ts
+  async refreshShowsCache(): Promise<void> {
     console.log('Refreshing shows cache from Phish.net API...');
 
     try {

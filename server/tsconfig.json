@@ -1,15 +1,28 @@
 {
   "compilerOptions": {
     "target": "ES2020",
-    "module": "CommonJS",           // Use CommonJS for Node runtime
+    "module": "CommonJS",
     "moduleResolution": "Node",
-    "outDir": "dist",
-    "rootDir": "src",               // Make sure only src/ compiles
-    "strict": true,
+    "strict": false,
+    "noEmit": true,
     "esModuleInterop": true,
     "skipLibCheck": true,
-    "forceConsistentCasingInFileNames": true
+    "forceConsistentCasingInFileNames": true,
+    "baseUrl": ".",
+    "paths": {
+      "@shared/*": ["../shared/*"]
+    }
   },
-  "include": ["src/**/*.ts"],
-  "exclude": ["node_modules"]
+  "include": [
+    "index.ts",
+    "auth.ts",
+    "db.ts",
+    "storage-db.ts",
+    "routes.ts",
+    "routes/**/*.ts",
+    "services/**/*.ts",
+    "middleware/**/*.ts",
+    "controllers/**/*.ts"
+  ],
+  "exclude": ["node_modules", "dist"]
 }

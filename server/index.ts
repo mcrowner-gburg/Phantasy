@@ -124,7 +124,7 @@ async function runDraftAutomation() {
 async function runAutoScore() {
   try {
     const { cacheService } = await import("./services/cache-service");
-    const { storage } = await import("./storage-db");
+    const { scoreLeague } = await import("./services/scoring");
     const { db } = await import("./db");
     const { leagues } = await import("../shared/schema");
     const { eq } = await import("drizzle-orm");
@@ -134,7 +134,7 @@ async function runAutoScore() {
     const activeLeagues = await db.select().from(leagues).where(eq(leagues.draftStatus, "completed"));
     for (const league of activeLeagues) {
       try {
-        await storage.scoreLeague(league.id);
+        await scoreLeague(league.id);
         console.log(`[AutoScore] Scored league ${league.id} (${league.name})`);
       } catch (e) {
         console.error(`[AutoScore] Failed to score league ${league.id}:`, e);

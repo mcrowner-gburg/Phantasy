@@ -1,4 +1,3 @@
-"use strict";
 var __create = Object.create;
 var __defProp = Object.defineProperty;
 var __getOwnPropDesc = Object.getOwnPropertyDescriptor;
@@ -464,7 +463,6 @@ __export(db_exports, {
 var import_serverless, import_neon_serverless, import_ws, pool, db;
 var init_db = __esm({
   "db.ts"() {
-    "use strict";
     import_serverless = require("@neondatabase/serverless");
     import_neon_serverless = require("drizzle-orm/neon-serverless");
     import_ws = __toESM(require("ws"));
@@ -480,307 +478,6 @@ var init_db = __esm({
   }
 });
 
-// services/phish-api.ts
-var phish_api_exports = {};
-__export(phish_api_exports, {
-  PhishNetService: () => PhishNetService,
-  phishApi: () => phishApi
-});
-var SONGS_CACHE_DURATION, PhishNetService, phishApi;
-var init_phish_api = __esm({
-  "services/phish-api.ts"() {
-    "use strict";
-    SONGS_CACHE_DURATION = 60 * 60 * 1e3;
-    PhishNetService = class {
-      constructor() {
-        this.phishInUrl = "https://phish.in/api/v2";
-        this.phishNetUrl = "https://api.phish.net/v5";
-        this.apiKey = process.env.PHISH_NET_API_KEY || process.env.PHISH_API_KEY || "";
-        if (!this.apiKey) {
-          console.error("FATAL: PHISH_NET_API_KEY is not set \u2014 setlist fetching and scoring will fail");
-        } else {
-          console.log(`Phish.net API initialized with key: ${this.apiKey.substring(0, 4)}\u2026`);
-        }
-      }
-      async getUpcomingShows() {
-        return this.getUpcomingShowsPhishNet();
-      }
-      async getUpcomingShowsPhishNet() {
-        try {
-          const currentYear = (/* @__PURE__ */ new Date()).getFullYear();
-          const response = await fetch(
-            `${this.phishNetUrl}/shows/showyear/${currentYear}.json?apikey=${this.apiKey}&order_by=showdate&direction=asc`
-          );
-          if (!response.ok)
-            throw new Error(`Phish.net API error: ${response.statusText}`);
-          const data = await response.json();
-          const shows = data.data || [];
-          const todayStr = (/* @__PURE__ */ new Date()).toISOString().split("T")[0];
-          return shows.filter((show) => show.showdate >= todayStr);
-        } catch (error) {
-          console.error("Error fetching upcoming shows from Phish.net:", error);
-          return [];
-        }
-      }
-      async getRecentShows(limit = 20) {
-        try {
-          const currentYear = (/* @__PURE__ */ new Date()).getFullYear();
-          const response = await fetch(
-            `${this.phishNetUrl}/shows/showyear/${currentYear}.json?apikey=${this.apiKey}&order_by=showdate&direction=desc`
-          );
-          if (!response.ok)
-            throw new Error(`Phish.net API error: ${response.statusText}`);
-          const data = await response.json();
-          const shows = data.data || [];
-          const todayStr = (/* @__PURE__ */ new Date()).toISOString().split("T")[0];
-          return shows.filter((show) => show.showdate < todayStr).slice(0, limit).map((show) => ({
-            showid: show.showid,
-            showdate: show.showdate,
-            venue: show.venue || "Unknown Venue",
-            city: show.city || "Unknown City",
-            state: show.state || null,
-            country: show.country || "USA"
-          }));
-        } catch (error) {
-          console.error("Error fetching recent shows from Phish.net:", error);
-          return [];
-        }
-      }
-      async getShowsByYear(year) {
-        try {
-          const response = await fetch(
-            `${this.phishNetUrl}/shows/showyear/${year}.json?apikey=${this.apiKey}&order_by=showdate&direction=asc`
-          );
-          if (!response.ok)
-            throw new Error(`Phish.net API error: ${response.statusText}`);
-          const data = await response.json();
-          return (data.data || []).map((show) => ({
-            showid: show.showid,
-            showdate: show.showdate,
-            venue: show.venue || "Unknown Venue",
-            city: show.city || "Unknown City",
-            state: show.state || null,
-            country: show.country || "USA",
-            tourid: show.tourid || null
-          }));
-        } catch (error) {
-          console.error(`Error fetching shows for year ${year} from Phish.net:`, error);
-          return [];
-        }
-      }
-      async getShowsLast24Months() {
-        try {
-          const currentYear = (/* @__PURE__ */ new Date()).getFullYear();
-          const years = [currentYear, currentYear - 1, currentYear - 2];
-          const allShows = [];
-          for (const year of years) {
-            const shows = await this.getShowsByYear(year);
-            allShows.push(...shows);
-          }
-          const twentyFourMonthsAgo = /* @__PURE__ */ new Date();
-          twentyFourMonthsAgo.setMonth(twentyFourMonthsAgo.getMonth() - 24);
-          return allShows.filter(
-            (show) => new Date(show.showdate) >= twentyFourMonthsAgo && new Date(show.showdate) <= /* @__PURE__ */ new Date()
-          );
-        } catch (error) {
-          console.error("Error fetching last 24 months of shows:", error);
-          return [];
-        }
-      }
-      async getSetlist(showDate) {
-        return this.getSetlistPhishNet(showDate);
-      }
-      async getSetlistPhishNet(showDate) {
-        try {
-          const response = await fetch(
-            `${this.phishNetUrl}/setlists/showdate/${showDate}.json?apikey=${this.apiKey}`
-          );
-          if (!response.ok)
-            throw new Error(`Phish.net API error: ${response.statusText}`);
-          const data = await response.json();
-          return (data.data || []).map((row) => ({
-            title: row.song,
-            set_name: row.set === "e" ? "Encore" : row.set === "e2" ? "Encore 2" : `Set ${row.set}`,
-            position: row.position
-          }));
-        } catch (error) {
-          console.error("Error fetching setlist from Phish.net:", error);
-          return null;
-        }
-      }
-      async getAllSongsForDraft() {
-        try {
-          console.log("\u{1F3B5} Fetching complete song catalog from Phish.in API...");
-          let allSongs = [];
-          let page = 1;
-          let hasMore = true;
-          while (hasMore) {
-            const response = await fetch(
-              `${this.phishInUrl}/songs?per_page=100&page=${page}`,
-              { headers: { "Accept": "application/json" } }
-            );
-            if (!response.ok)
-              throw new Error(`Phish.in API error: ${response.statusText}`);
-            const data = await response.json();
-            const songs2 = data.data || [];
-            allSongs = [...allSongs, ...songs2];
-            hasMore = data.meta?.next_page !== null && songs2.length === 100;
-            page++;
-            if (page > 20)
-              break;
-          }
-          console.log(`\u2705 Fetched ${allSongs.length} songs from Phish.in`);
-          return allSongs.map((song) => ({
-            songid: String(song.id || song.slug),
-            song: song.title,
-            times_played: song.times_played || 0,
-            last_played: song.last_played_at || null,
-            gap: song.gap || 0,
-            debut_date: song.debut_at || null,
-            original_artist: song.original_artist || null,
-            slug: song.slug
-          }));
-        } catch (error) {
-          console.error("\u{1F4A5} Error fetching from Phish.in, falling back to Phish.net:", error);
-          return this.getAllSongsPhishNet();
-        }
-      }
-      async getAllSongsPhishNet() {
-        try {
-          console.log("\u{1F504} Falling back to Phish.net for songs...");
-          const response = await fetch(
-            `${this.phishNetUrl}/songs.json?apikey=${this.apiKey}&limit=10000`
-          );
-          if (!response.ok)
-            throw new Error(`Phish.net API error: ${response.statusText}`);
-          const data = await response.json();
-          const songs2 = data?.data || [];
-          console.log(`\u2705 Got ${songs2.length} songs from Phish.net fallback`);
-          return songs2.map((song) => ({
-            songid: String(song.songid || song.id),
-            song: song.song || song.title,
-            times_played: song.times_played || 0,
-            last_played: song.last_played || null,
-            gap: song.gap || 0,
-            debut_date: song.debut_date || null,
-            original_artist: song.original_artist || null
-          }));
-        } catch (error) {
-          console.error("Error fetching from Phish.net fallback:", error);
-          return this.getFallbackSongs().map((song) => ({
-            songid: String(song.id),
-            song: song.title,
-            times_played: song.total_plays,
-            last_played: null,
-            gap: 50,
-            debut_date: null,
-            original_artist: null
-          }));
-        }
-      }
-      async getSongStats(songName) {
-        try {
-          const response = await fetch(
-            `${this.phishNetUrl}/songs/stats.json?apikey=${this.apiKey}&song=${encodeURIComponent(songName)}`
-          );
-          if (!response.ok)
-            throw new Error(`Phish.net API error: ${response.statusText}`);
-          const data = await response.json();
-          return data.response?.data || null;
-        } catch (error) {
-          console.error("Error fetching song stats:", error);
-          return null;
-        }
-      }
-      async getShowWithDurations(showDate) {
-        try {
-          const response = await fetch(
-            `${this.phishInUrl}/shows/${showDate}`,
-            { headers: { "Accept": "application/json" } }
-          );
-          if (!response.ok)
-            throw new Error(`Phish.in API error: ${response.statusText}`);
-          return await response.json();
-        } catch (error) {
-          console.error(`Error fetching show with durations for ${showDate}:`, error);
-          return null;
-        }
-      }
-      categoryzeSong(title) {
-        const titleLower = title.toLowerCase();
-        if (["tweezer", "ghost", "simple", "you enjoy myself", "david bowie", "wolfmans brother", "mike song", "piper", "weekapaug groove"].some((j) => titleLower.includes(j)))
-          return "jam";
-        if (["fluffhead", "harry hood", "slave to the traffic light", "run like an antelope"].some((e) => titleLower.includes(e)))
-          return "epic";
-        if (["divided sky", "reba", "foam", "theme from the bottom"].some((c) => titleLower.includes(c)))
-          return "composed";
-        if (["possum", "stash", "maze", "chalk dust torture", "julius", "suzy greenberg"].some((r) => titleLower.includes(r)))
-          return "rock";
-        if (["mercury", "thread", "sigma oasis", "ruby waves", "everything's right", "blaze on", "fuego", "waves"].some((m) => titleLower.includes(m)))
-          return "modern";
-        if (["the sloth", "contact", "oh kee pa", "harpua", "icculus", "gamehendge"].some((r) => titleLower.includes(r)))
-          return "rare";
-        return "classic";
-      }
-      calculateRarityScore(totalPlays) {
-        if (totalPlays > 300)
-          return 5;
-        if (totalPlays > 200)
-          return 15;
-        if (totalPlays > 100)
-          return 30;
-        if (totalPlays > 50)
-          return 50;
-        if (totalPlays > 10)
-          return 70;
-        return 90;
-      }
-      getFallbackSongs() {
-        return [
-          { id: 1001, title: "Tweezer", category: "jam", rarity_score: 5, total_plays: 411, plays_24_months: 22 },
-          { id: 1002, title: "You Enjoy Myself", category: "jam", rarity_score: 15, total_plays: 350, plays_24_months: 20 },
-          { id: 1003, title: "Ghost", category: "jam", rarity_score: 15, total_plays: 290, plays_24_months: 17 },
-          { id: 1004, title: "Harry Hood", category: "epic", rarity_score: 20, total_plays: 275, plays_24_months: 15 },
-          { id: 1005, title: "Fluffhead", category: "epic", rarity_score: 30, total_plays: 286, plays_24_months: 10 },
-          { id: 1006, title: "Divided Sky", category: "composed", rarity_score: 35, total_plays: 250, plays_24_months: 8 },
-          { id: 1007, title: "Possum", category: "rock", rarity_score: 15, total_plays: 310, plays_24_months: 18 },
-          { id: 1008, title: "Wilson", category: "classic", rarity_score: 25, total_plays: 300, plays_24_months: 11 },
-          { id: 1009, title: "Character Zero", category: "rock", rarity_score: 18, total_plays: 275, plays_24_months: 13 },
-          { id: 1010, title: "Down with Disease", category: "funk", rarity_score: 12, total_plays: 310, plays_24_months: 17 }
-        ];
-      }
-      async getSongById(songId) {
-        const songs2 = await this.getAllSongsForDraft();
-        return songs2.find((song) => song.id === songId) || null;
-      }
-      async saveSongToDatabase(songData) {
-        const { db: db2 } = await Promise.resolve().then(() => (init_db(), db_exports));
-        const { songs: songs2 } = await Promise.resolve().then(() => (init_schema(), schema_exports));
-        try {
-          const [savedSong] = await db2.insert(songs2).values({
-            title: songData.title,
-            category: songData.category,
-            rarityScore: songData.rarity_score || 50,
-            totalPlays: songData.total_plays || 0,
-            lastPlayed: songData.last_played || null
-          }).onConflictDoUpdate({
-            target: [songs2.title],
-            set: {
-              totalPlays: songData.total_plays || 0,
-              lastPlayed: songData.last_played || null
-            }
-          }).returning();
-          return savedSong;
-        } catch (error) {
-          console.error("Error saving song to database:", error);
-          throw error;
-        }
-      }
-    };
-    phishApi = new PhishNetService();
-  }
-});
-
 // storage-db.ts
 var storage_db_exports = {};
 __export(storage_db_exports, {
@@ -789,7 +486,6 @@ __export(storage_db_exports, {
 var import_drizzle_orm, storage;
 var init_storage_db = __esm({
   "storage-db.ts"() {
-    "use strict";
     import_drizzle_orm = require("drizzle-orm");
     init_db();
     init_schema();
@@ -1253,187 +949,6 @@ var init_storage_db = __esm({
           }
         }
       },
-      // Score every phish.in show in the league's season window against
-      // drafted songs, and persist the totals to draftedSongs.points.
-      // Safe to call multiple times — resets then recalculates each run.
-      async scoreLeague(leagueId) {
-        const league = await this.getLeague(leagueId);
-        if (!league)
-          throw new Error("League not found");
-        const seasonStartStr = league.seasonStartDate ? new Date(league.seasonStartDate).toISOString().split("T")[0] : null;
-        const seasonEndStr = league.seasonEndDate ? new Date(league.seasonEndDate).toISOString().split("T")[0] : null;
-        const allShows = await this.getCachedShows();
-        const shows = allShows.filter((s) => {
-          const d = new Date(s.showDate).toISOString().split("T")[0];
-          if (seasonStartStr && d < seasonStartStr)
-            return false;
-          if (seasonEndStr && d > seasonEndStr)
-            return false;
-          return true;
-        });
-        const drafted = await db.select().from(draftedSongs).where((0, import_drizzle_orm.eq)(draftedSongs.leagueId, leagueId));
-        await db.update(draftedSongs).set({ points: 0 }).where((0, import_drizzle_orm.eq)(draftedSongs.leagueId, leagueId));
-        const draftSongIds = [...new Set(drafted.map((d) => d.songId).filter(Boolean))];
-        const draftSongRows = draftSongIds.length ? await db.select({ id: songs.id, title: songs.title }).from(songs).where((0, import_drizzle_orm.inArray)(songs.id, draftSongIds)) : [];
-        const songIdToTitle = new Map(draftSongRows.map((s) => [s.id, s.title]));
-        const missingSongIds = draftSongIds.filter((id) => !songIdToTitle.has(id));
-        if (missingSongIds.length > 0) {
-          const cachedRows = await db.select({ id: cachedSongs.id, title: cachedSongs.title }).from(cachedSongs).where((0, import_drizzle_orm.inArray)(cachedSongs.id, missingSongIds));
-          for (const r of cachedRows)
-            songIdToTitle.set(r.id, r.title);
-        }
-        const titleMap = {};
-        for (const d of drafted) {
-          if (!d.songId)
-            continue;
-          const title = songIdToTitle.get(d.songId);
-          if (!title)
-            continue;
-          const key = title.toLowerCase();
-          if (!titleMap[key])
-            titleMap[key] = [];
-          titleMap[key].push(d);
-        }
-        const showIdToDate = new Map(allShows.map((s) => [s.id, new Date(s.showDate).toISOString().split("T")[0]]));
-        const allAdjustments = await db.select().from(pointAdjustments).where((0, import_drizzle_orm.eq)(pointAdjustments.leagueId, leagueId));
-        const adjustmentLookup = /* @__PURE__ */ new Map();
-        const adjustmentIdLookup = /* @__PURE__ */ new Map();
-        const adjDiag = [];
-        for (const adj of allAdjustments) {
-          if (!adj.userId) {
-            adjDiag.push(`id=${adj.id} SKIP:noUserId`);
-            continue;
-          }
-          const adjTitle = songIdToTitle.get(adj.songId)?.toLowerCase();
-          if (!adjTitle) {
-            adjDiag.push(`id=${adj.id} SKIP:songId=${adj.songId} notInTitleMap`);
-            continue;
-          }
-          const adjShowDate = showIdToDate.get(adj.concertId);
-          if (!adjShowDate) {
-            adjDiag.push(`id=${adj.id} SKIP:concertId=${adj.concertId} notInShowIdToDate(size=${showIdToDate.size})`);
-            continue;
-          }
-          const key = `${adjShowDate}:${adjTitle}:${adj.userId}`;
-          if (!adjustmentIdLookup.has(key) || adj.id > adjustmentIdLookup.get(key)) {
-            adjustmentLookup.set(key, adj.adjustedPoints);
-            adjustmentIdLookup.set(key, adj.id);
-            adjDiag.push(`id=${adj.id} OK:key=${key} pts=${adj.adjustedPoints}`);
-          }
-        }
-        console.log(`[scoreLeague] adjustments(${allAdjustments.length}):`, adjDiag.join(" | "));
-        const BATCH = 8;
-        const showDates = [...new Set(shows.map((s) => new Date(s.showDate).toISOString().split("T")[0]))];
-        const fetchedSetlists = [];
-        const { phishApi: phishApi2 } = await Promise.resolve().then(() => (init_phish_api(), phish_api_exports));
-        for (let i = 0; i < showDates.length; i += BATCH) {
-          const chunk = showDates.slice(i, i + BATCH);
-          const results = await Promise.all(chunk.map(async (showDate) => {
-            try {
-              const tracks = await phishApi2.getSetlist(showDate);
-              return tracks && tracks.length > 0 ? { showDate, tracks } : null;
-            } catch {
-              return null;
-            }
-          }));
-          fetchedSetlists.push(...results);
-        }
-        const pointDeltas = /* @__PURE__ */ new Map();
-        const adjsApplied = [];
-        let totalPoints = 0;
-        let showsScored = 0;
-        const setlistsToCache = [];
-        for (const result of fetchedSetlists) {
-          if (!result)
-            continue;
-          const { showDate, tracks: rawTracks } = result;
-          const firstPosBySet = {};
-          for (const t of rawTracks) {
-            const s = t.set_name || "Set 1";
-            if (!(s in firstPosBySet) || t.position < firstPosBySet[s])
-              firstPosBySet[s] = t.position;
-          }
-          const songUserBase = /* @__PURE__ */ new Map();
-          for (const t of rawTracks) {
-            const title = (t.title || "").toLowerCase();
-            const setKey = t.set_name || "Set 1";
-            const isEncore = setKey.toLowerCase().includes("encore");
-            const isSetOpener = !isEncore && t.position === firstPosBySet[setKey];
-            let basePts = 1;
-            if (isSetOpener)
-              basePts += 1;
-            if (isEncore)
-              basePts += 1;
-            const entries = titleMap[title];
-            if (entries && entries.length > 0) {
-              for (const entry of entries) {
-                const accumKey = `${title}\0${entry.userId}`;
-                const existing = songUserBase.get(accumKey);
-                if (existing) {
-                  existing.basePts += basePts;
-                } else {
-                  songUserBase.set(accumKey, { entryId: entry.id, basePts });
-                }
-              }
-            }
-          }
-          for (const [accumKey, { entryId, basePts }] of songUserBase) {
-            const nullIdx = accumKey.indexOf("\0");
-            const title = accumKey.slice(0, nullIdx);
-            const userId = parseInt(accumKey.slice(nullIdx + 1));
-            const overrideKey = `${showDate}:${title}:${userId}`;
-            const pts = adjustmentLookup.has(overrideKey) ? adjustmentLookup.get(overrideKey) : basePts;
-            if (adjustmentLookup.has(overrideKey)) {
-              console.log(`[scoreLeague] override: show=${showDate} song="${title}" user=${userId} base=${basePts} \u2192 ${pts}pts`);
-              adjsApplied.push({ username: String(userId), song: title, base: basePts, override: pts });
-            }
-            pointDeltas.set(entryId, (pointDeltas.get(entryId) ?? 0) + pts);
-            totalPoints += pts;
-          }
-          showsScored++;
-          setlistsToCache.push({ showDate, tracks: rawTracks });
-        }
-        const unmappedSongIds = [];
-        for (const d of drafted) {
-          if (d.songId && !songIdToTitle.has(d.songId))
-            unmappedSongIds.push(d.songId);
-        }
-        for (const [entryId, pts] of pointDeltas) {
-          await db.update(draftedSongs).set({ points: pts }).where((0, import_drizzle_orm.eq)(draftedSongs.id, entryId));
-        }
-        for (const { showDate, tracks } of setlistsToCache) {
-          try {
-            const trackTitles = tracks.map((t) => t.title || "");
-            await db.insert(cachedSetlists).values({ showDate, setlistData: tracks, songs: trackTitles }).onConflictDoUpdate({
-              target: cachedSetlists.showDate,
-              set: { setlistData: tracks, songs: trackTitles, cachedAt: /* @__PURE__ */ new Date() }
-            });
-          } catch {
-          }
-        }
-        const userPtsLog = {};
-        for (const d of drafted) {
-          if (!d.userId)
-            continue;
-          userPtsLog[d.userId] = (userPtsLog[d.userId] ?? 0) + (pointDeltas.get(d.id) ?? 0);
-        }
-        console.log(`[scoreLeague] league=${leagueId} shows=${showsScored} totalPts=${totalPoints} entries=${pointDeltas.size}`);
-        console.log(`[scoreLeague] per-user points:`, JSON.stringify(userPtsLog));
-        if (unmappedSongIds.length)
-          console.log(`[scoreLeague] unmapped songIds:`, unmappedSongIds);
-        const scoredUserIds = Object.keys(userPtsLog).map(Number);
-        const usernameRows = scoredUserIds.length ? await db.select({ id: users.id, username: users.username }).from(users).where((0, import_drizzle_orm.inArray)(users.id, scoredUserIds)) : [];
-        const usernameMap = new Map(usernameRows.map((u) => [u.id, u.username]));
-        const perUser = Object.fromEntries(
-          scoredUserIds.map((uid) => [usernameMap.get(uid) ?? `user#${uid}`, userPtsLog[uid]])
-        );
-        for (const a of adjsApplied) {
-          const uid = parseInt(a.username);
-          if (!isNaN(uid))
-            a.username = usernameMap.get(uid) ?? `user#${uid}`;
-        }
-        return { shows: showsScored, points: totalPoints, perUser, unmappedSongIds, adjustmentsApplied: adjsApplied, adjDiag };
-      },
       // ==================== ACTIVITIES ====================
       async getUserActivities(userId, leagueId) {
         if (leagueId) {
@@ -1563,6 +1078,830 @@ var init_storage_db = __esm({
         return result[0];
       }
     };
+  }
+});
+
+// services/phish-api.ts
+var phish_api_exports = {};
+__export(phish_api_exports, {
+  PhishNetService: () => PhishNetService,
+  phishApi: () => phishApi
+});
+var SONGS_CACHE_DURATION, PhishNetService, phishApi;
+var init_phish_api = __esm({
+  "services/phish-api.ts"() {
+    SONGS_CACHE_DURATION = 60 * 60 * 1e3;
+    PhishNetService = class {
+      constructor() {
+        this.phishInUrl = "https://phish.in/api/v2";
+        this.phishNetUrl = "https://api.phish.net/v5";
+        this.apiKey = process.env.PHISH_NET_API_KEY || process.env.PHISH_API_KEY || "";
+        if (!this.apiKey) {
+          console.error("FATAL: PHISH_NET_API_KEY is not set \u2014 setlist fetching and scoring will fail");
+        } else {
+          console.log(`Phish.net API initialized with key: ${this.apiKey.substring(0, 4)}\u2026`);
+        }
+      }
+      async getUpcomingShows() {
+        return this.getUpcomingShowsPhishNet();
+      }
+      async getUpcomingShowsPhishNet() {
+        try {
+          const currentYear = (/* @__PURE__ */ new Date()).getFullYear();
+          const response = await fetch(
+            `${this.phishNetUrl}/shows/showyear/${currentYear}.json?apikey=${this.apiKey}&order_by=showdate&direction=asc`
+          );
+          if (!response.ok)
+            throw new Error(`Phish.net API error: ${response.statusText}`);
+          const data = await response.json();
+          const shows = data.data || [];
+          const todayStr = (/* @__PURE__ */ new Date()).toISOString().split("T")[0];
+          return shows.filter((show) => show.showdate >= todayStr);
+        } catch (error) {
+          console.error("Error fetching upcoming shows from Phish.net:", error);
+          return [];
+        }
+      }
+      async getRecentShows(limit = 20) {
+        try {
+          const currentYear = (/* @__PURE__ */ new Date()).getFullYear();
+          const response = await fetch(
+            `${this.phishNetUrl}/shows/showyear/${currentYear}.json?apikey=${this.apiKey}&order_by=showdate&direction=desc`
+          );
+          if (!response.ok)
+            throw new Error(`Phish.net API error: ${response.statusText}`);
+          const data = await response.json();
+          const shows = data.data || [];
+          const todayStr = (/* @__PURE__ */ new Date()).toISOString().split("T")[0];
+          return shows.filter((show) => show.showdate < todayStr).slice(0, limit).map((show) => ({
+            showid: show.showid,
+            showdate: show.showdate,
+            venue: show.venue || "Unknown Venue",
+            city: show.city || "Unknown City",
+            state: show.state || null,
+            country: show.country || "USA"
+          }));
+        } catch (error) {
+          console.error("Error fetching recent shows from Phish.net:", error);
+          return [];
+        }
+      }
+      async getShowsByYear(year) {
+        try {
+          const response = await fetch(
+            `${this.phishNetUrl}/shows/showyear/${year}.json?apikey=${this.apiKey}&order_by=showdate&direction=asc`
+          );
+          if (!response.ok)
+            throw new Error(`Phish.net API error: ${response.statusText}`);
+          const data = await response.json();
+          return (data.data || []).map((show) => ({
+            showid: show.showid,
+            showdate: show.showdate,
+            venue: show.venue || "Unknown Venue",
+            city: show.city || "Unknown City",
+            state: show.state || null,
+            country: show.country || "USA",
+            tourid: show.tourid || null
+          }));
+        } catch (error) {
+          console.error(`Error fetching shows for year ${year} from Phish.net:`, error);
+          return [];
+        }
+      }
+      async getShowsLast24Months() {
+        try {
+          const currentYear = (/* @__PURE__ */ new Date()).getFullYear();
+          const years = [currentYear, currentYear - 1, currentYear - 2];
+          const allShows = [];
+          for (const year of years) {
+            const shows = await this.getShowsByYear(year);
+            allShows.push(...shows);
+          }
+          const twentyFourMonthsAgo = /* @__PURE__ */ new Date();
+          twentyFourMonthsAgo.setMonth(twentyFourMonthsAgo.getMonth() - 24);
+          return allShows.filter(
+            (show) => new Date(show.showdate) >= twentyFourMonthsAgo && new Date(show.showdate) <= /* @__PURE__ */ new Date()
+          );
+        } catch (error) {
+          console.error("Error fetching last 24 months of shows:", error);
+          return [];
+        }
+      }
+      async getSetlist(showDate) {
+        return this.getSetlistPhishNet(showDate);
+      }
+      async getSetlistPhishNet(showDate) {
+        try {
+          const response = await fetch(
+            `${this.phishNetUrl}/setlists/showdate/${showDate}.json?apikey=${this.apiKey}`
+          );
+          if (!response.ok)
+            throw new Error(`Phish.net API error: ${response.statusText}`);
+          const data = await response.json();
+          return (data.data || []).map((row) => ({
+            title: row.song,
+            set_name: row.set === "e" ? "Encore" : row.set === "e2" ? "Encore 2" : `Set ${row.set}`,
+            position: row.position
+          }));
+        } catch (error) {
+          console.error("Error fetching setlist from Phish.net:", error);
+          return null;
+        }
+      }
+      async getAllSongsForDraft() {
+        try {
+          console.log("\u{1F3B5} Fetching complete song catalog from Phish.in API...");
+          let allSongs = [];
+          let page = 1;
+          let hasMore = true;
+          while (hasMore) {
+            const response = await fetch(
+              `${this.phishInUrl}/songs?per_page=100&page=${page}`,
+              { headers: { "Accept": "application/json" } }
+            );
+            if (!response.ok)
+              throw new Error(`Phish.in API error: ${response.statusText}`);
+            const data = await response.json();
+            const songs3 = data.data || [];
+            allSongs = [...allSongs, ...songs3];
+            hasMore = data.meta?.next_page !== null && songs3.length === 100;
+            page++;
+            if (page > 20)
+              break;
+          }
+          console.log(`\u2705 Fetched ${allSongs.length} songs from Phish.in`);
+          return allSongs.map((song) => ({
+            songid: String(song.id || song.slug),
+            song: song.title,
+            times_played: song.times_played || 0,
+            last_played: song.last_played_at || null,
+            gap: song.gap || 0,
+            debut_date: song.debut_at || null,
+            original_artist: song.original_artist || null,
+            slug: song.slug
+          }));
+        } catch (error) {
+          console.error("\u{1F4A5} Error fetching from Phish.in, falling back to Phish.net:", error);
+          return this.getAllSongsPhishNet();
+        }
+      }
+      async getAllSongsPhishNet() {
+        try {
+          console.log("\u{1F504} Falling back to Phish.net for songs...");
+          const response = await fetch(
+            `${this.phishNetUrl}/songs.json?apikey=${this.apiKey}&limit=10000`
+          );
+          if (!response.ok)
+            throw new Error(`Phish.net API error: ${response.statusText}`);
+          const data = await response.json();
+          const songs3 = data?.data || [];
+          console.log(`\u2705 Got ${songs3.length} songs from Phish.net fallback`);
+          return songs3.map((song) => ({
+            songid: String(song.songid || song.id),
+            song: song.song || song.title,
+            times_played: song.times_played || 0,
+            last_played: song.last_played || null,
+            gap: song.gap || 0,
+            debut_date: song.debut_date || null,
+            original_artist: song.original_artist || null
+          }));
+        } catch (error) {
+          console.error("Error fetching from Phish.net fallback:", error);
+          return this.getFallbackSongs().map((song) => ({
+            songid: String(song.id),
+            song: song.title,
+            times_played: song.total_plays,
+            last_played: null,
+            gap: 50,
+            debut_date: null,
+            original_artist: null
+          }));
+        }
+      }
+      async getSongStats(songName) {
+        try {
+          const response = await fetch(
+            `${this.phishNetUrl}/songs/stats.json?apikey=${this.apiKey}&song=${encodeURIComponent(songName)}`
+          );
+          if (!response.ok)
+            throw new Error(`Phish.net API error: ${response.statusText}`);
+          const data = await response.json();
+          return data.response?.data || null;
+        } catch (error) {
+          console.error("Error fetching song stats:", error);
+          return null;
+        }
+      }
+      async getShowWithDurations(showDate) {
+        try {
+          const response = await fetch(
+            `${this.phishInUrl}/shows/${showDate}`,
+            { headers: { "Accept": "application/json" } }
+          );
+          if (!response.ok)
+            throw new Error(`Phish.in API error: ${response.statusText}`);
+          return await response.json();
+        } catch (error) {
+          console.error(`Error fetching show with durations for ${showDate}:`, error);
+          return null;
+        }
+      }
+      categoryzeSong(title) {
+        const titleLower = title.toLowerCase();
+        if (["tweezer", "ghost", "simple", "you enjoy myself", "david bowie", "wolfmans brother", "mike song", "piper", "weekapaug groove"].some((j) => titleLower.includes(j)))
+          return "jam";
+        if (["fluffhead", "harry hood", "slave to the traffic light", "run like an antelope"].some((e) => titleLower.includes(e)))
+          return "epic";
+        if (["divided sky", "reba", "foam", "theme from the bottom"].some((c) => titleLower.includes(c)))
+          return "composed";
+        if (["possum", "stash", "maze", "chalk dust torture", "julius", "suzy greenberg"].some((r) => titleLower.includes(r)))
+          return "rock";
+        if (["mercury", "thread", "sigma oasis", "ruby waves", "everything's right", "blaze on", "fuego", "waves"].some((m) => titleLower.includes(m)))
+          return "modern";
+        if (["the sloth", "contact", "oh kee pa", "harpua", "icculus", "gamehendge"].some((r) => titleLower.includes(r)))
+          return "rare";
+        return "classic";
+      }
+      calculateRarityScore(totalPlays) {
+        if (totalPlays > 300)
+          return 5;
+        if (totalPlays > 200)
+          return 15;
+        if (totalPlays > 100)
+          return 30;
+        if (totalPlays > 50)
+          return 50;
+        if (totalPlays > 10)
+          return 70;
+        return 90;
+      }
+      getFallbackSongs() {
+        return [
+          { id: 1001, title: "Tweezer", category: "jam", rarity_score: 5, total_plays: 411, plays_24_months: 22 },
+          { id: 1002, title: "You Enjoy Myself", category: "jam", rarity_score: 15, total_plays: 350, plays_24_months: 20 },
+          { id: 1003, title: "Ghost", category: "jam", rarity_score: 15, total_plays: 290, plays_24_months: 17 },
+          { id: 1004, title: "Harry Hood", category: "epic", rarity_score: 20, total_plays: 275, plays_24_months: 15 },
+          { id: 1005, title: "Fluffhead", category: "epic", rarity_score: 30, total_plays: 286, plays_24_months: 10 },
+          { id: 1006, title: "Divided Sky", category: "composed", rarity_score: 35, total_plays: 250, plays_24_months: 8 },
+          { id: 1007, title: "Possum", category: "rock", rarity_score: 15, total_plays: 310, plays_24_months: 18 },
+          { id: 1008, title: "Wilson", category: "classic", rarity_score: 25, total_plays: 300, plays_24_months: 11 },
+          { id: 1009, title: "Character Zero", category: "rock", rarity_score: 18, total_plays: 275, plays_24_months: 13 },
+          { id: 1010, title: "Down with Disease", category: "funk", rarity_score: 12, total_plays: 310, plays_24_months: 17 }
+        ];
+      }
+      async getSongById(songId) {
+        const songs3 = await this.getAllSongsForDraft();
+        return songs3.find((song) => song.id === songId) || null;
+      }
+      async saveSongToDatabase(songData) {
+        const { db: db2 } = await Promise.resolve().then(() => (init_db(), db_exports));
+        const { songs: songs3 } = await Promise.resolve().then(() => (init_schema(), schema_exports));
+        try {
+          const [savedSong] = await db2.insert(songs3).values({
+            title: songData.title,
+            category: songData.category,
+            rarityScore: songData.rarity_score || 50,
+            totalPlays: songData.total_plays || 0,
+            lastPlayed: songData.last_played || null
+          }).onConflictDoUpdate({
+            target: [songs3.title],
+            set: {
+              totalPlays: songData.total_plays || 0,
+              lastPlayed: songData.last_played || null
+            }
+          }).returning();
+          return savedSong;
+        } catch (error) {
+          console.error("Error saving song to database:", error);
+          throw error;
+        }
+      }
+    };
+    phishApi = new PhishNetService();
+  }
+});
+
+// services/cache-service.ts
+var cache_service_exports = {};
+__export(cache_service_exports, {
+  CacheService: () => CacheService,
+  cacheService: () => cacheService
+});
+var import_drizzle_orm2, CacheService, cacheService;
+var init_cache_service = __esm({
+  "services/cache-service.ts"() {
+    init_db();
+    init_schema();
+    import_drizzle_orm2 = require("drizzle-orm");
+    init_phish_api();
+    CacheService = class {
+      constructor() {
+        this.phishApi = new PhishNetService();
+      }
+      // Check if cache is fresh based on refresh interval
+      async isCacheFresh(cacheType) {
+        try {
+          const [metadata] = await db.select().from(cacheMetadata).where((0, import_drizzle_orm2.eq)(cacheMetadata.cacheType, cacheType));
+          if (!metadata || !metadata.lastRefreshed || !metadata.refreshInterval) {
+            return false;
+          }
+          const now = /* @__PURE__ */ new Date();
+          const lastRefreshed = new Date(metadata.lastRefreshed);
+          const refreshIntervalMs = metadata.refreshInterval * 1e3;
+          return now.getTime() - lastRefreshed.getTime() < refreshIntervalMs;
+        } catch (error) {
+          console.error(`Error checking cache freshness for ${cacheType}:`, error);
+          return false;
+        }
+      }
+      // Update cache metadata
+      async updateCacheMetadata(cacheType, totalRecords, error) {
+        try {
+          await db.insert(cacheMetadata).values({
+            cacheType,
+            lastRefreshed: /* @__PURE__ */ new Date(),
+            totalRecords,
+            isRefreshing: false,
+            lastError: error || null
+          }).onConflictDoUpdate({
+            target: cacheMetadata.cacheType,
+            set: {
+              lastRefreshed: /* @__PURE__ */ new Date(),
+              totalRecords,
+              isRefreshing: false,
+              lastError: error || null
+            }
+          });
+        } catch (error2) {
+          console.error(`Error updating cache metadata for ${cacheType}:`, error2);
+        }
+      }
+      // Get cached songs with optional refresh
+      async getCachedSongs(forceRefresh = false) {
+        const cacheType = "songs";
+        const needsRefresh = forceRefresh || !await this.isCacheFresh(cacheType);
+        if (needsRefresh) {
+          await this.refreshSongsCache();
+        }
+        return await db.select().from(cachedSongs).orderBy((0, import_drizzle_orm2.desc)(cachedSongs.timesPlayed));
+      }
+      // Get cached shows with optional refresh
+      async getCachedShows(forceRefresh = false) {
+        const cacheType = "shows";
+        const needsRefresh = forceRefresh || !await this.isCacheFresh(cacheType);
+        if (needsRefresh) {
+          await this.refreshShowsCache();
+        }
+        return await db.select().from(cachedShows).orderBy((0, import_drizzle_orm2.desc)(cachedShows.showDate));
+      }
+      // Get cached setlist for a specific date
+      async getCachedSetlist(showDate, forceRefresh = false) {
+        const [cached] = await db.select().from(cachedSetlists).where((0, import_drizzle_orm2.eq)(cachedSetlists.showDate, showDate));
+        if (cached && !forceRefresh) {
+          return cached;
+        }
+        return await this.refreshSetlistCache(showDate);
+      }
+      // Refresh songs cache from Phish.net API
+      async refreshSongsCache() {
+        console.log("\u{1F504} [CacheService] refreshSongsCache v2 (dedup+upsert) - STARTING...");
+        try {
+          await db.insert(cacheMetadata).values({
+            cacheType: "songs",
+            isRefreshing: true
+          }).onConflictDoUpdate({
+            target: cacheMetadata.cacheType,
+            set: { isRefreshing: true }
+          });
+          const apiSongs = await this.phishApi.getAllSongsForDraft();
+          console.log(`Fetched ${apiSongs.length} songs from Phish.net API`);
+          if (apiSongs.length > 0) {
+            const plays24MonthsMap = await this.calculate24MonthPlays();
+            await db.delete(cachedSongs);
+            const normalizeId = (s, idx) => String(s.songid ?? s.id ?? s.slug ?? idx + 1e4);
+            const seen = /* @__PURE__ */ new Set();
+            const deduped = apiSongs.filter((s, i) => {
+              const id = normalizeId(s, i);
+              if (seen.has(id))
+                return false;
+              seen.add(id);
+              s.__normId = id;
+              return true;
+            });
+            console.log(`\u2705 Deduplicated ${apiSongs.length} songs to ${deduped.length} unique songs (string-based)`);
+            const batchSize = 100;
+            for (let i = 0; i < deduped.length; i += batchSize) {
+              const batch = deduped.slice(i, i + batchSize);
+              const insertData = batch.map((song) => ({
+                phishNetId: song.__normId,
+                // Use normalized string ID
+                title: song.song,
+                artist: "Phish",
+                timesPlayed: song.times_played || 0,
+                plays24Months: plays24MonthsMap.get(song.song) || 0,
+                debutDate: song.debut_date || null,
+                lastPlayed: song.last_played || null,
+                gap: song.gap || 0,
+                originalArtist: song.original_artist || null,
+                category: this.categoryzeSong(song.song),
+                rarityScore: this.calculateRarityScore(song.times_played || 0, song.gap || 0)
+              }));
+              await db.insert(cachedSongs).values(insertData).onConflictDoNothing();
+            }
+            await this.updateCacheMetadata("songs", apiSongs.length);
+            console.log(`Successfully cached ${apiSongs.length} songs`);
+          }
+        } catch (error) {
+          console.error("Error refreshing songs cache:", error);
+          await this.updateCacheMetadata("songs", 0, error instanceof Error ? error.message : String(error));
+        }
+      }
+      // Refresh shows cache from Phish.net API
+      // Public — also called by the auto-score job in index.ts
+      async refreshShowsCache() {
+        console.log("Refreshing shows cache from Phish.net API...");
+        try {
+          await db.insert(cacheMetadata).values({ cacheType: "shows", isRefreshing: true }).onConflictDoUpdate({ target: cacheMetadata.cacheType, set: { isRefreshing: true } });
+          const currentYear = (/* @__PURE__ */ new Date()).getFullYear();
+          const years = [currentYear, currentYear - 1, currentYear - 2];
+          const allShows = [];
+          for (const year of years) {
+            const shows = await this.phishApi.getShowsByYear(year);
+            allShows.push(...shows);
+          }
+          console.log(`Fetched ${allShows.length} shows from Phish.net API`);
+          if (allShows.length > 0) {
+            const seen = /* @__PURE__ */ new Set();
+            const uniqueShows = allShows.filter((show) => {
+              if (seen.has(show.showdate))
+                return false;
+              seen.add(show.showdate);
+              return true;
+            });
+            const insertData = uniqueShows.map((show) => ({
+              phishNetId: String(show.showid || show.showdate),
+              showDate: /* @__PURE__ */ new Date(show.showdate + "T00:00:00Z"),
+              venue: show.venue || "Unknown Venue",
+              city: show.city || "Unknown City",
+              state: show.state || null,
+              country: show.country || "USA",
+              tourid: show.tourid || null,
+              setlistdata: show.setlistdata || null,
+              isCompleted: show.showdate < (/* @__PURE__ */ new Date()).toISOString().split("T")[0]
+            }));
+            const batchSize = 50;
+            for (let i = 0; i < insertData.length; i += batchSize) {
+              await db.insert(cachedShows).values(insertData.slice(i, i + batchSize)).onConflictDoUpdate({
+                target: cachedShows.phishNetId,
+                set: {
+                  showDate: import_drizzle_orm2.sql`EXCLUDED.show_date`,
+                  venue: import_drizzle_orm2.sql`EXCLUDED.venue`,
+                  city: import_drizzle_orm2.sql`EXCLUDED.city`,
+                  state: import_drizzle_orm2.sql`EXCLUDED.state`,
+                  country: import_drizzle_orm2.sql`EXCLUDED.country`,
+                  tourid: import_drizzle_orm2.sql`EXCLUDED.tourid`,
+                  setlistdata: import_drizzle_orm2.sql`EXCLUDED.setlistdata`,
+                  isCompleted: import_drizzle_orm2.sql`EXCLUDED.is_completed`,
+                  cachedAt: /* @__PURE__ */ new Date()
+                }
+              });
+            }
+            await this.updateCacheMetadata("shows", uniqueShows.length);
+            console.log(`Successfully cached ${uniqueShows.length} shows`);
+          }
+        } catch (error) {
+          console.error("Error refreshing shows cache:", error);
+          await this.updateCacheMetadata("shows", 0, error instanceof Error ? error.message : String(error));
+        }
+      }
+      // Refresh specific setlist cache
+      async refreshSetlistCache(showDate) {
+        console.log(`Refreshing setlist cache for ${showDate}...`);
+        try {
+          const setlistData = await this.phishApi.getSetlist(showDate);
+          if (setlistData) {
+            const songs3 = Array.isArray(setlistData) ? setlistData.map((song) => song.song || song.title || song.songname).filter(Boolean) : [];
+            const insertData = {
+              showDate,
+              setlistData,
+              songs: songs3
+            };
+            const [cached] = await db.insert(cachedSetlists).values(insertData).onConflictDoUpdate({
+              target: cachedSetlists.showDate,
+              set: {
+                setlistData: insertData.setlistData,
+                songs: insertData.songs,
+                cachedAt: /* @__PURE__ */ new Date()
+              }
+            }).returning();
+            console.log(`Successfully cached setlist for ${showDate}`);
+            return cached;
+          }
+        } catch (error) {
+          console.error(`Error refreshing setlist cache for ${showDate}:`, error);
+        }
+        return null;
+      }
+      // Calculate 24-month play counts from cached shows and setlists
+      async calculate24MonthPlays() {
+        console.log("\u{1F4CA} Calculating 24-month play counts from cached shows...");
+        const songPlayCounts = /* @__PURE__ */ new Map();
+        try {
+          const twentyFourMonthsAgo = /* @__PURE__ */ new Date();
+          twentyFourMonthsAgo.setMonth(twentyFourMonthsAgo.getMonth() - 24);
+          const recentShows = await db.select().from(cachedShows).where((0, import_drizzle_orm2.eq)(cachedShows.isCompleted, true)).orderBy((0, import_drizzle_orm2.desc)(cachedShows.showDate));
+          const showsLast24Months = recentShows.filter(
+            (show) => new Date(show.showDate) >= twentyFourMonthsAgo
+          );
+          console.log(`Found ${showsLast24Months.length} shows in last 24 months`);
+          for (const show of showsLast24Months) {
+            const showDateStr = show.showDate.toISOString().split("T")[0];
+            const [cachedSetlist] = await db.select().from(cachedSetlists).where((0, import_drizzle_orm2.eq)(cachedSetlists.showDate, showDateStr));
+            let songs3 = [];
+            if (cachedSetlist && cachedSetlist.songs) {
+              songs3 = Array.isArray(cachedSetlist.songs) ? cachedSetlist.songs : [];
+            } else if (show.setlistdata) {
+              const setlistData = show.setlistdata;
+              if (Array.isArray(setlistData)) {
+                songs3 = setlistData.map((s) => s.song || s.title || s.songname).filter(Boolean);
+              }
+            }
+            for (const songTitle of songs3) {
+              const count = songPlayCounts.get(songTitle) || 0;
+              songPlayCounts.set(songTitle, count + 1);
+            }
+          }
+          console.log(`\u2705 Calculated plays for ${songPlayCounts.size} unique songs`);
+        } catch (error) {
+          console.error("Error calculating 24-month plays:", error);
+        }
+        return songPlayCounts;
+      }
+      // Helper method to categorize songs (copied from phish-api.ts)
+      categoryzeSong(title) {
+        const lowerTitle = title.toLowerCase();
+        const gamehengePattern = /\b(wilson|tela|colonel forbin|famous mockingbird|lizards|the sloth|unit monster|n2o|the man who stepped into yesterday|avenu malkenu|icculus|ac\/dc bag|possum)\b/;
+        if (gamehengePattern.test(lowerTitle)) {
+          return "Gamehendge";
+        }
+        const epicPattern = /\b(you enjoy myself|tweezer|ghost|harry hood|stash|fluffhead|divided sky|reba|run like an antelope|david bowie)\b/;
+        if (epicPattern.test(lowerTitle)) {
+          return "Epic";
+        }
+        const classicPattern = /\b(wilson|sample in a jar|character zero|bouncing around the room|lawn boy|suzy greenberg|golgi apparatus|fee|maze|cavern|punch you in the eye|the squirming coil|foam|esther|dinner and a movie|bold as love|loving cup)\b/;
+        if (classicPattern.test(lowerTitle)) {
+          return "Classic";
+        }
+        const coverPattern = /\b(good times bad times|bold as love|loving cup|cities|sneakin' sally|rocky top|i am the walrus|while my guitar gently weeps|fire on the mountain|weekapaug groove)\b/;
+        if (coverPattern.test(lowerTitle)) {
+          return "Cover";
+        }
+        const modernPattern = /\b(ghost|sigma oasis|everything's right|blaze on|more|mercury|ruby waves|soul planet|about to run|threads|we are come to outlive our brains|carini|joy|backwards down the number line|kill devil falls|ocelot|twenty years later)\b/;
+        if (modernPattern.test(lowerTitle)) {
+          return "Modern";
+        }
+        return "Standard";
+      }
+      // Helper method to calculate rarity score (copied from phish-api.ts)
+      calculateRarityScore(timesPlayed, gap) {
+        let score = 1;
+        if (timesPlayed < 5)
+          score += 4;
+        else if (timesPlayed < 20)
+          score += 3;
+        else if (timesPlayed < 50)
+          score += 2;
+        else if (timesPlayed < 100)
+          score += 1;
+        if (gap > 500)
+          score += 2;
+        else if (gap > 100)
+          score += 1;
+        return Math.min(score, 7);
+      }
+      // Get cache statistics
+      async getCacheStats() {
+        try {
+          const metadata = await db.select().from(cacheMetadata);
+          const stats = {};
+          for (const meta of metadata) {
+            stats[meta.cacheType] = {
+              lastRefreshed: meta.lastRefreshed,
+              totalRecords: meta.totalRecords,
+              isRefreshing: meta.isRefreshing,
+              lastError: meta.lastError,
+              refreshInterval: meta.refreshInterval
+            };
+          }
+          return stats;
+        } catch (error) {
+          console.error("Error getting cache stats:", error);
+          return {};
+        }
+      }
+      // Force refresh all caches
+      async refreshAllCaches() {
+        console.log("Force refreshing all caches...");
+        await Promise.all([
+          this.refreshSongsCache(),
+          this.refreshShowsCache()
+        ]);
+      }
+    };
+    cacheService = new CacheService();
+  }
+});
+
+// services/scoring.ts
+var scoring_exports = {};
+__export(scoring_exports, {
+  scoreLeague: () => scoreLeague
+});
+async function scoreLeague(leagueId) {
+  const league = await storage.getLeague(leagueId);
+  if (!league)
+    throw new Error("League not found");
+  const seasonStartStr = league.seasonStartDate ? new Date(league.seasonStartDate).toISOString().split("T")[0] : null;
+  const seasonEndStr = league.seasonEndDate ? new Date(league.seasonEndDate).toISOString().split("T")[0] : null;
+  const allShows = await storage.getCachedShows();
+  const shows = allShows.filter((s) => {
+    const d = new Date(s.showDate).toISOString().split("T")[0];
+    if (seasonStartStr && d < seasonStartStr)
+      return false;
+    if (seasonEndStr && d > seasonEndStr)
+      return false;
+    return true;
+  });
+  const drafted = await db.select().from(draftedSongs).where((0, import_drizzle_orm4.eq)(draftedSongs.leagueId, leagueId));
+  await db.update(draftedSongs).set({ points: 0 }).where((0, import_drizzle_orm4.eq)(draftedSongs.leagueId, leagueId));
+  const draftSongIds = [...new Set(drafted.map((d) => d.songId).filter(Boolean))];
+  const draftSongRows = draftSongIds.length ? await db.select({ id: songs.id, title: songs.title }).from(songs).where((0, import_drizzle_orm4.inArray)(songs.id, draftSongIds)) : [];
+  const songIdToTitle = new Map(draftSongRows.map((s) => [s.id, s.title]));
+  const missingSongIds = draftSongIds.filter((id) => !songIdToTitle.has(id));
+  if (missingSongIds.length > 0) {
+    const cachedRows = await db.select({ id: cachedSongs.id, title: cachedSongs.title }).from(cachedSongs).where((0, import_drizzle_orm4.inArray)(cachedSongs.id, missingSongIds));
+    for (const r of cachedRows)
+      songIdToTitle.set(r.id, r.title);
+  }
+  const titleMap = {};
+  for (const d of drafted) {
+    if (!d.songId)
+      continue;
+    const title = songIdToTitle.get(d.songId);
+    if (!title)
+      continue;
+    const key = title.toLowerCase();
+    if (!titleMap[key])
+      titleMap[key] = [];
+    titleMap[key].push(d);
+  }
+  const showIdToDate = new Map(allShows.map((s) => [s.id, new Date(s.showDate).toISOString().split("T")[0]]));
+  const allAdjustments = await db.select().from(pointAdjustments).where((0, import_drizzle_orm4.eq)(pointAdjustments.leagueId, leagueId));
+  const adjustmentLookup = /* @__PURE__ */ new Map();
+  const adjustmentIdLookup = /* @__PURE__ */ new Map();
+  const adjDiag = [];
+  for (const adj of allAdjustments) {
+    if (!adj.userId) {
+      adjDiag.push(`id=${adj.id} SKIP:noUserId`);
+      continue;
+    }
+    const adjTitle = songIdToTitle.get(adj.songId)?.toLowerCase();
+    if (!adjTitle) {
+      adjDiag.push(`id=${adj.id} SKIP:songId=${adj.songId} notInTitleMap`);
+      continue;
+    }
+    const adjShowDate = showIdToDate.get(adj.concertId);
+    if (!adjShowDate) {
+      adjDiag.push(`id=${adj.id} SKIP:concertId=${adj.concertId} notInShowIdToDate(size=${showIdToDate.size})`);
+      continue;
+    }
+    const key = `${adjShowDate}:${adjTitle}:${adj.userId}`;
+    if (!adjustmentIdLookup.has(key) || adj.id > adjustmentIdLookup.get(key)) {
+      adjustmentLookup.set(key, adj.adjustedPoints);
+      adjustmentIdLookup.set(key, adj.id);
+      adjDiag.push(`id=${adj.id} OK:key=${key} pts=${adj.adjustedPoints}`);
+    }
+  }
+  console.log(`[scoreLeague] adjustments(${allAdjustments.length}):`, adjDiag.join(" | "));
+  const BATCH = 8;
+  const showDates = [...new Set(shows.map((s) => new Date(s.showDate).toISOString().split("T")[0]))];
+  const fetchedSetlists = [];
+  const { phishApi: phishApi2 } = await Promise.resolve().then(() => (init_phish_api(), phish_api_exports));
+  for (let i = 0; i < showDates.length; i += BATCH) {
+    const chunk = showDates.slice(i, i + BATCH);
+    const results = await Promise.all(chunk.map(async (showDate) => {
+      try {
+        const tracks = await phishApi2.getSetlist(showDate);
+        return tracks && tracks.length > 0 ? { showDate, tracks } : null;
+      } catch {
+        return null;
+      }
+    }));
+    fetchedSetlists.push(...results);
+  }
+  const pointDeltas = /* @__PURE__ */ new Map();
+  const adjsApplied = [];
+  let totalPoints = 0;
+  let showsScored = 0;
+  const setlistsToCache = [];
+  for (const result of fetchedSetlists) {
+    if (!result)
+      continue;
+    const { showDate, tracks: rawTracks } = result;
+    const firstPosBySet = {};
+    for (const t of rawTracks) {
+      const s = t.set_name || "Set 1";
+      if (!(s in firstPosBySet) || t.position < firstPosBySet[s])
+        firstPosBySet[s] = t.position;
+    }
+    const songUserBase = /* @__PURE__ */ new Map();
+    for (const t of rawTracks) {
+      const title = (t.title || "").toLowerCase();
+      const setKey = t.set_name || "Set 1";
+      const isEncore = setKey.toLowerCase().includes("encore");
+      const isSetOpener = !isEncore && t.position === firstPosBySet[setKey];
+      let basePts = 1;
+      if (isSetOpener)
+        basePts += 1;
+      if (isEncore)
+        basePts += 1;
+      const entries = titleMap[title];
+      if (entries && entries.length > 0) {
+        for (const entry of entries) {
+          const accumKey = `${title}\0${entry.userId}`;
+          const existing = songUserBase.get(accumKey);
+          if (existing) {
+            existing.basePts += basePts;
+          } else {
+            songUserBase.set(accumKey, { entryId: entry.id, basePts });
+          }
+        }
+      }
+    }
+    for (const [accumKey, { entryId, basePts }] of songUserBase) {
+      const nullIdx = accumKey.indexOf("\0");
+      const title = accumKey.slice(0, nullIdx);
+      const userId = parseInt(accumKey.slice(nullIdx + 1));
+      const overrideKey = `${showDate}:${title}:${userId}`;
+      const pts = adjustmentLookup.has(overrideKey) ? adjustmentLookup.get(overrideKey) : basePts;
+      if (adjustmentLookup.has(overrideKey)) {
+        console.log(`[scoreLeague] override: show=${showDate} song="${title}" user=${userId} base=${basePts} \u2192 ${pts}pts`);
+        adjsApplied.push({ username: String(userId), song: title, base: basePts, override: pts });
+      }
+      pointDeltas.set(entryId, (pointDeltas.get(entryId) ?? 0) + pts);
+      totalPoints += pts;
+    }
+    showsScored++;
+    setlistsToCache.push({ showDate, tracks: rawTracks });
+  }
+  const unmappedSongIds = [];
+  for (const d of drafted) {
+    if (d.songId && !songIdToTitle.has(d.songId))
+      unmappedSongIds.push(d.songId);
+  }
+  for (const [entryId, pts] of pointDeltas) {
+    await db.update(draftedSongs).set({ points: pts }).where((0, import_drizzle_orm4.eq)(draftedSongs.id, entryId));
+  }
+  for (const { showDate, tracks } of setlistsToCache) {
+    try {
+      const trackTitles = tracks.map((t) => t.title || "");
+      await db.insert(cachedSetlists).values({ showDate, setlistData: tracks, songs: trackTitles }).onConflictDoUpdate({
+        target: cachedSetlists.showDate,
+        set: { setlistData: tracks, songs: trackTitles, cachedAt: /* @__PURE__ */ new Date() }
+      });
+    } catch {
+    }
+  }
+  const userPtsLog = {};
+  for (const d of drafted) {
+    if (!d.userId)
+      continue;
+    userPtsLog[d.userId] = (userPtsLog[d.userId] ?? 0) + (pointDeltas.get(d.id) ?? 0);
+  }
+  console.log(`[scoreLeague] league=${leagueId} shows=${showsScored} totalPts=${totalPoints} entries=${pointDeltas.size}`);
+  console.log(`[scoreLeague] per-user points:`, JSON.stringify(userPtsLog));
+  if (unmappedSongIds.length)
+    console.log(`[scoreLeague] unmapped songIds:`, unmappedSongIds);
+  const scoredUserIds = Object.keys(userPtsLog).map(Number);
+  const usernameRows = scoredUserIds.length ? await db.select({ id: users.id, username: users.username }).from(users).where((0, import_drizzle_orm4.inArray)(users.id, scoredUserIds)) : [];
+  const usernameMap = new Map(usernameRows.map((u) => [u.id, u.username]));
+  const perUser = Object.fromEntries(
+    scoredUserIds.map((uid) => [usernameMap.get(uid) ?? `user#${uid}`, userPtsLog[uid]])
+  );
+  for (const a of adjsApplied) {
+    const uid = parseInt(a.username);
+    if (!isNaN(uid))
+      a.username = usernameMap.get(uid) ?? `user#${uid}`;
+  }
+  return { shows: showsScored, points: totalPoints, perUser, unmappedSongIds, adjustmentsApplied: adjsApplied, adjDiag };
+}
+var import_drizzle_orm4;
+var init_scoring = __esm({
+  "services/scoring.ts"() {
+    import_drizzle_orm4 = require("drizzle-orm");
+    init_db();
+    init_schema();
+    init_storage_db();
   }
 });
 
@@ -10088,339 +10427,8 @@ var require_dist2 = __commonJS({
   }
 });
 
-// services/cache-service.ts
-var cache_service_exports = {};
-__export(cache_service_exports, {
-  CacheService: () => CacheService,
-  cacheService: () => cacheService
-});
-var import_drizzle_orm2, CacheService, cacheService;
-var init_cache_service = __esm({
-  "services/cache-service.ts"() {
-    "use strict";
-    init_db();
-    init_schema();
-    import_drizzle_orm2 = require("drizzle-orm");
-    init_phish_api();
-    CacheService = class {
-      constructor() {
-        this.phishApi = new PhishNetService();
-      }
-      // Check if cache is fresh based on refresh interval
-      async isCacheFresh(cacheType) {
-        try {
-          const [metadata] = await db.select().from(cacheMetadata).where((0, import_drizzle_orm2.eq)(cacheMetadata.cacheType, cacheType));
-          if (!metadata || !metadata.lastRefreshed || !metadata.refreshInterval) {
-            return false;
-          }
-          const now = /* @__PURE__ */ new Date();
-          const lastRefreshed = new Date(metadata.lastRefreshed);
-          const refreshIntervalMs = metadata.refreshInterval * 1e3;
-          return now.getTime() - lastRefreshed.getTime() < refreshIntervalMs;
-        } catch (error) {
-          console.error(`Error checking cache freshness for ${cacheType}:`, error);
-          return false;
-        }
-      }
-      // Update cache metadata
-      async updateCacheMetadata(cacheType, totalRecords, error) {
-        try {
-          await db.insert(cacheMetadata).values({
-            cacheType,
-            lastRefreshed: /* @__PURE__ */ new Date(),
-            totalRecords,
-            isRefreshing: false,
-            lastError: error || null
-          }).onConflictDoUpdate({
-            target: cacheMetadata.cacheType,
-            set: {
-              lastRefreshed: /* @__PURE__ */ new Date(),
-              totalRecords,
-              isRefreshing: false,
-              lastError: error || null
-            }
-          });
-        } catch (error2) {
-          console.error(`Error updating cache metadata for ${cacheType}:`, error2);
-        }
-      }
-      // Get cached songs with optional refresh
-      async getCachedSongs(forceRefresh = false) {
-        const cacheType = "songs";
-        const needsRefresh = forceRefresh || !await this.isCacheFresh(cacheType);
-        if (needsRefresh) {
-          await this.refreshSongsCache();
-        }
-        return await db.select().from(cachedSongs).orderBy((0, import_drizzle_orm2.desc)(cachedSongs.timesPlayed));
-      }
-      // Get cached shows with optional refresh
-      async getCachedShows(forceRefresh = false) {
-        const cacheType = "shows";
-        const needsRefresh = forceRefresh || !await this.isCacheFresh(cacheType);
-        if (needsRefresh) {
-          await this.refreshShowsCache();
-        }
-        return await db.select().from(cachedShows).orderBy((0, import_drizzle_orm2.desc)(cachedShows.showDate));
-      }
-      // Get cached setlist for a specific date
-      async getCachedSetlist(showDate, forceRefresh = false) {
-        const [cached] = await db.select().from(cachedSetlists).where((0, import_drizzle_orm2.eq)(cachedSetlists.showDate, showDate));
-        if (cached && !forceRefresh) {
-          return cached;
-        }
-        return await this.refreshSetlistCache(showDate);
-      }
-      // Refresh songs cache from Phish.net API
-      async refreshSongsCache() {
-        console.log("\u{1F504} [CacheService] refreshSongsCache v2 (dedup+upsert) - STARTING...");
-        try {
-          await db.insert(cacheMetadata).values({
-            cacheType: "songs",
-            isRefreshing: true
-          }).onConflictDoUpdate({
-            target: cacheMetadata.cacheType,
-            set: { isRefreshing: true }
-          });
-          const apiSongs = await this.phishApi.getAllSongsForDraft();
-          console.log(`Fetched ${apiSongs.length} songs from Phish.net API`);
-          if (apiSongs.length > 0) {
-            const plays24MonthsMap = await this.calculate24MonthPlays();
-            await db.delete(cachedSongs);
-            const normalizeId = (s, idx) => String(s.songid ?? s.id ?? s.slug ?? idx + 1e4);
-            const seen = /* @__PURE__ */ new Set();
-            const deduped = apiSongs.filter((s, i) => {
-              const id = normalizeId(s, i);
-              if (seen.has(id))
-                return false;
-              seen.add(id);
-              s.__normId = id;
-              return true;
-            });
-            console.log(`\u2705 Deduplicated ${apiSongs.length} songs to ${deduped.length} unique songs (string-based)`);
-            const batchSize = 100;
-            for (let i = 0; i < deduped.length; i += batchSize) {
-              const batch = deduped.slice(i, i + batchSize);
-              const insertData = batch.map((song) => ({
-                phishNetId: song.__normId,
-                // Use normalized string ID
-                title: song.song,
-                artist: "Phish",
-                timesPlayed: song.times_played || 0,
-                plays24Months: plays24MonthsMap.get(song.song) || 0,
-                debutDate: song.debut_date || null,
-                lastPlayed: song.last_played || null,
-                gap: song.gap || 0,
-                originalArtist: song.original_artist || null,
-                category: this.categoryzeSong(song.song),
-                rarityScore: this.calculateRarityScore(song.times_played || 0, song.gap || 0)
-              }));
-              await db.insert(cachedSongs).values(insertData).onConflictDoNothing();
-            }
-            await this.updateCacheMetadata("songs", apiSongs.length);
-            console.log(`Successfully cached ${apiSongs.length} songs`);
-          }
-        } catch (error) {
-          console.error("Error refreshing songs cache:", error);
-          await this.updateCacheMetadata("songs", 0, error instanceof Error ? error.message : String(error));
-        }
-      }
-      // Refresh shows cache from Phish.net API
-      async refreshShowsCache() {
-        console.log("Refreshing shows cache from Phish.net API...");
-        try {
-          await db.insert(cacheMetadata).values({ cacheType: "shows", isRefreshing: true }).onConflictDoUpdate({ target: cacheMetadata.cacheType, set: { isRefreshing: true } });
-          const currentYear = (/* @__PURE__ */ new Date()).getFullYear();
-          const years = [currentYear, currentYear - 1, currentYear - 2];
-          const allShows = [];
-          for (const year of years) {
-            const shows = await this.phishApi.getShowsByYear(year);
-            allShows.push(...shows);
-          }
-          console.log(`Fetched ${allShows.length} shows from Phish.net API`);
-          if (allShows.length > 0) {
-            const seen = /* @__PURE__ */ new Set();
-            const uniqueShows = allShows.filter((show) => {
-              if (seen.has(show.showdate))
-                return false;
-              seen.add(show.showdate);
-              return true;
-            });
-            const insertData = uniqueShows.map((show) => ({
-              phishNetId: String(show.showid || show.showdate),
-              showDate: /* @__PURE__ */ new Date(show.showdate + "T00:00:00Z"),
-              venue: show.venue || "Unknown Venue",
-              city: show.city || "Unknown City",
-              state: show.state || null,
-              country: show.country || "USA",
-              tourid: show.tourid || null,
-              setlistdata: show.setlistdata || null,
-              isCompleted: show.showdate < (/* @__PURE__ */ new Date()).toISOString().split("T")[0]
-            }));
-            const batchSize = 50;
-            for (let i = 0; i < insertData.length; i += batchSize) {
-              await db.insert(cachedShows).values(insertData.slice(i, i + batchSize)).onConflictDoUpdate({
-                target: cachedShows.phishNetId,
-                set: {
-                  showDate: sql`EXCLUDED.show_date`,
-                  venue: sql`EXCLUDED.venue`,
-                  city: sql`EXCLUDED.city`,
-                  state: sql`EXCLUDED.state`,
-                  country: sql`EXCLUDED.country`,
-                  tourid: sql`EXCLUDED.tourid`,
-                  setlistdata: sql`EXCLUDED.setlistdata`,
-                  isCompleted: sql`EXCLUDED.is_completed`,
-                  cachedAt: /* @__PURE__ */ new Date()
-                }
-              });
-            }
-            await this.updateCacheMetadata("shows", uniqueShows.length);
-            console.log(`Successfully cached ${uniqueShows.length} shows`);
-          }
-        } catch (error) {
-          console.error("Error refreshing shows cache:", error);
-          await this.updateCacheMetadata("shows", 0, error instanceof Error ? error.message : String(error));
-        }
-      }
-      // Refresh specific setlist cache
-      async refreshSetlistCache(showDate) {
-        console.log(`Refreshing setlist cache for ${showDate}...`);
-        try {
-          const setlistData = await this.phishApi.getSetlist(showDate);
-          if (setlistData) {
-            const songs2 = Array.isArray(setlistData) ? setlistData.map((song) => song.song || song.title || song.songname).filter(Boolean) : [];
-            const insertData = {
-              showDate,
-              setlistData,
-              songs: songs2
-            };
-            const [cached] = await db.insert(cachedSetlists).values(insertData).onConflictDoUpdate({
-              target: cachedSetlists.showDate,
-              set: {
-                setlistData: insertData.setlistData,
-                songs: insertData.songs,
-                cachedAt: /* @__PURE__ */ new Date()
-              }
-            }).returning();
-            console.log(`Successfully cached setlist for ${showDate}`);
-            return cached;
-          }
-        } catch (error) {
-          console.error(`Error refreshing setlist cache for ${showDate}:`, error);
-        }
-        return null;
-      }
-      // Calculate 24-month play counts from cached shows and setlists
-      async calculate24MonthPlays() {
-        console.log("\u{1F4CA} Calculating 24-month play counts from cached shows...");
-        const songPlayCounts = /* @__PURE__ */ new Map();
-        try {
-          const twentyFourMonthsAgo = /* @__PURE__ */ new Date();
-          twentyFourMonthsAgo.setMonth(twentyFourMonthsAgo.getMonth() - 24);
-          const recentShows = await db.select().from(cachedShows).where((0, import_drizzle_orm2.eq)(cachedShows.isCompleted, true)).orderBy((0, import_drizzle_orm2.desc)(cachedShows.showDate));
-          const showsLast24Months = recentShows.filter(
-            (show) => new Date(show.showDate) >= twentyFourMonthsAgo
-          );
-          console.log(`Found ${showsLast24Months.length} shows in last 24 months`);
-          for (const show of showsLast24Months) {
-            const showDateStr = show.showDate.toISOString().split("T")[0];
-            const [cachedSetlist] = await db.select().from(cachedSetlists).where((0, import_drizzle_orm2.eq)(cachedSetlists.showDate, showDateStr));
-            let songs2 = [];
-            if (cachedSetlist && cachedSetlist.songs) {
-              songs2 = Array.isArray(cachedSetlist.songs) ? cachedSetlist.songs : [];
-            } else if (show.setlistdata) {
-              const setlistData = show.setlistdata;
-              if (Array.isArray(setlistData)) {
-                songs2 = setlistData.map((s) => s.song || s.title || s.songname).filter(Boolean);
-              }
-            }
-            for (const songTitle of songs2) {
-              const count = songPlayCounts.get(songTitle) || 0;
-              songPlayCounts.set(songTitle, count + 1);
-            }
-          }
-          console.log(`\u2705 Calculated plays for ${songPlayCounts.size} unique songs`);
-        } catch (error) {
-          console.error("Error calculating 24-month plays:", error);
-        }
-        return songPlayCounts;
-      }
-      // Helper method to categorize songs (copied from phish-api.ts)
-      categoryzeSong(title) {
-        const lowerTitle = title.toLowerCase();
-        const gamehengePattern = /\b(wilson|tela|colonel forbin|famous mockingbird|lizards|the sloth|unit monster|n2o|the man who stepped into yesterday|avenu malkenu|icculus|ac\/dc bag|possum)\b/;
-        if (gamehengePattern.test(lowerTitle)) {
-          return "Gamehendge";
-        }
-        const epicPattern = /\b(you enjoy myself|tweezer|ghost|harry hood|stash|fluffhead|divided sky|reba|run like an antelope|david bowie)\b/;
-        if (epicPattern.test(lowerTitle)) {
-          return "Epic";
-        }
-        const classicPattern = /\b(wilson|sample in a jar|character zero|bouncing around the room|lawn boy|suzy greenberg|golgi apparatus|fee|maze|cavern|punch you in the eye|the squirming coil|foam|esther|dinner and a movie|bold as love|loving cup)\b/;
-        if (classicPattern.test(lowerTitle)) {
-          return "Classic";
-        }
-        const coverPattern = /\b(good times bad times|bold as love|loving cup|cities|sneakin' sally|rocky top|i am the walrus|while my guitar gently weeps|fire on the mountain|weekapaug groove)\b/;
-        if (coverPattern.test(lowerTitle)) {
-          return "Cover";
-        }
-        const modernPattern = /\b(ghost|sigma oasis|everything's right|blaze on|more|mercury|ruby waves|soul planet|about to run|threads|we are come to outlive our brains|carini|joy|backwards down the number line|kill devil falls|ocelot|twenty years later)\b/;
-        if (modernPattern.test(lowerTitle)) {
-          return "Modern";
-        }
-        return "Standard";
-      }
-      // Helper method to calculate rarity score (copied from phish-api.ts)
-      calculateRarityScore(timesPlayed, gap) {
-        let score = 1;
-        if (timesPlayed < 5)
-          score += 4;
-        else if (timesPlayed < 20)
-          score += 3;
-        else if (timesPlayed < 50)
-          score += 2;
-        else if (timesPlayed < 100)
-          score += 1;
-        if (gap > 500)
-          score += 2;
-        else if (gap > 100)
-          score += 1;
-        return Math.min(score, 7);
-      }
-      // Get cache statistics
-      async getCacheStats() {
-        try {
-          const metadata = await db.select().from(cacheMetadata);
-          const stats = {};
-          for (const meta of metadata) {
-            stats[meta.cacheType] = {
-              lastRefreshed: meta.lastRefreshed,
-              totalRecords: meta.totalRecords,
-              isRefreshing: meta.isRefreshing,
-              lastError: meta.lastError,
-              refreshInterval: meta.refreshInterval
-            };
-          }
-          return stats;
-        } catch (error) {
-          console.error("Error getting cache stats:", error);
-          return {};
-        }
-      }
-      // Force refresh all caches
-      async refreshAllCaches() {
-        console.log("Force refreshing all caches...");
-        await Promise.all([
-          this.refreshSongsCache(),
-          this.refreshShowsCache()
-        ]);
-      }
-    };
-    cacheService = new CacheService();
-  }
-});
-
 // index.ts
-var import_express2 = __toESM(require("express"));
+var import_express8 = __toESM(require("express"));
 var import_serverless2 = require("@neondatabase/serverless");
 var import_ws2 = __toESM(require("ws"));
 var import_path = __toESM(require("path"));
@@ -10428,9 +10436,6 @@ var import_http2 = require("http");
 
 // routes.ts
 var import_http = require("http");
-init_storage_db();
-init_schema();
-init_phish_api();
 
 // auth.ts
 var import_express_session = __toESM(require("express-session"));
@@ -10762,6 +10767,1615 @@ function requireAuth(req, res, next) {
   req.userId = userId;
   next();
 }
+
+// routes/admin.ts
+var import_express = require("express");
+
+// controllers/adminController.ts
+init_storage_db();
+var import_bcrypt2 = __toESM(require("bcrypt"));
+var createUser = async (req, res) => {
+  try {
+    const { username, email, password, role } = req.body;
+    if (!username || !email || !password) {
+      return res.status(400).json({ message: "Username, email, and password are required" });
+    }
+    const hashedPassword = await import_bcrypt2.default.hash(password, 10);
+    const user = await storage.createUser({ username, email, password: hashedPassword, role: role || "user" });
+    res.json({ user: { id: user.id, username: user.username, email: user.email, role: user.role } });
+  } catch (error) {
+    console.error("Admin createUser error:", error);
+    res.status(500).json({ message: error.message || "Failed to create user" });
+  }
+};
+var getUsers = async (req, res) => {
+  try {
+    const users2 = await storage.getAllUsers();
+    res.json(users2.map((u) => ({ id: u.id, username: u.username, email: u.email, role: u.role, totalPoints: u.totalPoints, createdAt: u.createdAt })));
+  } catch (error) {
+    console.error("Admin getUsers error:", error);
+    res.status(500).json({ message: "Failed to fetch users" });
+  }
+};
+var updateUser = async (req, res) => {
+  try {
+    const userId = parseInt(req.params.id);
+    const { role } = req.body;
+    if (!role) {
+      return res.status(400).json({ message: "Role is required" });
+    }
+    const user = await storage.updateUserRole(userId, role);
+    res.json({ id: user.id, username: user.username, email: user.email, role: user.role });
+  } catch (error) {
+    console.error("Admin updateUser error:", error);
+    res.status(500).json({ message: "Failed to update user" });
+  }
+};
+var deleteUser = async (req, res) => {
+  try {
+    const userId = parseInt(req.params.id);
+    await storage.deleteUser(userId);
+    res.json({ message: "User deleted successfully" });
+  } catch (error) {
+    console.error("Admin deleteUser error:", error);
+    res.status(500).json({ message: "Failed to delete user" });
+  }
+};
+
+// routes/admin.ts
+init_storage_db();
+init_phish_api();
+init_cache_service();
+init_db();
+init_schema();
+var import_drizzle_orm3 = require("drizzle-orm");
+
+// middleware/admin.ts
+init_storage_db();
+var getSessionUserId = (req) => {
+  return req.session?.user?.id || req.session?.userId || null;
+};
+var requireSuperAdmin = async (req, res, next) => {
+  try {
+    const userId = getSessionUserId(req);
+    if (!userId)
+      return res.status(401).json({ message: "Not authenticated" });
+    const isSuperAdmin = await storage.isUserSuperAdmin(userId);
+    if (!isSuperAdmin)
+      return res.status(403).json({ message: "Super admin access required" });
+    next();
+  } catch (error) {
+    console.error("Super admin middleware error:", error);
+    res.status(500).json({ message: "Server error" });
+  }
+};
+var requireAdmin = async (req, res, next) => {
+  try {
+    const userId = getSessionUserId(req);
+    if (!userId)
+      return res.status(401).json({ message: "Not authenticated" });
+    const isAdmin = await storage.isUserAdmin(userId);
+    if (!isAdmin)
+      return res.status(403).json({ message: "Admin access required" });
+    next();
+  } catch (error) {
+    console.error("Admin middleware error:", error);
+    res.status(500).json({ message: "Server error" });
+  }
+};
+var requireLeagueAdmin = async (req, res, next) => {
+  try {
+    const userId = getSessionUserId(req);
+    if (!userId)
+      return res.status(401).json({ message: "Not authenticated" });
+    if (await storage.isUserAdmin(userId))
+      return next();
+    const leagueId = req.params.leagueId || req.body.leagueId;
+    if (!leagueId)
+      return res.status(400).json({ message: "League ID required" });
+    const isLeagueAdmin = await storage.isUserLeagueAdmin(userId, parseInt(leagueId));
+    if (!isLeagueAdmin)
+      return res.status(403).json({ message: "League admin access required" });
+    next();
+  } catch (error) {
+    console.error("League admin middleware error:", error);
+    res.status(500).json({ message: "Server error" });
+  }
+};
+var requireLeagueOwnerOrAdmin = async (req, res, next) => {
+  try {
+    const userId = getSessionUserId(req);
+    if (!userId)
+      return res.status(401).json({ message: "Authentication required" });
+    const leagueId = parseInt(req.params.id);
+    if (isNaN(leagueId))
+      return res.status(400).json({ message: "Invalid league id" });
+    if (await storage.isUserAdmin(userId))
+      return next();
+    if (await storage.isUserLeagueAdmin(userId, leagueId))
+      return next();
+    return res.status(403).json({ message: "League owner or admin access required" });
+  } catch (error) {
+    console.error("League owner middleware error:", error);
+    res.status(500).json({ message: "Server error" });
+  }
+};
+
+// routes/admin.ts
+var router = (0, import_express.Router)();
+router.use((req, res, next) => {
+  const userId = req.session?.user?.id || req.session?.userId;
+  if (!userId)
+    return res.status(401).json({ message: "Not authenticated" });
+  next();
+});
+router.post("/users", requireSuperAdmin, createUser);
+router.get("/users", requireAdmin, getUsers);
+router.put("/users/:id", requireSuperAdmin, updateUser);
+router.delete("/users/:id", requireSuperAdmin, deleteUser);
+router.get("/concerts", async (_req, res) => {
+  try {
+    const shows = await storage.getCachedShows();
+    const todayStr = (/* @__PURE__ */ new Date()).toISOString().split("T")[0];
+    const sorted = shows.filter((s) => {
+      const d = s.showDate instanceof Date ? s.showDate : new Date(s.showDate);
+      return d.toISOString().split("T")[0] < todayStr;
+    }).sort((a, b) => new Date(b.showDate).getTime() - new Date(a.showDate).getTime());
+    const seenDates = /* @__PURE__ */ new Set();
+    const deduped = sorted.filter((s) => {
+      const dateKey = (s.showDate instanceof Date ? s.showDate : new Date(s.showDate)).toISOString().split("T")[0];
+      if (seenDates.has(dateKey))
+        return false;
+      seenDates.add(dateKey);
+      return true;
+    });
+    res.json(deduped.map((s) => ({
+      id: s.id,
+      date: (s.showDate instanceof Date ? s.showDate : new Date(s.showDate)).toISOString().split("T")[0],
+      venue: s.venue,
+      city: s.city,
+      state: s.state
+    })));
+  } catch (e) {
+    res.status(500).json({ message: e.message || "Failed to fetch concerts" });
+  }
+});
+router.post("/refresh-shows", async (_req, res) => {
+  try {
+    await cacheService.getCachedShows(true);
+    res.json({ message: "Shows cache refreshed successfully" });
+  } catch (e) {
+    res.status(500).json({ message: e.message || "Failed to refresh shows cache" });
+  }
+});
+router.get("/leagues", requireAdmin, async (_req, res) => {
+  try {
+    const leagues2 = await storage.getAllLeagues();
+    res.json(leagues2);
+  } catch (e) {
+    res.status(500).json({ message: e.message || "Failed to fetch leagues" });
+  }
+});
+router.get("/shows/:concertId/league/:leagueId", requireLeagueAdmin, async (req, res) => {
+  try {
+    const concertId = parseInt(req.params.concertId);
+    const leagueId = parseInt(req.params.leagueId);
+    const shows = await storage.getCachedShows();
+    const show = shows.find((s) => s.id === concertId);
+    if (!show)
+      return res.status(404).json({ message: "Show not found" });
+    const showDate = new Date(show.showDate).toISOString().split("T")[0];
+    const tracks = await phishApi.getSetlist(showDate);
+    if (!tracks || tracks.length === 0) {
+      return res.json({ concert: { venue: show.venue, city: show.city, date: show.showDate }, songPerformances: [] });
+    }
+    const drafted = await db.select({ songId: draftedSongs.songId, userId: draftedSongs.userId }).from(draftedSongs).where((0, import_drizzle_orm3.eq)(draftedSongs.leagueId, leagueId));
+    const songIds = [...new Set(drafted.map((d) => d.songId).filter(Boolean))];
+    const userIds = [...new Set(drafted.map((d) => d.userId).filter(Boolean))];
+    const [songRows, userRows] = await Promise.all([
+      songIds.length ? db.select({ id: songs.id, title: songs.title }).from(songs).where((0, import_drizzle_orm3.inArray)(songs.id, songIds)) : [],
+      userIds.length ? db.select({ id: users.id, username: users.username }).from(users).where((0, import_drizzle_orm3.inArray)(users.id, userIds)) : []
+    ]);
+    const songMap = new Map(songRows.map((s) => [s.id, s.title]));
+    const userMap = new Map(userRows.map((u) => [u.id, u.username]));
+    const draftersByTitle = {};
+    const titleToSongId = {};
+    for (const d of drafted) {
+      if (!d.songId || !d.userId)
+        continue;
+      const title = songMap.get(d.songId);
+      const username = userMap.get(d.userId);
+      if (!title || !username)
+        continue;
+      const key = title.toLowerCase();
+      if (!draftersByTitle[key])
+        draftersByTitle[key] = [];
+      draftersByTitle[key].push({ userId: d.userId, username });
+      titleToSongId[key] = d.songId;
+    }
+    const firstPositionBySet = {};
+    for (const track of tracks) {
+      const setKey = track.set || "Set 1";
+      const pos = track.position || 0;
+      if (!(setKey in firstPositionBySet) || pos < firstPositionBySet[setKey]) {
+        firstPositionBySet[setKey] = pos;
+      }
+    }
+    const titleOccCount = {};
+    const songPerformances2 = tracks.map((track, idx) => {
+      const title = track.song || track.title || "";
+      const titleKey = title.toLowerCase();
+      titleOccCount[titleKey] = (titleOccCount[titleKey] ?? 0) + 1;
+      const occurrence = titleOccCount[titleKey];
+      const draftedBy = draftersByTitle[titleKey] || [];
+      const setKey = track.set || track.set_name || "Set 1";
+      const isEncore = track.isEncore || setKey.toLowerCase().includes("encore");
+      const isSetOpener = !isEncore && track.position === firstPositionBySet[setKey];
+      const durationSeconds = track.duration ? Math.round(track.duration / 1e3) : 0;
+      return {
+        id: idx,
+        song: { title, id: titleToSongId[titleKey] },
+        occurrence,
+        setNumber: setKey,
+        position: track.position || idx + 1,
+        isSetOpener,
+        isEncore,
+        durationSeconds,
+        draftedBy
+      };
+    });
+    res.json({
+      concert: { venue: show.venue, city: show.city, state: show.state, date: show.showDate },
+      songPerformances: songPerformances2
+    });
+  } catch (e) {
+    console.error("Error fetching admin show data:", e);
+    res.status(500).json({ message: e.message || "Failed to fetch show data" });
+  }
+});
+router.post("/adjustments", requireLeagueAdmin, async (req, res) => {
+  try {
+    const { leagueId, concertId, songId, userId, originalPoints, adjustedPoints, reason } = req.body;
+    if (!leagueId || !concertId || !songId || !userId) {
+      return res.status(400).json({ message: "leagueId, concertId, songId, userId are required" });
+    }
+    const adjustment = await storage.createPointAdjustment({
+      leagueId,
+      concertId,
+      songId,
+      userId,
+      originalPoints: originalPoints ?? 0,
+      adjustedPoints: adjustedPoints ?? 0,
+      reason: reason || "",
+      adjustedBy: req.session.userId
+    });
+    res.json(adjustment);
+  } catch (e) {
+    console.error("Error saving adjustment:", e);
+    res.status(500).json({ message: e.message || "Failed to save adjustment" });
+  }
+});
+router.get("/adjustments/league/:leagueId", async (req, res) => {
+  try {
+    const leagueId = parseInt(req.params.leagueId);
+    const concertId = req.query.concertId ? parseInt(req.query.concertId) : void 0;
+    const userId = req.session?.user?.id || req.session?.userId;
+    if (!userId)
+      return res.status(401).json({ message: "Not authenticated" });
+    const canAccess = await storage.isUserAdmin(userId) || await storage.isUserLeagueAdmin(userId, leagueId);
+    if (!canAccess)
+      return res.status(403).json({ message: "Not authorized" });
+    const adjustments = await storage.getPointAdjustments(leagueId, concertId);
+    res.json(adjustments);
+  } catch (e) {
+    res.status(500).json({ message: e.message || "Failed to fetch adjustments" });
+  }
+});
+router.delete("/adjustments/by-song", requireLeagueAdmin, async (req, res) => {
+  try {
+    const { leagueId, concertId, songId, userId } = req.body;
+    if (!leagueId || !concertId || !songId || !userId) {
+      return res.status(400).json({ message: "leagueId, concertId, songId, userId are required" });
+    }
+    await db.delete(pointAdjustments).where(
+      (0, import_drizzle_orm3.and)(
+        (0, import_drizzle_orm3.eq)(pointAdjustments.leagueId, leagueId),
+        (0, import_drizzle_orm3.eq)(pointAdjustments.concertId, concertId),
+        (0, import_drizzle_orm3.eq)(pointAdjustments.songId, songId),
+        (0, import_drizzle_orm3.eq)(pointAdjustments.userId, userId)
+      )
+    );
+    res.json({ message: "All adjustments for song deleted" });
+  } catch (e) {
+    res.status(500).json({ message: e.message || "Failed to delete adjustments" });
+  }
+});
+router.delete("/adjustments/:id", requireLeagueAdmin, async (req, res) => {
+  try {
+    const id = parseInt(req.params.id);
+    if (isNaN(id))
+      return res.status(400).json({ message: "Invalid id" });
+    await db.delete(pointAdjustments).where((0, import_drizzle_orm3.eq)(pointAdjustments.id, id));
+    res.json({ message: "Adjustment deleted" });
+  } catch (e) {
+    res.status(500).json({ message: e.message || "Failed to delete adjustment" });
+  }
+});
+router.get("/my-leagues", async (req, res) => {
+  try {
+    const userId = req.session?.user?.id || req.session?.userId;
+    if (!userId)
+      return res.status(401).json({ message: "Not authenticated" });
+    const allLeagues = await storage.getAllLeagues();
+    const accessible = await Promise.all(
+      allLeagues.map(async (l) => {
+        const canManage = await storage.isUserAdmin(userId) || await storage.isUserLeagueAdmin(userId, l.id);
+        return canManage ? l : null;
+      })
+    );
+    res.json(accessible.filter(Boolean));
+  } catch (e) {
+    res.status(500).json({ message: e.message || "Failed to fetch leagues" });
+  }
+});
+router.get("/leagues/:id/members", async (req, res) => {
+  try {
+    const userId = req.session?.user?.id || req.session?.userId;
+    if (!userId)
+      return res.status(401).json({ message: "Not authenticated" });
+    const leagueId = parseInt(req.params.id);
+    const canAccess = await storage.isUserAdmin(userId) || await storage.isUserLeagueAdmin(userId, leagueId);
+    if (!canAccess)
+      return res.status(403).json({ message: "Not authorized" });
+    const members = await storage.getLeagueMembers(leagueId);
+    res.json(members.map((m) => ({
+      id: m.id,
+      userId: m.userId,
+      username: m.user?.username,
+      role: m.role,
+      joinedAt: m.joinedAt,
+      totalPoints: m.user?.totalPoints ?? 0
+    })));
+  } catch (e) {
+    res.status(500).json({ message: e.message || "Failed to fetch members" });
+  }
+});
+router.delete("/leagues/:id/members/:userId", async (req, res) => {
+  try {
+    const requestingUserId = req.session?.user?.id || req.session?.userId;
+    if (!requestingUserId)
+      return res.status(401).json({ message: "Not authenticated" });
+    const leagueId = parseInt(req.params.id);
+    const canAccess = await storage.isUserAdmin(requestingUserId) || await storage.isUserLeagueAdmin(requestingUserId, leagueId);
+    if (!canAccess)
+      return res.status(403).json({ message: "Not authorized" });
+    const targetUserId = parseInt(req.params.userId);
+    await db.delete(leagueMembers).where(
+      (0, import_drizzle_orm3.and)((0, import_drizzle_orm3.eq)(leagueMembers.leagueId, leagueId), (0, import_drizzle_orm3.eq)(leagueMembers.userId, targetUserId))
+    );
+    res.json({ message: "Member removed from league" });
+  } catch (e) {
+    res.status(500).json({ message: e.message || "Failed to remove member" });
+  }
+});
+router.post("/leagues/:id/members", async (req, res) => {
+  try {
+    const requestingUserId = req.session?.user?.id || req.session?.userId;
+    if (!requestingUserId)
+      return res.status(401).json({ message: "Not authenticated" });
+    const leagueId = parseInt(req.params.id);
+    const canAccess = await storage.isUserAdmin(requestingUserId) || await storage.isUserLeagueAdmin(requestingUserId, leagueId);
+    if (!canAccess)
+      return res.status(403).json({ message: "Not authorized" });
+    const { userId } = req.body;
+    if (!userId)
+      return res.status(400).json({ message: "userId required" });
+    const user = await storage.getUser(parseInt(userId));
+    if (!user)
+      return res.status(404).json({ message: "User not found" });
+    await storage.joinLeague(parseInt(userId), leagueId);
+    res.json({ message: `${user.username} added to league`, username: user.username, userId: user.id });
+  } catch (e) {
+    res.status(500).json({ message: e.message || "Failed to add member" });
+  }
+});
+router.put("/users/:id/role", requireSuperAdmin, async (req, res) => {
+  try {
+    const userId = parseInt(req.params.id);
+    const { role } = req.body;
+    if (!["user", "admin", "superadmin"].includes(role)) {
+      return res.status(400).json({ message: "Invalid role" });
+    }
+    const updated = await storage.updateUserRole(userId, role);
+    res.json(updated);
+  } catch (e) {
+    res.status(500).json({ message: e.message || "Failed to update role" });
+  }
+});
+router.get("/debug/adjustments", requireAdmin, async (req, res) => {
+  try {
+    const leagueId = req.query.leagueId ? parseInt(req.query.leagueId) : null;
+    if (!leagueId)
+      return res.status(400).json({ message: "leagueId required" });
+    const allShows = await storage.getCachedShows();
+    const showIdToDate = new Map(allShows.map((s) => [s.id, new Date(s.showDate).toISOString().split("T")[0]]));
+    const adjs = await db.select().from(pointAdjustments).where((0, import_drizzle_orm3.eq)(pointAdjustments.leagueId, leagueId));
+    const songIds = [...new Set(adjs.map((a) => a.songId).filter(Boolean))];
+    const userIds = [...new Set(adjs.map((a) => a.userId).filter(Boolean))];
+    const [songRows, userRows] = await Promise.all([
+      songIds.length ? db.select({ id: songs.id, title: songs.title }).from(songs).where((0, import_drizzle_orm3.inArray)(songs.id, songIds)) : [],
+      userIds.length ? db.select({ id: users.id, username: users.username }).from(users).where((0, import_drizzle_orm3.inArray)(users.id, userIds)) : []
+    ]);
+    const songMap = new Map(songRows.map((s) => [s.id, s.title]));
+    const userMap = new Map(userRows.map((u) => [u.id, u.username]));
+    const result = adjs.map((a) => {
+      const showDate = showIdToDate.get(a.concertId);
+      const songTitle = songMap.get(a.songId) ?? "(not found)";
+      const username = a.userId ? userMap.get(a.userId) ?? "(not found)" : null;
+      return {
+        id: a.id,
+        concertId: a.concertId,
+        resolvedShowDate: showDate ?? "STALE \u2014 not in cachedShows",
+        songId: a.songId,
+        songTitle,
+        userId: a.userId,
+        username,
+        adjustedPoints: a.adjustedPoints,
+        overrideKey: showDate && songTitle !== "(not found)" && a.userId ? `${showDate}:${songTitle.toLowerCase()}:${a.userId}` : "CANNOT BUILD \u2014 missing data"
+      };
+    });
+    res.json({ leagueId, adjustmentCount: adjs.length, adjustments: result });
+  } catch (e) {
+    res.status(500).json({ message: e.message || "Debug query failed" });
+  }
+});
+router.get("/debug/player", requireAdmin, async (req, res) => {
+  try {
+    const username = String(req.query.username || "");
+    const leagueId = req.query.leagueId ? parseInt(req.query.leagueId) : null;
+    if (!username)
+      return res.status(400).json({ message: "username query param required" });
+    const [u] = await db.select({ id: users.id, username: users.username, totalPoints: users.totalPoints }).from(users).where((0, import_drizzle_orm3.eq)(users.username, username)).limit(1);
+    if (!u)
+      return res.status(404).json({ message: `User '${username}' not found` });
+    if (!leagueId) {
+      return res.json({ user: u, note: "add &leagueId=XX to see drafted songs" });
+    }
+    const rows = await db.select({
+      draftedSongId: draftedSongs.id,
+      songId: draftedSongs.songId,
+      points: draftedSongs.points,
+      songTitle: songs.title
+    }).from(draftedSongs).leftJoin(songs, (0, import_drizzle_orm3.eq)(draftedSongs.songId, songs.id)).where((0, import_drizzle_orm3.and)((0, import_drizzle_orm3.eq)(draftedSongs.leagueId, leagueId), (0, import_drizzle_orm3.eq)(draftedSongs.userId, u.id)));
+    res.json({
+      user: u,
+      leagueId,
+      totalDraftedPoints: rows.reduce((s, r) => s + (r.points ?? 0), 0),
+      songCount: rows.length,
+      songs: rows.map((r) => ({
+        draftedSongId: r.draftedSongId,
+        songId: r.songId,
+        songTitle: r.songTitle ?? "(NOT FOUND IN songs TABLE \u2014 wrong ID namespace)",
+        points: r.points ?? 0
+      }))
+    });
+  } catch (e) {
+    res.status(500).json({ message: e.message || "Debug query failed" });
+  }
+});
+var admin_default = router;
+
+// routes/leagues.ts
+var import_express2 = require("express");
+init_storage_db();
+init_db();
+var import_drizzle_orm5 = require("drizzle-orm");
+init_schema();
+init_phish_api();
+init_cache_service();
+init_scoring();
+var import_nanoid = require("nanoid");
+var router2 = (0, import_express2.Router)();
+router2.get("/api/leagues", requireAuth, async (req, res) => {
+  try {
+    const { tourId, public: isPublic } = req.query;
+    if (isPublic === "true") {
+      const leagueList = await storage.getPublicLeagues(tourId ? parseInt(tourId) : void 0);
+      const withCounts = await Promise.all(leagueList.map(async (l) => {
+        const members = await storage.getLeagueMembers(l.id);
+        return { ...l, memberCount: members.length };
+      }));
+      res.json(withCounts);
+    } else {
+      const userId = req.userId;
+      if (!userId) {
+        return res.status(401).json({ message: "User not authenticated" });
+      }
+      const leagueList = await storage.getUserLeagues(userId);
+      const withCounts = await Promise.all(leagueList.map(async (l) => {
+        const members = await storage.getLeagueMembers(l.id);
+        return { ...l, memberCount: members.length };
+      }));
+      res.json(withCounts);
+    }
+  } catch (error) {
+    res.status(500).json({ message: "Failed to fetch leagues" });
+  }
+});
+router2.post("/api/leagues", requireAuth, async (req, res) => {
+  try {
+    const body = { ...req.body };
+    if (body.seasonStartDate)
+      body.seasonStartDate = new Date(body.seasonStartDate);
+    if (body.seasonEndDate)
+      body.seasonEndDate = new Date(body.seasonEndDate);
+    const leagueData = insertLeagueSchema.partial({ tourId: true, seasonStartDate: true, seasonEndDate: true }).parse(body);
+    const ownerId = req.userId;
+    const league = await storage.createLeague({ ...leagueData, ownerId });
+    res.json(league);
+  } catch (error) {
+    console.error("League creation error:", JSON.stringify(error?.errors ?? error?.message ?? error));
+    res.status(400).json({ message: "Invalid league data", detail: error?.errors ?? error?.message });
+  }
+});
+router2.get("/api/leagues/:id", requireAuth, async (req, res) => {
+  try {
+    const leagueId = parseInt(req.params.id);
+    const league = await storage.getLeague(leagueId);
+    if (!league) {
+      return res.status(404).json({ message: "League not found" });
+    }
+    res.json(league);
+  } catch (error) {
+    console.error("Error fetching league:", error);
+    res.status(500).json({ message: "Failed to fetch league" });
+  }
+});
+router2.patch("/api/leagues/:id", requireAuth, async (req, res) => {
+  try {
+    const leagueId = parseInt(req.params.id);
+    const updates = { ...req.body };
+    if (updates.seasonStartDate !== void 0) {
+      updates.seasonStartDate = !updates.seasonStartDate || updates.seasonStartDate === "null" ? null : new Date(updates.seasonStartDate);
+    }
+    if (updates.seasonEndDate !== void 0) {
+      updates.seasonEndDate = !updates.seasonEndDate || updates.seasonEndDate === "null" ? null : new Date(updates.seasonEndDate);
+    }
+    if (updates.draftDate !== void 0) {
+      updates.draftDate = !updates.draftDate || updates.draftDate === "null" ? null : new Date(updates.draftDate);
+    }
+    const league = await storage.getLeague(leagueId);
+    if (!league) {
+      return res.status(404).json({ message: "League not found" });
+    }
+    const userId = req.userId;
+    const user = await storage.getUser(userId);
+    const userRole = user?.role;
+    if (league.ownerId !== userId && userRole !== "admin") {
+      return res.status(403).json({ message: "Not authorized to update this league" });
+    }
+    const updatedLeague = await storage.updateLeague(leagueId, updates);
+    res.json(updatedLeague);
+  } catch (error) {
+    console.error("Error updating league:", error);
+    res.status(500).json({ message: "Failed to update league" });
+  }
+});
+router2.delete("/api/leagues/:id", requireAuth, async (req, res) => {
+  try {
+    const leagueId = parseInt(req.params.id);
+    const league = await storage.getLeague(leagueId);
+    if (!league) {
+      return res.status(404).json({ message: "League not found" });
+    }
+    const userId = req.userId;
+    const user = await storage.getUser(userId);
+    const userRole = user?.role;
+    if (league.ownerId !== userId && userRole !== "admin" && userRole !== "superadmin") {
+      return res.status(403).json({ message: "Not authorized to delete this league" });
+    }
+    await storage.deleteLeague(leagueId);
+    res.json({ message: "League deleted successfully" });
+  } catch (error) {
+    console.error("Error deleting league:", error);
+    res.status(500).json({ message: "Failed to delete league" });
+  }
+});
+router2.post("/api/leagues/join/:inviteCode", requireAuth, async (req, res) => {
+  try {
+    const inviteCode = req.params.inviteCode;
+    const userId = req.userId;
+    if (!userId) {
+      return res.status(401).json({ message: "User not authenticated" });
+    }
+    const success = await storage.joinLeagueByInvite(inviteCode, userId);
+    if (success) {
+      res.json({ message: "Successfully joined league" });
+    } else {
+      res.status(400).json({ message: "Invalid invite code or unable to join league" });
+    }
+  } catch (error) {
+    console.error("Error joining league by invite:", error);
+    res.status(500).json({ message: "Failed to join league" });
+  }
+});
+router2.post("/api/leagues/:id/join", requireAuth, async (req, res) => {
+  try {
+    const leagueId = parseInt(req.params.id);
+    const { userId } = req.body;
+    if (!userId) {
+      return res.status(400).json({ message: "User ID required" });
+    }
+    await storage.joinLeague(userId, leagueId);
+    res.json({ message: "Successfully joined league" });
+  } catch (error) {
+    res.status(400).json({ message: error.message || "Failed to join league" });
+  }
+});
+router2.post("/api/leagues/:id/invite", requireAuth, requireLeagueOwnerOrAdmin, async (req, res) => {
+  try {
+    const leagueId = parseInt(req.params.id);
+    const createdBy = req.session?.user?.id || req.session?.userId || req.body?.createdBy;
+    if (!createdBy)
+      return res.status(401).json({ message: "Not authenticated" });
+    const inviteCode = (0, import_nanoid.nanoid)(10);
+    const { leagueInvites: leagueInvites2 } = await Promise.resolve().then(() => (init_schema(), schema_exports));
+    await db.insert(leagueInvites2).values({
+      leagueId,
+      inviteCode,
+      createdBy,
+      maxUses: req.body?.maxUses ?? null,
+      isActive: true
+    });
+    res.json({ inviteCode, joinUrl: `/join/${inviteCode}` });
+  } catch (error) {
+    res.status(500).json({ message: error.message || "Failed to create invite" });
+  }
+});
+router2.get("/api/leagues/:id/members", async (req, res) => {
+  try {
+    const leagueId = parseInt(req.params.id);
+    const members = await storage.getLeagueMembers(leagueId);
+    res.json(members);
+  } catch (error) {
+    res.status(500).json({ message: "Failed to fetch league members" });
+  }
+});
+router2.get("/api/leagues/:id/standings", async (req, res) => {
+  try {
+    const leagueId = parseInt(req.params.id);
+    const standings = await storage.getLeagueStandings(leagueId);
+    res.json(standings);
+  } catch (error) {
+    res.status(500).json({ message: "Failed to fetch standings" });
+  }
+});
+router2.get("/api/leagues/:id/export-picks", requireAuth, async (req, res) => {
+  try {
+    const leagueId = parseInt(req.params.id);
+    const userId = req.userId;
+    const league = await storage.getLeague(leagueId);
+    if (!league) {
+      return res.status(404).json({ message: "League not found" });
+    }
+    const members = await storage.getLeagueMembers(leagueId);
+    const isMember = members.some((m) => m.userId === userId);
+    if (!isMember) {
+      return res.status(403).json({ message: "Not authorized to access this league's data" });
+    }
+    const allPicks = [];
+    for (const member of members) {
+      if (!member.user || !member.user.id) {
+        console.warn("Member missing user data:", member);
+        continue;
+      }
+      const draftedSongs2 = await storage.getDraftedSongs(member.user.id, leagueId);
+      for (const pick of draftedSongs2) {
+        allPicks.push({
+          username: member.user.username || "Unknown User",
+          songTitle: pick.song?.title || "Unknown",
+          category: pick.song?.category || "Unknown",
+          plays24Months: pick.song?.plays24Months || 0,
+          totalPlays: pick.song?.totalPlays || 0,
+          points: pick.points || 0,
+          draftedAt: pick.draftedAt ? new Date(pick.draftedAt).toLocaleString() : "N/A"
+        });
+      }
+    }
+    const escapeCSV = (value) => {
+      let sanitized = value;
+      sanitized = sanitized.replace(/[\x00-\x1F\x7F]/g, "");
+      sanitized = sanitized.trim();
+      const dangerousChars = /^[=+\-@]/;
+      if (dangerousChars.test(sanitized)) {
+        sanitized = "'" + sanitized;
+      }
+      sanitized = sanitized.replace(/"/g, '""');
+      return `"${sanitized}"`;
+    };
+    const csvHeaders = "Username,Song Title,Category,Plays (24 months),Total Plays,Points,Drafted At\n";
+    const csvRows = allPicks.length > 0 ? allPicks.map(
+      (pick) => `${escapeCSV(pick.username)},${escapeCSV(pick.songTitle)},${escapeCSV(pick.category)},${pick.plays24Months},${pick.totalPlays},${pick.points},${escapeCSV(pick.draftedAt)}`
+    ).join("\n") : "";
+    const csv = csvHeaders + csvRows;
+    let safeFilename = league.name.replace(/[^a-z0-9_-]/gi, "_");
+    safeFilename = safeFilename.replace(/^_+|_+$/g, "") || "league";
+    res.setHeader("Content-Type", "text/csv");
+    res.setHeader("Content-Disposition", `attachment; filename="${safeFilename}_picks_${(/* @__PURE__ */ new Date()).toISOString().split("T")[0]}.csv"`);
+    res.send(csv);
+  } catch (error) {
+    console.error("Error exporting picks:", error);
+    res.status(500).json({ message: "Failed to export picks" });
+  }
+});
+router2.get("/api/leagues/:id/player/:userId/songs", async (req, res) => {
+  try {
+    const leagueId = parseInt(req.params.id);
+    const userId = parseInt(req.params.userId);
+    const drafts = await storage.getDraftedSongs(userId, leagueId);
+    const sorted = drafts.map((d) => ({
+      songTitle: d.song?.title || "Unknown",
+      points: d.points ?? 0,
+      draftRound: d.draftRound,
+      draftPick: d.draftPick
+    })).sort((a, b) => b.points - a.points);
+    res.json(sorted);
+  } catch (error) {
+    res.status(500).json({ message: error.message || "Failed to fetch player songs" });
+  }
+});
+router2.get("/api/leagues/:id/setlist", async (req, res) => {
+  try {
+    const leagueId = parseInt(req.params.id);
+    const date = req.query.date;
+    if (!date)
+      return res.status(400).json({ message: "date query param required" });
+    const tracks = await phishApi.getSetlist(date);
+    if (!tracks || tracks.length === 0) {
+      return res.json({ date, songPerformances: [] });
+    }
+    const drafted = await db.select({ songId: draftedSongs.songId, userId: draftedSongs.userId }).from(draftedSongs).where((0, import_drizzle_orm5.eq)(draftedSongs.leagueId, leagueId));
+    const draftersByTitle = {};
+    for (const d of drafted) {
+      if (!d.songId)
+        continue;
+      const [song] = await db.select().from(songs).where((0, import_drizzle_orm5.eq)(songs.id, d.songId)).limit(1);
+      if (!song)
+        continue;
+      const user = await storage.getUser(d.userId);
+      if (!user)
+        continue;
+      const key = song.title.toLowerCase();
+      if (!draftersByTitle[key])
+        draftersByTitle[key] = [];
+      draftersByTitle[key].push({ userId: user.id, username: user.username });
+    }
+    const firstPosBySet = {};
+    for (const t of tracks) {
+      const setKey = t.set || "Set 1";
+      const pos = t.position || 0;
+      if (!(setKey in firstPosBySet) || pos < firstPosBySet[setKey])
+        firstPosBySet[setKey] = pos;
+    }
+    const songPerformances2 = tracks.map((track, idx) => {
+      const title = track.song || track.title || "";
+      const setKey = track.set || "Set 1";
+      const isEncore = track.isEncore || setKey.toLowerCase().includes("encore");
+      const isSetOpener = !isEncore && track.position === firstPosBySet[setKey];
+      const durationSeconds = track.duration ? Math.round(track.duration / 1e3) : 0;
+      const mins = durationSeconds / 60;
+      let points = 1;
+      if (isSetOpener)
+        points += 1;
+      if (isEncore)
+        points += 1;
+      if (mins >= 20)
+        points += 1;
+      if (mins >= 30)
+        points += 1;
+      if (mins >= 40)
+        points += 1;
+      const draftedBy = draftersByTitle[title.toLowerCase()] || [];
+      return {
+        id: idx,
+        song: { title },
+        setNumber: setKey,
+        position: track.position || idx + 1,
+        isSetOpener,
+        isEncore,
+        durationSeconds,
+        points,
+        draftedBy
+      };
+    });
+    res.json({ date, songPerformances: songPerformances2 });
+  } catch (error) {
+    res.status(500).json({ message: error.message || "Failed to fetch setlist" });
+  }
+});
+router2.post("/api/leagues/:id/score", requireAuth, requireLeagueOwnerOrAdmin, async (req, res) => {
+  try {
+    const leagueId = parseInt(req.params.id);
+    await cacheService.getCachedShows(true);
+    const result = await scoreLeague(leagueId);
+    res.json({ message: "Scoring complete", shows: result.shows, points: result.points, perUser: result.perUser, unmappedSongIds: result.unmappedSongIds });
+  } catch (error) {
+    console.error("Score league error:", error);
+    res.status(500).json({ message: error.message || "Failed to score league" });
+  }
+});
+var leagues_default = router2;
+
+// routes/draft.ts
+var import_express3 = require("express");
+init_storage_db();
+init_db();
+var import_drizzle_orm6 = require("drizzle-orm");
+init_schema();
+var serverAutoDraftEnabled = /* @__PURE__ */ new Set();
+var serverAutoDraftRegistry = /* @__PURE__ */ new Map();
+var router3 = (0, import_express3.Router)();
+router3.post("/api/leagues/:id/schedule-draft", requireAuth, requireLeagueOwnerOrAdmin, async (req, res) => {
+  try {
+    const leagueId = parseInt(req.params.id);
+    const { draftDate, draftRounds, pickTimeLimit } = req.body;
+    if (!draftDate) {
+      return res.status(400).json({ message: "Draft date is required" });
+    }
+    await storage.scheduleDraft(
+      leagueId,
+      new Date(draftDate),
+      draftRounds || 10,
+      pickTimeLimit || 90
+    );
+    res.json({ message: "Draft scheduled successfully" });
+  } catch (error) {
+    res.status(500).json({ message: error.message || "Failed to schedule draft" });
+  }
+});
+router3.post("/api/leagues/:id/start-draft", requireAuth, requireLeagueOwnerOrAdmin, async (req, res) => {
+  try {
+    const leagueId = parseInt(req.params.id);
+    await storage.startDraft(leagueId);
+    res.json({ message: "Draft started successfully" });
+  } catch (error) {
+    res.status(500).json({ message: error.message || "Failed to start draft" });
+  }
+});
+router3.post("/api/leagues/:id/auto-pick", requireAuth, async (req, res) => {
+  try {
+    const leagueId = parseInt(req.params.id);
+    const { userId, preferredSongIds } = req.body;
+    if (userId !== req.userId) {
+      return res.status(403).json({ message: "You can only auto-pick for yourself" });
+    }
+    const league = await storage.getDraftStatus(leagueId);
+    if (!league || league.draftStatus !== "active") {
+      return res.status(400).json({ message: "Draft is not active" });
+    }
+    if (league.currentPlayer !== userId) {
+      return res.status(400).json({ message: "Not this player's turn" });
+    }
+    if (Array.isArray(preferredSongIds) && preferredSongIds.length > 0) {
+      for (const songId of preferredSongIds) {
+        const isDrafted = await storage.isSongDraftedInLeague(songId, leagueId);
+        if (!isDrafted) {
+          const song = await storage.getSong(songId);
+          const pick2 = await storage.makeDraftPick(leagueId, userId, songId, league.pickTimeLimit ?? 90);
+          return res.json({ ...pick2, autoPicked: true, fromQueue: true, songTitle: song?.title ?? `Song #${songId}` });
+        }
+      }
+    }
+    const available = await storage.getAvailableSongsPlayedLastYear(leagueId);
+    if (available.length === 0) {
+      return res.status(400).json({ message: "No available songs to auto-pick" });
+    }
+    const pick = await storage.makeDraftPick(leagueId, userId, available[0].id, league.pickTimeLimit ?? 90);
+    res.json({ ...pick, autoPicked: true, fromQueue: false, songTitle: available[0].title });
+  } catch (error) {
+    res.status(500).json({ message: error.message || "Failed to auto-pick" });
+  }
+});
+router3.get("/api/leagues/:id/draft-status", async (req, res) => {
+  try {
+    const leagueId = parseInt(req.params.id);
+    const league = await storage.getDraftStatus(leagueId);
+    if (league?.draftStatus === "active" && league?.currentPlayer) {
+      const key = `${leagueId}:${league.currentPlayer}`;
+      if (serverAutoDraftEnabled.has(key)) {
+        const lastFiredPick = serverAutoDraftRegistry.get(key) ?? -1;
+        if (lastFiredPick !== league.currentPick) {
+          serverAutoDraftRegistry.set(key, league.currentPick);
+          setTimeout(() => {
+            storage.getAvailableSongsPlayedLastYear(leagueId).then(async (available) => {
+              if (!available.length)
+                return;
+              try {
+                const pick = await storage.makeDraftPick(leagueId, league.currentPlayer, available[0].id, league.pickTimeLimit ?? 90);
+                console.log(`[server-auto-draft] Picked "${available[0].title}" for user ${league.currentPlayer} (pick #${league.currentPick}) in league ${leagueId}`);
+              } catch (e) {
+                console.warn(`[server-auto-draft] Pick failed for user ${league.currentPlayer}: ${e.message}`);
+              }
+            });
+          }, 500);
+        }
+      }
+    }
+    res.json(league);
+  } catch (error) {
+    res.status(500).json({ message: "Failed to get draft status" });
+  }
+});
+router3.get("/api/leagues/:id/draft-order", async (req, res) => {
+  try {
+    const leagueId = parseInt(req.params.id);
+    const draftOrder = await storage.getDraftOrder(leagueId);
+    res.json(draftOrder);
+  } catch (error) {
+    res.status(500).json({ message: "Failed to get draft order" });
+  }
+});
+router3.post("/api/leagues/:id/draft-order", requireAuth, requireLeagueOwnerOrAdmin, async (req, res) => {
+  try {
+    const leagueId = parseInt(req.params.id);
+    const { userIds } = req.body;
+    if (!Array.isArray(userIds)) {
+      return res.status(400).json({ message: "userIds must be an array" });
+    }
+    await storage.setDraftOrder(leagueId, userIds);
+    res.json({ message: "Draft order set successfully" });
+  } catch (error) {
+    res.status(500).json({ message: error.message || "Failed to set draft order" });
+  }
+});
+router3.post("/api/leagues/:id/randomize-draft-order", requireAuth, async (req, res) => {
+  try {
+    const leagueId = parseInt(req.params.id);
+    const userId = req.userId;
+    const league = await storage.getLeague(leagueId);
+    if (!league)
+      return res.status(404).json({ message: "League not found" });
+    const user = await storage.getUser(userId);
+    if (league.ownerId !== userId && user?.role !== "admin" && user?.role !== "superadmin") {
+      return res.status(403).json({ message: "Owner only" });
+    }
+    const members = await storage.getLeagueMembers(leagueId);
+    const ids = members.map((m) => m.userId);
+    for (let i = ids.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      [ids[i], ids[j]] = [ids[j], ids[i]];
+    }
+    await storage.setDraftOrder(leagueId, ids);
+    res.json({ orderedUserIds: ids });
+  } catch (err) {
+    res.status(500).json({ message: err.message || "Failed to randomize order" });
+  }
+});
+router3.get("/api/leagues/:id/draft-picks", async (req, res) => {
+  try {
+    const leagueId = parseInt(req.params.id);
+    const picks = await storage.getDraftPicks(leagueId);
+    res.json(picks);
+  } catch (error) {
+    res.status(500).json({ message: "Failed to get draft picks" });
+  }
+});
+router3.post("/api/admin/leagues/:id/reset-draft", requireAuth, async (req, res) => {
+  try {
+    const leagueId = parseInt(req.params.id);
+    const userId = req.userId;
+    const user = await storage.getUser(userId);
+    if (!user || user.role !== "admin" && user.role !== "superadmin") {
+      return res.status(403).json({ message: "Admin only" });
+    }
+    await db.delete(draftPicks).where((0, import_drizzle_orm6.eq)(draftPicks.leagueId, leagueId));
+    await db.delete(draftedSongs).where((0, import_drizzle_orm6.eq)(draftedSongs.leagueId, leagueId));
+    await storage.updateLeague(leagueId, {
+      draftStatus: "scheduled",
+      currentPick: 1,
+      currentRound: 1,
+      currentPlayer: null,
+      pickDeadline: null
+    });
+    res.json({ message: `Draft reset for league ${leagueId}` });
+  } catch (error) {
+    res.status(500).json({ message: error.message || "Failed to reset draft" });
+  }
+});
+router3.post("/api/admin/leagues/:id/reassign-pick", requireAuth, async (req, res) => {
+  try {
+    const leagueId = parseInt(req.params.id);
+    const userId = req.userId;
+    const user = await storage.getUser(userId);
+    if (!user || user.role !== "admin" && user.role !== "superadmin") {
+      return res.status(403).json({ message: "Admin only" });
+    }
+    const { pickId, newUserId, newSongId } = req.body;
+    const [existing] = await db.select().from(draftPicks).where((0, import_drizzle_orm6.eq)(draftPicks.id, pickId)).limit(1);
+    if (!existing)
+      return res.status(404).json({ message: "Pick not found" });
+    await db.update(draftPicks).set({ userId: newUserId, songId: newSongId }).where((0, import_drizzle_orm6.eq)(draftPicks.id, pickId));
+    await db.delete(draftedSongs).where(
+      import_drizzle_orm6.sql`${draftedSongs.leagueId} = ${leagueId} AND ${draftedSongs.userId} = ${existing.userId} AND ${draftedSongs.songId} = ${existing.songId}`
+    );
+    await db.insert(draftedSongs).values({
+      leagueId,
+      userId: newUserId,
+      songId: newSongId,
+      draftRound: existing.draftRound ?? 1,
+      draftPick: existing.pickNumber ?? 1
+    }).onConflictDoNothing();
+    res.json({ message: `Pick #${existing.pickNumber} reassigned`, pickId, newUserId, newSongId });
+  } catch (error) {
+    res.status(500).json({ message: error.message || "Failed to reassign pick" });
+  }
+});
+router3.post("/api/admin/leagues/:id/auto-draft/:userId", requireAuth, async (req, res) => {
+  try {
+    const requestingUserId = req.userId;
+    const requester = await storage.getUser(requestingUserId);
+    if (!requester || requester.role !== "admin" && requester.role !== "superadmin") {
+      return res.status(403).json({ message: "Admin only" });
+    }
+    const leagueId = req.params.id;
+    const targetUserId = req.params.userId;
+    const key = `${leagueId}:${targetUserId}`;
+    const enable = req.body.enable !== false;
+    if (enable) {
+      serverAutoDraftEnabled.add(key);
+    } else {
+      serverAutoDraftEnabled.delete(key);
+      serverAutoDraftRegistry.delete(key);
+    }
+    console.log(`[server-auto-draft] ${enable ? "Enabled" : "Disabled"} for user ${targetUserId} in league ${leagueId}`);
+    res.json({ autoDraft: serverAutoDraftEnabled.has(key), leagueId, userId: targetUserId });
+  } catch (error) {
+    res.status(500).json({ message: error.message || "Failed to toggle auto-draft" });
+  }
+});
+router3.delete("/api/admin/picks/:pickId", requireAuth, async (req, res) => {
+  try {
+    const userId = req.userId;
+    const user = await storage.getUser(userId);
+    if (!user || user.role !== "admin" && user.role !== "superadmin") {
+      return res.status(403).json({ message: "Admin only" });
+    }
+    const pickId = parseInt(req.params.pickId);
+    const [existing] = await db.select().from(draftPicks).where((0, import_drizzle_orm6.eq)(draftPicks.id, pickId)).limit(1);
+    if (!existing)
+      return res.status(404).json({ message: "Pick not found" });
+    await db.delete(draftPicks).where((0, import_drizzle_orm6.eq)(draftPicks.id, pickId));
+    await db.delete(draftedSongs).where(
+      import_drizzle_orm6.sql`${draftedSongs.leagueId} = ${existing.leagueId} AND ${draftedSongs.userId} = ${existing.userId} AND ${draftedSongs.songId} = ${existing.songId}`
+    );
+    res.json({ message: `Pick #${existing.pickNumber} deleted` });
+  } catch (error) {
+    res.status(500).json({ message: error.message || "Failed to delete pick" });
+  }
+});
+router3.post("/api/admin/leagues/:id/add-pick", requireAuth, async (req, res) => {
+  try {
+    const adminUserId = req.userId;
+    const adminUser = await storage.getUser(adminUserId);
+    if (!adminUser || adminUser.role !== "admin" && adminUser.role !== "superadmin") {
+      return res.status(403).json({ message: "Admin only" });
+    }
+    const leagueId = parseInt(req.params.id);
+    const { userId, songId } = req.body;
+    const { cachedSongs: cachedSongsTable } = await Promise.resolve().then(() => (init_schema(), schema_exports));
+    const { songs: songsTable } = await Promise.resolve().then(() => (init_schema(), schema_exports));
+    const { inArray: inArr } = await import("drizzle-orm");
+    const [cs] = await db.select().from(cachedSongsTable).where((0, import_drizzle_orm6.eq)(cachedSongsTable.id, songId)).limit(1);
+    if (!cs)
+      return res.status(404).json({ message: "Song not found" });
+    await db.insert(songsTable).values({
+      title: cs.title,
+      category: cs.category,
+      rarityScore: cs.rarityScore ?? 0,
+      totalPlays: cs.timesPlayed ?? 0,
+      plays24Months: cs.plays24Months ?? 0
+    }).onConflictDoNothing();
+    const [song] = await db.select().from(songsTable).where((0, import_drizzle_orm6.eq)(songsTable.title, cs.title)).limit(1);
+    if (!song)
+      return res.status(500).json({ message: "Failed to resolve song" });
+    const league = await storage.getLeague(leagueId);
+    const existingPicks = await db.select().from(draftPicks).where((0, import_drizzle_orm6.eq)(draftPicks.leagueId, leagueId));
+    const nextPickNum = existingPicks.length > 0 ? Math.max(...existingPicks.map((p) => p.pickNumber ?? 0)) + 1 : 1;
+    const [pick] = await db.insert(draftPicks).values({
+      leagueId,
+      userId,
+      songId: song.id,
+      pickNumber: nextPickNum,
+      round: league?.currentRound ?? 1,
+      timeUsed: 0
+    }).returning();
+    await db.insert(draftedSongs).values({
+      leagueId,
+      userId,
+      songId: song.id,
+      draftRound: league?.currentRound ?? 1,
+      draftPick: nextPickNum
+    }).onConflictDoNothing();
+    res.json({ ...pick, songTitle: song.title });
+  } catch (error) {
+    res.status(500).json({ message: error.message || "Failed to add pick" });
+  }
+});
+router3.post("/api/leagues/:id/draft-pick", requireAuth, async (req, res) => {
+  try {
+    const leagueId = parseInt(req.params.id);
+    const { userId, songId, timeUsed } = req.body;
+    if (!userId || !songId) {
+      return res.status(400).json({ message: "userId and songId are required" });
+    }
+    if (userId !== req.userId) {
+      return res.status(403).json({ message: "You can only pick for yourself" });
+    }
+    const league = await storage.getDraftStatus(leagueId);
+    if (league?.currentPlayer !== userId) {
+      return res.status(400).json({ message: "It's not your turn to pick" });
+    }
+    const isTaken = await storage.isSongDraftedInLeague(songId, leagueId);
+    if (isTaken) {
+      return res.status(400).json({ message: "Song already drafted" });
+    }
+    const pick = await storage.makeDraftPick(leagueId, userId, songId, timeUsed || 0);
+    res.json(pick);
+  } catch (error) {
+    res.status(500).json({ message: error.message || "Failed to make draft pick" });
+  }
+});
+router3.get("/api/drafted-songs", async (req, res) => {
+  try {
+    const userIdStr = req.query.userId;
+    const leagueIdStr = req.query.leagueId;
+    if (!userIdStr || !leagueIdStr) {
+      return res.status(400).json({ message: "User ID and League ID required" });
+    }
+    const userId = parseInt(userIdStr);
+    const leagueId = parseInt(leagueIdStr);
+    if (isNaN(userId) || isNaN(leagueId)) {
+      return res.status(400).json({ message: "Invalid User ID or League ID" });
+    }
+    const draftedSongs2 = await storage.getDraftedSongs(userId, leagueId);
+    res.json(draftedSongs2);
+  } catch (error) {
+    res.status(500).json({ message: "Failed to fetch drafted songs" });
+  }
+});
+router3.post("/api/draft", requireAuth, async (req, res) => {
+  try {
+    const draftData = insertDraftedSongSchema.parse(req.body);
+    const isSongTaken = await storage.isSongDraftedInLeague(draftData.songId, draftData.leagueId);
+    if (isSongTaken) {
+      return res.status(400).json({ message: "Song already drafted by another player in this league" });
+    }
+    const existingDrafts = await storage.getDraftedSongs(draftData.userId, draftData.leagueId);
+    const alreadyDraftedByUser = existingDrafts.some((draft) => draft.songId === draftData.songId);
+    if (alreadyDraftedByUser) {
+      return res.status(400).json({ message: "You have already drafted this song" });
+    }
+    if (existingDrafts.length >= 10) {
+      return res.status(400).json({ message: "Maximum of 10 songs can be drafted" });
+    }
+    const draftedSong = await storage.draftSong(draftData);
+    const song = await storage.getSong(draftData.songId);
+    if (song) {
+      await storage.createActivity(
+        draftData.userId,
+        draftData.leagueId,
+        "draft",
+        `You drafted "${song.title}"`
+      );
+    }
+    res.json(draftedSong);
+  } catch (error) {
+    console.error("Draft error:", error);
+    res.status(400).json({ message: "Failed to draft song" });
+  }
+});
+var draft_default = router3;
+
+// routes/songs.ts
+var import_express4 = require("express");
+init_storage_db();
+var router4 = (0, import_express4.Router)();
+router4.get("/api/songs/debug", requireAuth, requireAdmin, async (req, res) => {
+  try {
+    console.log("\u{1F527} DEBUG: Testing direct Phish.net API call...");
+    const apiKey = process.env.PHISH_NET_API_KEY;
+    if (!apiKey) {
+      return res.json({ error: "API key not found" });
+    }
+    const response = await fetch(`https://api.phish.net/v5/songs.json?apikey=${apiKey}&limit=5`);
+    const data = await response.json();
+    res.json({
+      status: response.status,
+      ok: response.ok,
+      data,
+      dataLength: (data.data || []).length
+    });
+  } catch (error) {
+    res.json({ error: error.message });
+  }
+});
+router4.get("/api/songs", async (req, res) => {
+  try {
+    const leagueId = req.query.leagueId ? parseInt(req.query.leagueId) : null;
+    console.log(`\u{1F3B5} Songs API endpoint called with leagueId: ${leagueId}`);
+    console.log("\u{1F504} Getting cached songs...");
+    const cachedSongs2 = await storage.getCachedSongs();
+    const allSongs = cachedSongs2.map((cached) => ({
+      id: cached.id,
+      title: cached.title,
+      category: cached.category,
+      rarityScore: cached.rarityScore,
+      totalPlays: cached.timesPlayed,
+      lastPlayed: cached.lastPlayed,
+      plays24Months: cached.plays24Months || 0
+    }));
+    console.log(`\u{1F4CA} Cache returned ${allSongs.length} songs`);
+    if (leagueId) {
+      console.log(`\u{1F50D} Filtering for league ${leagueId}`);
+      const draftedSongIds = await storage.getDraftedSongIdsForLeague(leagueId);
+      const availableSongs = allSongs.filter((song) => !draftedSongIds.includes(song.id));
+      console.log(`\u2705 Returning ${availableSongs.length} available songs for league`);
+      res.json(availableSongs);
+    } else {
+      console.log(`\u2705 Returning all ${allSongs.length} songs from cache`);
+      res.json(allSongs);
+    }
+  } catch (error) {
+    console.error("\u274C Error fetching cached songs:", error);
+    res.status(500).json({ message: "Failed to fetch songs" });
+  }
+});
+router4.get("/api/songs/search", async (req, res) => {
+  try {
+    const { q } = req.query;
+    if (!q) {
+      return res.status(400).json({ message: "Search query required" });
+    }
+    const cachedSongs2 = await storage.getCachedSongs();
+    const allSongs = cachedSongs2.map((cached, index2) => ({
+      id: index2 + 1,
+      title: cached.title,
+      category: cached.category,
+      rarityScore: cached.rarityScore,
+      totalPlays: cached.timesPlayed,
+      lastPlayed: cached.lastPlayed,
+      plays24Months: cached.plays24Months || 0
+    }));
+    const filtered = allSongs.filter(
+      (song) => song.title.toLowerCase().includes(q.toLowerCase())
+    );
+    res.json(filtered);
+  } catch (error) {
+    res.status(500).json({ message: "Failed to search songs" });
+  }
+});
+var songs_default = router4;
+
+// routes/concerts.ts
+var import_express5 = require("express");
+init_storage_db();
+init_phish_api();
+var router5 = (0, import_express5.Router)();
+router5.get("/api/concerts", async (req, res) => {
+  try {
+    const { cacheService: cacheService2 } = await Promise.resolve().then(() => (init_cache_service(), cache_service_exports));
+    const cachedShows3 = await cacheService2.getCachedShows();
+    console.log(`Fetched ${cachedShows3.length} shows from cache`);
+    const concerts2 = await Promise.all(cachedShows3.map(async (show) => {
+      const isCompleted = new Date(show.showDate) < /* @__PURE__ */ new Date();
+      let setlist = [];
+      let setlistData = [];
+      if (isCompleted) {
+        try {
+          const cachedSetlist = await cacheService2.getCachedSetlist(show.showDate.toISOString().split("T")[0]);
+          if (cachedSetlist) {
+            setlist = Array.isArray(cachedSetlist.songs) ? cachedSetlist.songs : [];
+            setlistData = Array.isArray(cachedSetlist.setlistData) ? cachedSetlist.setlistData : [];
+          }
+        } catch (error) {
+          console.error(`Error fetching setlist for ${show.showDate}:`, error);
+        }
+      }
+      return {
+        id: show.id,
+        tourId: 1,
+        date: new Date(show.showDate),
+        venue: show.venue,
+        city: show.city,
+        state: show.state,
+        country: show.country,
+        setlist,
+        setlistData,
+        isCompleted
+      };
+    }));
+    res.json(concerts2);
+  } catch (error) {
+    console.error("Error fetching concerts:", error);
+    res.status(500).json({ message: "Failed to fetch concerts" });
+  }
+});
+router5.get("/api/shows/:date/setlist", async (req, res) => {
+  const { date } = req.params;
+  try {
+    const r = await fetch(`https://phish.in/api/v2/shows/${date}`, {
+      headers: { Accept: "application/json" }
+    });
+    if (!r.ok)
+      return res.status(r.status).json({ message: "Show not found on phish.in" });
+    const data = await r.json();
+    const rawTracks = data.tracks ?? [];
+    const setMap = {};
+    for (const t of rawTracks) {
+      const key = t.set_name ?? "Set 1";
+      if (!setMap[key])
+        setMap[key] = [];
+      setMap[key].push(t);
+    }
+    const sets = Object.entries(setMap).map(([setName, tracks]) => {
+      const isEncore = setName.toLowerCase().includes("encore");
+      const firstPos = Math.min(...tracks.map((t) => t.position ?? 99));
+      return {
+        setName,
+        isEncore,
+        songs: tracks.map((t) => ({
+          title: t.title,
+          position: t.position,
+          durationSecs: t.duration ? Math.round(t.duration / 1e3) : 0,
+          isOpener: !isEncore && t.position === firstPos,
+          isEncore
+        }))
+      };
+    });
+    sets.sort((a, b) => {
+      if (a.isEncore && !b.isEncore)
+        return 1;
+      if (!a.isEncore && b.isEncore)
+        return -1;
+      return a.setName.localeCompare(b.setName);
+    });
+    res.json({ date, sets });
+  } catch (err) {
+    console.error("phish.in setlist error:", err);
+    res.status(500).json({ message: "Failed to fetch setlist" });
+  }
+});
+router5.get("/api/concerts/upcoming", async (req, res) => {
+  try {
+    const upcomingShows = await phishApi.getUpcomingShows();
+    const upcomingConcerts = upcomingShows.map((show) => ({
+      id: parseInt(show.showid),
+      tourId: 1,
+      date: new Date(show.showdate),
+      venue: show.venue,
+      city: show.city,
+      state: show.state,
+      country: show.country,
+      setlist: [],
+      isCompleted: false
+    })).sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime()).slice(0, 3);
+    res.json(upcomingConcerts);
+  } catch (error) {
+    console.error("Error fetching upcoming concerts:", error);
+    res.status(500).json({ message: "Failed to fetch upcoming concerts" });
+  }
+});
+router5.get("/api/concerts/:id/setlist", async (req, res) => {
+  try {
+    const showId = req.params.id;
+    const { cacheService: cacheService2 } = await Promise.resolve().then(() => (init_cache_service(), cache_service_exports));
+    const cachedShows3 = await cacheService2.getCachedShows();
+    const show = cachedShows3.find((s) => s.id.toString() === showId);
+    if (!show) {
+      return res.status(404).json({ message: "Show not found" });
+    }
+    const showDate = new Date(show.showDate).toISOString().split("T")[0];
+    const cachedSetlist = await cacheService2.getCachedSetlist(showDate);
+    if (!cachedSetlist) {
+      return res.status(404).json({ message: "Setlist not found" });
+    }
+    res.json(cachedSetlist.setlistData);
+  } catch (error) {
+    console.error("Error fetching setlist:", error);
+    res.status(500).json({ message: "Failed to fetch setlist" });
+  }
+});
+router5.get("/api/concerts/:id/performances", async (req, res) => {
+  try {
+    const concertIdStr = req.params.id;
+    const concertId = parseInt(concertIdStr);
+    if (isNaN(concertId)) {
+      return res.status(400).json({ message: "Invalid concert ID" });
+    }
+    const performances = await storage.getConcertPerformances(concertId);
+    res.json(performances);
+  } catch (error) {
+    res.status(500).json({ message: "Failed to fetch concert performances" });
+  }
+});
+var concerts_default = router5;
+
+// routes/cache.ts
+var import_express6 = require("express");
+init_storage_db();
+init_db();
+var import_drizzle_orm7 = require("drizzle-orm");
+init_schema();
+var router6 = (0, import_express6.Router)();
+router6.post("/api/cache/refresh", requireAuth, requireAdmin, async (req, res) => {
+  try {
+    console.log("\u{1F504} Force refreshing all caches...");
+    await storage.getCachedShows(true);
+    await storage.getCachedSongs(true);
+    res.json({ message: "Cache refreshed successfully" });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+router6.post("/api/cache/fetch-historical", requireAuth, requireAdmin, async (req, res) => {
+  console.log("\u{1F3B8} Historical fetch endpoint HIT!");
+  try {
+    console.log("\u{1F4C5} Fetching historical shows from 2023-2024...");
+    const API_KEY = process.env.PHISH_NET_API_KEY || "6F27E04F96EAC8C2C21B";
+    const years = [2023, 2024];
+    let totalShows = 0;
+    let totalSetlists = 0;
+    for (const year of years) {
+      console.log(`  Fetching ${year}...`);
+      const response = await fetch(`https://api.phish.net/v5/shows/showyear/${year}.json?apikey=${API_KEY}`);
+      const data = await response.json();
+      const shows = data.data || [];
+      console.log(`    Found ${shows.length} shows from ${year}`);
+      for (const show of shows) {
+        try {
+          await db.insert(cachedShows).values({
+            phishNetId: show.showid || show.showdate,
+            showDate: new Date(show.showdate),
+            venue: show.venue || "Unknown Venue",
+            city: show.city || "Unknown City",
+            state: show.state || null,
+            country: show.country || "USA",
+            tourid: show.tour_id || null,
+            setlistdata: show.setlistdata || null,
+            isCompleted: new Date(show.showdate) < /* @__PURE__ */ new Date()
+          }).onConflictDoNothing();
+          totalShows++;
+        } catch (e) {
+          console.error(`Error inserting show ${show.showdate}:`, e.message);
+        }
+      }
+      const completedShows = shows.filter((s) => new Date(s.showdate) < /* @__PURE__ */ new Date()).slice(-30);
+      for (const show of completedShows) {
+        try {
+          const setlistResponse = await fetch(`https://api.phish.net/v5/setlists/showdate/${show.showdate}.json?apikey=${API_KEY}`);
+          const setlistData = await setlistResponse.json();
+          const setlist = setlistData.data || [];
+          if (setlist.length > 0) {
+            const songs3 = setlist.map((s) => s.song || s.title || s.songname).filter(Boolean);
+            await db.insert(cachedSetlists).values({
+              showDate: show.showdate,
+              setlistData: setlist,
+              songs: songs3
+            }).onConflictDoNothing();
+            totalSetlists++;
+          }
+          await new Promise((resolve) => setTimeout(resolve, 100));
+        } catch (e) {
+          console.error(`Error fetching setlist for ${show.showdate}`);
+        }
+      }
+    }
+    console.log(`\u2705 Cached ${totalShows} shows and ${totalSetlists} setlists`);
+    console.log("\u{1F504} Recalculating 24-month play counts...");
+    await storage.getCachedSongs(true);
+    res.json({
+      message: "Historical data cached successfully",
+      shows: totalShows,
+      setlists: totalSetlists
+    });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+router6.post("/api/cache/fetch-missing-setlists", requireAuth, requireAdmin, async (req, res) => {
+  try {
+    console.log("\u{1F3B5} Fetching missing setlists...");
+    const API_KEY = process.env.PHISH_NET_API_KEY || "6F27E04F96EAC8C2C21B";
+    const limit = parseInt(req.body.limit || "50");
+    const showsWithoutSetlists = await db.execute(import_drizzle_orm7.sql`
+      SELECT TO_CHAR(cs.show_date, 'YYYY-MM-DD') as show_date
+      FROM cached_shows cs
+      LEFT JOIN cached_setlists csl ON TO_CHAR(cs.show_date, 'YYYY-MM-DD') = csl.show_date
+      WHERE cs.is_completed = true 
+      AND csl.show_date IS NULL
+      ORDER BY cs.show_date DESC
+      LIMIT ${limit}
+    `);
+    console.log(`  Found ${showsWithoutSetlists.rows.length} shows without setlists (fetching up to ${limit})`);
+    let fetchedCount = 0;
+    for (const row of showsWithoutSetlists.rows) {
+      const showDate = row.show_date;
+      try {
+        const response = await fetch(`https://api.phish.net/v5/setlists/showdate/${showDate}.json?apikey=${API_KEY}`);
+        const data = await response.json();
+        const setlist = data.data || [];
+        if (setlist.length > 0) {
+          const songs3 = setlist.map((s) => s.song || s.title || s.songname).filter(Boolean);
+          await db.insert(cachedSetlists).values({
+            showDate,
+            setlistData: setlist,
+            songs: songs3
+          }).onConflictDoNothing();
+          fetchedCount++;
+        }
+        await new Promise((resolve) => setTimeout(resolve, 100));
+      } catch (e) {
+        console.error(`Error fetching setlist for ${showDate}`);
+      }
+    }
+    console.log(`\u2705 Fetched ${fetchedCount} new setlists`);
+    console.log("\u{1F504} Recalculating 24-month play counts...");
+    await storage.getCachedSongs(true);
+    res.json({
+      message: `Fetched ${fetchedCount} missing setlists`,
+      fetched: fetchedCount,
+      remaining: Math.max(0, showsWithoutSetlists.rows.length - fetchedCount)
+    });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+router6.post("/api/admin/cache/refresh", requireAuth, requireAdmin, async (req, res) => {
+  try {
+    const { cacheService: cacheService2 } = await Promise.resolve().then(() => (init_cache_service(), cache_service_exports));
+    await cacheService2.refreshAllCaches();
+    res.json({ message: "All caches refreshed successfully" });
+  } catch (error) {
+    console.error("Error refreshing caches:", error);
+    res.status(500).json({ message: "Failed to refresh caches" });
+  }
+});
+router6.post("/api/admin/cache/refresh-songs", requireAuth, requireAdmin, async (req, res) => {
+  try {
+    const { cacheService: cacheService2 } = await Promise.resolve().then(() => (init_cache_service(), cache_service_exports));
+    await cacheService2.getCachedSongs(true);
+    res.json({ message: "Songs cache refreshed successfully" });
+  } catch (error) {
+    console.error("Error refreshing songs cache:", error);
+    res.status(500).json({ message: "Failed to refresh songs cache" });
+  }
+});
+router6.post("/api/admin/cache/refresh-shows", requireAuth, requireAdmin, async (req, res) => {
+  try {
+    const { cacheService: cacheService2 } = await Promise.resolve().then(() => (init_cache_service(), cache_service_exports));
+    await cacheService2.getCachedShows(true);
+    res.json({ message: "Shows cache refreshed successfully" });
+  } catch (error) {
+    console.error("Error refreshing shows cache:", error);
+    res.status(500).json({ message: "Failed to refresh shows cache" });
+  }
+});
+router6.get("/api/admin/cache/stats", requireAuth, requireAdmin, async (req, res) => {
+  try {
+    const { cacheService: cacheService2 } = await Promise.resolve().then(() => (init_cache_service(), cache_service_exports));
+    const stats = await cacheService2.getCacheStats();
+    res.json(stats);
+  } catch (error) {
+    console.error("Error getting cache stats:", error);
+    res.status(500).json({ message: "Failed to get cache stats" });
+  }
+});
+var cache_default = router6;
+
+// routes/misc.ts
+var import_express7 = require("express");
+init_storage_db();
+init_schema();
 
 // node_modules/postal-mime/src/decode-strings.js
 var textEncoder = new TextEncoder();
@@ -15646,1772 +17260,217 @@ async function sendPasswordResetEmail(email, resetToken, baseUrl2) {
   }
 }
 
-// routes.ts
-var import_nanoid = require("nanoid");
-var import_bcrypt3 = __toESM(require("bcrypt"));
-
-// routes/admin.ts
-var import_express = require("express");
-
-// controllers/adminController.ts
-init_storage_db();
-var import_bcrypt2 = __toESM(require("bcrypt"));
-var createUser = async (req, res) => {
-  try {
-    const { username, email, password, role } = req.body;
-    if (!username || !email || !password) {
-      return res.status(400).json({ message: "Username, email, and password are required" });
-    }
-    const hashedPassword = await import_bcrypt2.default.hash(password, 10);
-    const user = await storage.createUser({ username, email, password: hashedPassword, role: role || "user" });
-    res.json({ user: { id: user.id, username: user.username, email: user.email, role: user.role } });
-  } catch (error) {
-    console.error("Admin createUser error:", error);
-    res.status(500).json({ message: error.message || "Failed to create user" });
-  }
-};
-var getUsers = async (req, res) => {
-  try {
-    const users2 = await storage.getAllUsers();
-    res.json(users2.map((u) => ({ id: u.id, username: u.username, email: u.email, role: u.role, totalPoints: u.totalPoints, createdAt: u.createdAt })));
-  } catch (error) {
-    console.error("Admin getUsers error:", error);
-    res.status(500).json({ message: "Failed to fetch users" });
-  }
-};
-var updateUser = async (req, res) => {
-  try {
-    const userId = parseInt(req.params.id);
-    const { role } = req.body;
-    if (!role) {
-      return res.status(400).json({ message: "Role is required" });
-    }
-    const user = await storage.updateUserRole(userId, role);
-    res.json({ id: user.id, username: user.username, email: user.email, role: user.role });
-  } catch (error) {
-    console.error("Admin updateUser error:", error);
-    res.status(500).json({ message: "Failed to update user" });
-  }
-};
-var deleteUser = async (req, res) => {
-  try {
-    const userId = parseInt(req.params.id);
-    await storage.deleteUser(userId);
-    res.json({ message: "User deleted successfully" });
-  } catch (error) {
-    console.error("Admin deleteUser error:", error);
-    res.status(500).json({ message: "Failed to delete user" });
-  }
-};
-
-// routes/admin.ts
-init_storage_db();
+// routes/misc.ts
 init_phish_api();
-init_cache_service();
-init_db();
-init_schema();
-var import_drizzle_orm3 = require("drizzle-orm");
-
-// middleware/admin.ts
-init_storage_db();
-var getSessionUserId = (req) => {
-  return req.session?.user?.id || req.session?.userId || null;
-};
-var requireSuperAdmin = async (req, res, next) => {
-  try {
-    const userId = getSessionUserId(req);
-    if (!userId)
-      return res.status(401).json({ message: "Not authenticated" });
-    const isSuperAdmin = await storage.isUserSuperAdmin(userId);
-    if (!isSuperAdmin)
-      return res.status(403).json({ message: "Super admin access required" });
-    next();
-  } catch (error) {
-    console.error("Super admin middleware error:", error);
-    res.status(500).json({ message: "Server error" });
-  }
-};
-var requireAdmin = async (req, res, next) => {
-  try {
-    const userId = getSessionUserId(req);
-    if (!userId)
-      return res.status(401).json({ message: "Not authenticated" });
-    const isAdmin = await storage.isUserAdmin(userId);
-    if (!isAdmin)
-      return res.status(403).json({ message: "Admin access required" });
-    next();
-  } catch (error) {
-    console.error("Admin middleware error:", error);
-    res.status(500).json({ message: "Server error" });
-  }
-};
-var requireLeagueAdmin = async (req, res, next) => {
-  try {
-    const userId = getSessionUserId(req);
-    if (!userId)
-      return res.status(401).json({ message: "Not authenticated" });
-    if (await storage.isUserAdmin(userId))
-      return next();
-    const leagueId = req.params.leagueId || req.body.leagueId;
-    if (!leagueId)
-      return res.status(400).json({ message: "League ID required" });
-    const isLeagueAdmin = await storage.isUserLeagueAdmin(userId, parseInt(leagueId));
-    if (!isLeagueAdmin)
-      return res.status(403).json({ message: "League admin access required" });
-    next();
-  } catch (error) {
-    console.error("League admin middleware error:", error);
-    res.status(500).json({ message: "Server error" });
-  }
-};
-
-// routes/admin.ts
-var router = (0, import_express.Router)();
-router.use((req, res, next) => {
-  const userId = req.session?.user?.id || req.session?.userId;
-  if (!userId)
-    return res.status(401).json({ message: "Not authenticated" });
-  next();
-});
-router.post("/users", requireSuperAdmin, createUser);
-router.get("/users", requireAdmin, getUsers);
-router.put("/users/:id", requireSuperAdmin, updateUser);
-router.delete("/users/:id", requireSuperAdmin, deleteUser);
-router.get("/concerts", async (_req, res) => {
-  try {
-    const shows = await storage.getCachedShows();
-    const todayStr = (/* @__PURE__ */ new Date()).toISOString().split("T")[0];
-    const sorted = shows.filter((s) => {
-      const d = s.showDate instanceof Date ? s.showDate : new Date(s.showDate);
-      return d.toISOString().split("T")[0] < todayStr;
-    }).sort((a, b) => new Date(b.showDate).getTime() - new Date(a.showDate).getTime());
-    const seenDates = /* @__PURE__ */ new Set();
-    const deduped = sorted.filter((s) => {
-      const dateKey = (s.showDate instanceof Date ? s.showDate : new Date(s.showDate)).toISOString().split("T")[0];
-      if (seenDates.has(dateKey))
-        return false;
-      seenDates.add(dateKey);
-      return true;
-    });
-    res.json(deduped.map((s) => ({
-      id: s.id,
-      date: (s.showDate instanceof Date ? s.showDate : new Date(s.showDate)).toISOString().split("T")[0],
-      venue: s.venue,
-      city: s.city,
-      state: s.state
-    })));
-  } catch (e) {
-    res.status(500).json({ message: e.message || "Failed to fetch concerts" });
-  }
-});
-router.post("/refresh-shows", async (_req, res) => {
-  try {
-    await cacheService.getCachedShows(true);
-    res.json({ message: "Shows cache refreshed successfully" });
-  } catch (e) {
-    res.status(500).json({ message: e.message || "Failed to refresh shows cache" });
-  }
-});
-router.get("/leagues", requireAdmin, async (_req, res) => {
-  try {
-    const leagues2 = await storage.getAllLeagues();
-    res.json(leagues2);
-  } catch (e) {
-    res.status(500).json({ message: e.message || "Failed to fetch leagues" });
-  }
-});
-router.get("/shows/:concertId/league/:leagueId", requireLeagueAdmin, async (req, res) => {
-  try {
-    const concertId = parseInt(req.params.concertId);
-    const leagueId = parseInt(req.params.leagueId);
-    const shows = await storage.getCachedShows();
-    const show = shows.find((s) => s.id === concertId);
-    if (!show)
-      return res.status(404).json({ message: "Show not found" });
-    const showDate = new Date(show.showDate).toISOString().split("T")[0];
-    const tracks = await phishApi.getSetlist(showDate);
-    if (!tracks || tracks.length === 0) {
-      return res.json({ concert: { venue: show.venue, city: show.city, date: show.showDate }, songPerformances: [] });
-    }
-    const drafted = await db.select({ songId: draftedSongs.songId, userId: draftedSongs.userId }).from(draftedSongs).where((0, import_drizzle_orm3.eq)(draftedSongs.leagueId, leagueId));
-    const songIds = [...new Set(drafted.map((d) => d.songId).filter(Boolean))];
-    const userIds = [...new Set(drafted.map((d) => d.userId).filter(Boolean))];
-    const [songRows, userRows] = await Promise.all([
-      songIds.length ? db.select({ id: songs.id, title: songs.title }).from(songs).where((0, import_drizzle_orm3.inArray)(songs.id, songIds)) : [],
-      userIds.length ? db.select({ id: users.id, username: users.username }).from(users).where((0, import_drizzle_orm3.inArray)(users.id, userIds)) : []
-    ]);
-    const songMap = new Map(songRows.map((s) => [s.id, s.title]));
-    const userMap = new Map(userRows.map((u) => [u.id, u.username]));
-    const draftersByTitle = {};
-    const titleToSongId = {};
-    for (const d of drafted) {
-      if (!d.songId || !d.userId)
-        continue;
-      const title = songMap.get(d.songId);
-      const username = userMap.get(d.userId);
-      if (!title || !username)
-        continue;
-      const key = title.toLowerCase();
-      if (!draftersByTitle[key])
-        draftersByTitle[key] = [];
-      draftersByTitle[key].push({ userId: d.userId, username });
-      titleToSongId[key] = d.songId;
-    }
-    const firstPositionBySet = {};
-    for (const track of tracks) {
-      const setKey = track.set || "Set 1";
-      const pos = track.position || 0;
-      if (!(setKey in firstPositionBySet) || pos < firstPositionBySet[setKey]) {
-        firstPositionBySet[setKey] = pos;
-      }
-    }
-    const titleOccCount = {};
-    const songPerformances2 = tracks.map((track, idx) => {
-      const title = track.song || track.title || "";
-      const titleKey = title.toLowerCase();
-      titleOccCount[titleKey] = (titleOccCount[titleKey] ?? 0) + 1;
-      const occurrence = titleOccCount[titleKey];
-      const draftedBy = draftersByTitle[titleKey] || [];
-      const setKey = track.set || track.set_name || "Set 1";
-      const isEncore = track.isEncore || setKey.toLowerCase().includes("encore");
-      const isSetOpener = !isEncore && track.position === firstPositionBySet[setKey];
-      const durationSeconds = track.duration ? Math.round(track.duration / 1e3) : 0;
-      return {
-        id: idx,
-        song: { title, id: titleToSongId[titleKey] },
-        occurrence,
-        setNumber: setKey,
-        position: track.position || idx + 1,
-        isSetOpener,
-        isEncore,
-        durationSeconds,
-        draftedBy
-      };
-    });
-    res.json({
-      concert: { venue: show.venue, city: show.city, state: show.state, date: show.showDate },
-      songPerformances: songPerformances2
-    });
-  } catch (e) {
-    console.error("Error fetching admin show data:", e);
-    res.status(500).json({ message: e.message || "Failed to fetch show data" });
-  }
-});
-router.post("/adjustments", requireLeagueAdmin, async (req, res) => {
-  try {
-    const { leagueId, concertId, songId, userId, occurrence, originalPoints, adjustedPoints, reason } = req.body;
-    if (!leagueId || !concertId || !songId || !userId) {
-      return res.status(400).json({ message: "leagueId, concertId, songId, userId are required" });
-    }
-    const adjustment = await storage.createPointAdjustment({
-      leagueId,
-      concertId,
-      songId,
-      userId,
-      occurrence: occurrence ?? 1,
-      originalPoints: originalPoints ?? 0,
-      adjustedPoints: adjustedPoints ?? 0,
-      reason: reason || "",
-      adjustedBy: req.session.userId
-    });
-    res.json(adjustment);
-  } catch (e) {
-    console.error("Error saving adjustment:", e);
-    res.status(500).json({ message: e.message || "Failed to save adjustment" });
-  }
-});
-router.get("/adjustments/league/:leagueId", async (req, res) => {
-  try {
-    const leagueId = parseInt(req.params.leagueId);
-    const concertId = req.query.concertId ? parseInt(req.query.concertId) : void 0;
-    const userId = req.session?.user?.id || req.session?.userId;
-    if (!userId)
-      return res.status(401).json({ message: "Not authenticated" });
-    const canAccess = await storage.isUserAdmin(userId) || await storage.isUserLeagueAdmin(userId, leagueId);
-    if (!canAccess)
-      return res.status(403).json({ message: "Not authorized" });
-    const adjustments = await storage.getPointAdjustments(leagueId, concertId);
-    res.json(adjustments);
-  } catch (e) {
-    res.status(500).json({ message: e.message || "Failed to fetch adjustments" });
-  }
-});
-router.delete("/adjustments/by-song", requireLeagueAdmin, async (req, res) => {
-  try {
-    const { leagueId, concertId, songId, userId } = req.body;
-    if (!leagueId || !concertId || !songId || !userId) {
-      return res.status(400).json({ message: "leagueId, concertId, songId, userId are required" });
-    }
-    await db.delete(pointAdjustments).where(
-      (0, import_drizzle_orm3.and)(
-        (0, import_drizzle_orm3.eq)(pointAdjustments.leagueId, leagueId),
-        (0, import_drizzle_orm3.eq)(pointAdjustments.concertId, concertId),
-        (0, import_drizzle_orm3.eq)(pointAdjustments.songId, songId),
-        (0, import_drizzle_orm3.eq)(pointAdjustments.userId, userId)
-      )
-    );
-    res.json({ message: "All adjustments for song deleted" });
-  } catch (e) {
-    res.status(500).json({ message: e.message || "Failed to delete adjustments" });
-  }
-});
-router.delete("/adjustments/:id", requireLeagueAdmin, async (req, res) => {
-  try {
-    const id = parseInt(req.params.id);
-    if (isNaN(id))
-      return res.status(400).json({ message: "Invalid id" });
-    await db.delete(pointAdjustments).where((0, import_drizzle_orm3.eq)(pointAdjustments.id, id));
-    res.json({ message: "Adjustment deleted" });
-  } catch (e) {
-    res.status(500).json({ message: e.message || "Failed to delete adjustment" });
-  }
-});
-router.get("/my-leagues", async (req, res) => {
-  try {
-    const userId = req.session?.user?.id || req.session?.userId;
-    if (!userId)
-      return res.status(401).json({ message: "Not authenticated" });
-    const allLeagues = await storage.getAllLeagues();
-    const accessible = await Promise.all(
-      allLeagues.map(async (l) => {
-        const canManage = await storage.isUserAdmin(userId) || await storage.isUserLeagueAdmin(userId, l.id);
-        return canManage ? l : null;
-      })
-    );
-    res.json(accessible.filter(Boolean));
-  } catch (e) {
-    res.status(500).json({ message: e.message || "Failed to fetch leagues" });
-  }
-});
-router.get("/leagues/:id/members", async (req, res) => {
-  try {
-    const userId = req.session?.user?.id || req.session?.userId;
-    if (!userId)
-      return res.status(401).json({ message: "Not authenticated" });
-    const leagueId = parseInt(req.params.id);
-    const canAccess = await storage.isUserAdmin(userId) || await storage.isUserLeagueAdmin(userId, leagueId);
-    if (!canAccess)
-      return res.status(403).json({ message: "Not authorized" });
-    const members = await storage.getLeagueMembers(leagueId);
-    res.json(members.map((m) => ({
-      id: m.id,
-      userId: m.userId,
-      username: m.user?.username,
-      role: m.role,
-      joinedAt: m.joinedAt,
-      totalPoints: m.user?.totalPoints ?? 0
-    })));
-  } catch (e) {
-    res.status(500).json({ message: e.message || "Failed to fetch members" });
-  }
-});
-router.delete("/leagues/:id/members/:userId", async (req, res) => {
-  try {
-    const requestingUserId = req.session?.user?.id || req.session?.userId;
-    if (!requestingUserId)
-      return res.status(401).json({ message: "Not authenticated" });
-    const leagueId = parseInt(req.params.id);
-    const canAccess = await storage.isUserAdmin(requestingUserId) || await storage.isUserLeagueAdmin(requestingUserId, leagueId);
-    if (!canAccess)
-      return res.status(403).json({ message: "Not authorized" });
-    const targetUserId = parseInt(req.params.userId);
-    await db.delete(leagueMembers).where(
-      (0, import_drizzle_orm3.and)((0, import_drizzle_orm3.eq)(leagueMembers.leagueId, leagueId), (0, import_drizzle_orm3.eq)(leagueMembers.userId, targetUserId))
-    );
-    res.json({ message: "Member removed from league" });
-  } catch (e) {
-    res.status(500).json({ message: e.message || "Failed to remove member" });
-  }
-});
-router.post("/leagues/:id/members", async (req, res) => {
-  try {
-    const requestingUserId = req.session?.user?.id || req.session?.userId;
-    if (!requestingUserId)
-      return res.status(401).json({ message: "Not authenticated" });
-    const leagueId = parseInt(req.params.id);
-    const canAccess = await storage.isUserAdmin(requestingUserId) || await storage.isUserLeagueAdmin(requestingUserId, leagueId);
-    if (!canAccess)
-      return res.status(403).json({ message: "Not authorized" });
-    const { userId } = req.body;
-    if (!userId)
-      return res.status(400).json({ message: "userId required" });
-    const user = await storage.getUser(parseInt(userId));
-    if (!user)
-      return res.status(404).json({ message: "User not found" });
-    await storage.joinLeague(parseInt(userId), leagueId);
-    res.json({ message: `${user.username} added to league`, username: user.username, userId: user.id });
-  } catch (e) {
-    res.status(500).json({ message: e.message || "Failed to add member" });
-  }
-});
-router.put("/users/:id/role", requireSuperAdmin, async (req, res) => {
+var import_nanoid2 = require("nanoid");
+var import_bcrypt3 = __toESM(require("bcrypt"));
+var router7 = (0, import_express7.Router)();
+router7.get("/api/users/:id", async (req, res) => {
   try {
     const userId = parseInt(req.params.id);
-    const { role } = req.body;
-    if (!["user", "admin", "superadmin"].includes(role)) {
-      return res.status(400).json({ message: "Invalid role" });
+    const user = await storage.getUser(userId);
+    if (!user) {
+      return res.status(404).json({ message: "User not found" });
     }
-    const updated = await storage.updateUserRole(userId, role);
-    res.json(updated);
-  } catch (e) {
-    res.status(500).json({ message: e.message || "Failed to update role" });
+    res.json({ id: user.id, username: user.username, totalPoints: user.totalPoints });
+  } catch (error) {
+    res.status(500).json({ message: "Failed to fetch user" });
   }
 });
-router.get("/debug/adjustments", requireAdmin, async (req, res) => {
+router7.get("/api/tours", async (req, res) => {
   try {
-    const leagueId = req.query.leagueId ? parseInt(req.query.leagueId) : null;
-    if (!leagueId)
-      return res.status(400).json({ message: "leagueId required" });
-    const allShows = await storage.getCachedShows();
-    const showIdToDate = new Map(allShows.map((s) => [s.id, new Date(s.showDate).toISOString().split("T")[0]]));
-    const adjs = await db.select().from(pointAdjustments).where((0, import_drizzle_orm3.eq)(pointAdjustments.leagueId, leagueId));
-    const songIds = [...new Set(adjs.map((a) => a.songId).filter(Boolean))];
-    const userIds = [...new Set(adjs.map((a) => a.userId).filter(Boolean))];
-    const [songRows, userRows] = await Promise.all([
-      songIds.length ? db.select({ id: songs.id, title: songs.title }).from(songs).where((0, import_drizzle_orm3.inArray)(songs.id, songIds)) : [],
-      userIds.length ? db.select({ id: users.id, username: users.username }).from(users).where((0, import_drizzle_orm3.inArray)(users.id, userIds)) : []
-    ]);
-    const songMap = new Map(songRows.map((s) => [s.id, s.title]));
-    const userMap = new Map(userRows.map((u) => [u.id, u.username]));
-    const result = adjs.map((a) => {
-      const showDate = showIdToDate.get(a.concertId);
-      const songTitle = songMap.get(a.songId) ?? "(not found)";
-      const username = a.userId ? userMap.get(a.userId) ?? "(not found)" : null;
-      return {
-        id: a.id,
-        concertId: a.concertId,
-        resolvedShowDate: showDate ?? "STALE \u2014 not in cachedShows",
-        songId: a.songId,
-        songTitle,
-        userId: a.userId,
-        username,
-        adjustedPoints: a.adjustedPoints,
-        overrideKey: showDate && songTitle !== "(not found)" && a.userId ? `${showDate}:${songTitle.toLowerCase()}:${a.userId}` : "CANNOT BUILD \u2014 missing data"
-      };
-    });
-    res.json({ leagueId, adjustmentCount: adjs.length, adjustments: result });
-  } catch (e) {
-    res.status(500).json({ message: e.message || "Debug query failed" });
+    const tours2 = await storage.getTours();
+    res.json(tours2);
+  } catch (error) {
+    res.status(500).json({ message: "Failed to fetch tours" });
   }
 });
-router.get("/debug/player", requireAdmin, async (req, res) => {
+router7.get("/api/tours/active", async (req, res) => {
   try {
-    const username = String(req.query.username || "");
-    const leagueId = req.query.leagueId ? parseInt(req.query.leagueId) : null;
-    if (!username)
-      return res.status(400).json({ message: "username query param required" });
-    const [u] = await db.select({ id: users.id, username: users.username, totalPoints: users.totalPoints }).from(users).where((0, import_drizzle_orm3.eq)(users.username, username)).limit(1);
-    if (!u)
-      return res.status(404).json({ message: `User '${username}' not found` });
-    if (!leagueId) {
-      return res.json({ user: u, note: "add &leagueId=XX to see drafted songs" });
+    const activeTour = await storage.getActiveTour();
+    if (!activeTour) {
+      return res.status(404).json({ message: "No active tour found" });
     }
-    const rows = await db.select({
-      draftedSongId: draftedSongs.id,
-      songId: draftedSongs.songId,
-      points: draftedSongs.points,
-      songTitle: songs.title
-    }).from(draftedSongs).leftJoin(songs, (0, import_drizzle_orm3.eq)(draftedSongs.songId, songs.id)).where((0, import_drizzle_orm3.and)((0, import_drizzle_orm3.eq)(draftedSongs.leagueId, leagueId), (0, import_drizzle_orm3.eq)(draftedSongs.userId, u.id)));
+    res.json(activeTour);
+  } catch (error) {
+    res.status(500).json({ message: "Failed to fetch active tour" });
+  }
+});
+router7.get("/api/tours/:id", async (req, res) => {
+  try {
+    const tourId = parseInt(req.params.id);
+    const tour = await storage.getTour(tourId);
+    if (!tour) {
+      return res.status(404).json({ message: "Tour not found" });
+    }
+    res.json(tour);
+  } catch (error) {
+    res.status(500).json({ message: "Failed to fetch tour" });
+  }
+});
+router7.post("/api/tours", requireAuth, requireAdmin, async (req, res) => {
+  try {
+    const tourData = insertTourSchema.parse(req.body);
+    const tour = await storage.createTour(tourData);
+    res.json(tour);
+  } catch (error) {
+    res.status(400).json({ message: "Invalid tour data" });
+  }
+});
+router7.get("/api/activities", async (req, res) => {
+  try {
+    const userId = parseInt(req.query.userId);
+    const leagueId = req.query.leagueId ? parseInt(req.query.leagueId) : void 0;
+    if (!userId) {
+      return res.status(400).json({ message: "User ID required" });
+    }
+    const activities2 = await storage.getUserActivities(userId, leagueId);
+    res.json(activities2);
+  } catch (error) {
+    res.status(500).json({ message: "Failed to fetch activities" });
+  }
+});
+router7.post("/api/performances", requireAuth, requireAdmin, async (req, res) => {
+  try {
+    const performanceData = insertSongPerformanceSchema.parse(req.body);
+    const performance = await storage.createSongPerformance(performanceData);
+    await storage.calculateAndUpdatePoints(performanceData.concertId);
+    res.json(performance);
+  } catch (error) {
+    res.status(400).json({ message: "Failed to create song performance" });
+  }
+});
+router7.get("/api/dashboard", async (req, res) => {
+  try {
+    const userId = parseInt(req.query.userId);
+    if (!userId) {
+      return res.status(400).json({ message: "User ID required" });
+    }
+    const user = await storage.getUser(userId);
+    if (!user) {
+      return res.status(404).json({ message: "User not found" });
+    }
+    const activeTour = await storage.getActiveTour();
+    const leagues2 = await storage.getUserLeagues(userId);
+    const currentLeague = leagues2[0];
+    if (!currentLeague) {
+      return res.json({
+        user: { id: user.id, username: user.username, totalPoints: user.totalPoints },
+        tour: activeTour,
+        league: null,
+        draftedSongs: [],
+        recentActivities: [],
+        upcomingConcerts: [],
+        leagueStandings: []
+      });
+    }
+    const draftedSongs2 = await storage.getDraftedSongs(userId, currentLeague.id);
+    const recentActivities = await storage.getUserActivities(userId, currentLeague.id);
+    const recentShows = await phishApi.getRecentShows(20);
+    const recentConcerts = recentShows.slice(0, 3).map((show) => ({
+      id: parseInt(show.showid),
+      tourId: 1,
+      date: show.showdate,
+      venue: show.venue,
+      city: show.city,
+      state: show.state,
+      country: show.country,
+      setlist: [],
+      isCompleted: true
+    }));
+    const upcomingShows = await phishApi.getUpcomingShows();
+    const upcomingConcerts = upcomingShows.map((show) => ({
+      id: parseInt(show.showid),
+      tourId: 1,
+      date: show.showdate,
+      venue: show.venue,
+      city: show.city,
+      state: show.state,
+      country: show.country,
+      setlist: [],
+      isCompleted: false
+    })).sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime()).slice(0, 3);
+    const leagueStandings = await storage.getLeagueStandings(currentLeague.id);
+    const top10 = leagueStandings.slice(0, 10);
+    const userInTop10 = top10.some((s) => s.id === userId);
+    const standingsForDashboard = userInTop10 ? top10 : [...top10, leagueStandings.find((s) => s.id === userId)].filter(Boolean);
     res.json({
-      user: u,
-      leagueId,
-      totalDraftedPoints: rows.reduce((s, r) => s + (r.points ?? 0), 0),
-      songCount: rows.length,
-      songs: rows.map((r) => ({
-        draftedSongId: r.draftedSongId,
-        songId: r.songId,
-        songTitle: r.songTitle ?? "(NOT FOUND IN songs TABLE \u2014 wrong ID namespace)",
-        points: r.points ?? 0
-      }))
+      user: { id: user.id, username: user.username, totalPoints: user.totalPoints },
+      tour: activeTour,
+      league: currentLeague,
+      draftedSongs: draftedSongs2.slice(0, 10),
+      recentActivities: recentActivities.slice(0, 5),
+      recentConcerts,
+      upcomingConcerts,
+      leagueStandings: standingsForDashboard
     });
-  } catch (e) {
-    res.status(500).json({ message: e.message || "Debug query failed" });
+  } catch (error) {
+    res.status(500).json({ message: "Failed to fetch dashboard data" });
   }
 });
-var admin_default = router;
+router7.post("/api/auth/forgot-password", async (req, res) => {
+  try {
+    const { email } = req.body;
+    if (!email) {
+      return res.status(400).json({ message: "Email is required" });
+    }
+    const user = await storage.getUserByEmail(email);
+    console.log(`forgot-password: user lookup for ${email}: ${user ? `found id=${user.id}` : "not found"}`);
+    if (!user) {
+      return res.json({ message: "If this email is registered, you will receive a password reset link." });
+    }
+    const resetToken = (0, import_nanoid2.nanoid)(32);
+    const expiresAt = new Date(Date.now() + 60 * 60 * 1e3);
+    console.log(`forgot-password: saving reset token for user ${user.id}`);
+    await storage.createPasswordResetToken({ userId: user.id, token: resetToken, expiresAt });
+    console.log(`forgot-password: token saved, calling sendPasswordResetEmail`);
+    const baseUrl2 = "https://phishphantasy.live";
+    const sent = await sendPasswordResetEmail(email, resetToken, baseUrl2);
+    console.log(`forgot-password: sendPasswordResetEmail returned ${sent}`);
+    if (!sent) {
+      return res.status(500).json({ message: "Failed to send reset email \u2014 please contact support" });
+    }
+    res.json({ message: "If this email is registered, you will receive a password reset link." });
+  } catch (error) {
+    console.error("Forgot password error:", error);
+    res.status(500).json({ message: "Failed to process password reset request" });
+  }
+});
+router7.post("/api/auth/reset-password", async (req, res) => {
+  try {
+    const { token, newPassword } = req.body;
+    if (!token || !newPassword) {
+      return res.status(400).json({ message: "Token and new password are required" });
+    }
+    if (newPassword.length < 6) {
+      return res.status(400).json({ message: "Password must be at least 6 characters long" });
+    }
+    const resetToken = await storage.getPasswordResetToken(token);
+    if (!resetToken || resetToken.used || /* @__PURE__ */ new Date() > resetToken.expiresAt) {
+      return res.status(400).json({ message: "Invalid or expired reset token" });
+    }
+    const hashedPassword = await import_bcrypt3.default.hash(newPassword, 10);
+    await storage.updateUserPassword(resetToken.userId, hashedPassword);
+    await storage.markTokenAsUsed(resetToken.id);
+    res.json({ message: "Password reset successful" });
+  } catch (error) {
+    console.error("Reset password error:", error);
+    res.status(500).json({ message: "Failed to reset password" });
+  }
+});
+var misc_default = router7;
 
 // routes.ts
-init_cache_service();
-init_db();
-var import_drizzle_orm4 = require("drizzle-orm");
-async function requireLeagueOwnerOrAdmin(req, res, next) {
-  try {
-    const userId = req.session?.userId || req.session?.user?.id;
-    if (!userId)
-      return res.status(401).json({ message: "Authentication required" });
-    const leagueId = parseInt(req.params.id);
-    if (isNaN(leagueId))
-      return res.status(400).json({ message: "Invalid league id" });
-    if (await storage.isUserAdmin(userId))
-      return next();
-    if (await storage.isUserLeagueAdmin(userId, leagueId))
-      return next();
-    return res.status(403).json({ message: "League owner or admin access required" });
-  } catch (e) {
-    console.error("League owner middleware error:", e);
-    return res.status(500).json({ message: "Server error" });
-  }
-}
-var serverAutoDraftEnabled = /* @__PURE__ */ new Set();
-var serverAutoDraftRegistry = /* @__PURE__ */ new Map();
 async function registerRoutes(app2) {
   setupAuth(app2);
   app2.get("/api/version", (_req, res) => res.json({ build: "2026-04-24-v3" }));
   app2.use("/api/admin", admin_default);
-  app2.get("/api/users/:id", async (req, res) => {
-    try {
-      const userId = parseInt(req.params.id);
-      const user = await storage.getUser(userId);
-      if (!user) {
-        return res.status(404).json({ message: "User not found" });
-      }
-      res.json({ id: user.id, username: user.username, totalPoints: user.totalPoints });
-    } catch (error) {
-      res.status(500).json({ message: "Failed to fetch user" });
-    }
-  });
-  app2.get("/api/tours", async (req, res) => {
-    try {
-      const tours2 = await storage.getTours();
-      res.json(tours2);
-    } catch (error) {
-      res.status(500).json({ message: "Failed to fetch tours" });
-    }
-  });
-  app2.get("/api/tours/active", async (req, res) => {
-    try {
-      const activeTour = await storage.getActiveTour();
-      if (!activeTour) {
-        return res.status(404).json({ message: "No active tour found" });
-      }
-      res.json(activeTour);
-    } catch (error) {
-      res.status(500).json({ message: "Failed to fetch active tour" });
-    }
-  });
-  app2.get("/api/tours/:id", async (req, res) => {
-    try {
-      const tourId = parseInt(req.params.id);
-      const tour = await storage.getTour(tourId);
-      if (!tour) {
-        return res.status(404).json({ message: "Tour not found" });
-      }
-      res.json(tour);
-    } catch (error) {
-      res.status(500).json({ message: "Failed to fetch tour" });
-    }
-  });
-  app2.post("/api/tours", requireAuth, requireAdmin, async (req, res) => {
-    try {
-      const tourData = insertTourSchema.parse(req.body);
-      const tour = await storage.createTour(tourData);
-      res.json(tour);
-    } catch (error) {
-      res.status(400).json({ message: "Invalid tour data" });
-    }
-  });
-  app2.get("/api/leagues", requireAuth, async (req, res) => {
-    try {
-      const { tourId, public: isPublic } = req.query;
-      if (isPublic === "true") {
-        const leagueList = await storage.getPublicLeagues(tourId ? parseInt(tourId) : void 0);
-        const withCounts = await Promise.all(leagueList.map(async (l) => {
-          const members = await storage.getLeagueMembers(l.id);
-          return { ...l, memberCount: members.length };
-        }));
-        res.json(withCounts);
-      } else {
-        const userId = req.userId;
-        if (!userId) {
-          return res.status(401).json({ message: "User not authenticated" });
-        }
-        const leagueList = await storage.getUserLeagues(userId);
-        const withCounts = await Promise.all(leagueList.map(async (l) => {
-          const members = await storage.getLeagueMembers(l.id);
-          return { ...l, memberCount: members.length };
-        }));
-        res.json(withCounts);
-      }
-    } catch (error) {
-      res.status(500).json({ message: "Failed to fetch leagues" });
-    }
-  });
-  app2.post("/api/leagues", requireAuth, async (req, res) => {
-    try {
-      const body = { ...req.body };
-      if (body.seasonStartDate)
-        body.seasonStartDate = new Date(body.seasonStartDate);
-      if (body.seasonEndDate)
-        body.seasonEndDate = new Date(body.seasonEndDate);
-      const leagueData = insertLeagueSchema.partial({ tourId: true, seasonStartDate: true, seasonEndDate: true }).parse(body);
-      const ownerId = req.userId;
-      const league = await storage.createLeague({ ...leagueData, ownerId });
-      res.json(league);
-    } catch (error) {
-      console.error("League creation error:", JSON.stringify(error?.errors ?? error?.message ?? error));
-      res.status(400).json({ message: "Invalid league data", detail: error?.errors ?? error?.message });
-    }
-  });
-  app2.get("/api/leagues/:id", requireAuth, async (req, res) => {
-    try {
-      const leagueId = parseInt(req.params.id);
-      const league = await storage.getLeague(leagueId);
-      if (!league) {
-        return res.status(404).json({ message: "League not found" });
-      }
-      res.json(league);
-    } catch (error) {
-      console.error("Error fetching league:", error);
-      res.status(500).json({ message: "Failed to fetch league" });
-    }
-  });
-  app2.patch("/api/leagues/:id", requireAuth, async (req, res) => {
-    try {
-      const leagueId = parseInt(req.params.id);
-      const updates = { ...req.body };
-      if (updates.seasonStartDate !== void 0) {
-        updates.seasonStartDate = !updates.seasonStartDate || updates.seasonStartDate === "null" ? null : new Date(updates.seasonStartDate);
-      }
-      if (updates.seasonEndDate !== void 0) {
-        updates.seasonEndDate = !updates.seasonEndDate || updates.seasonEndDate === "null" ? null : new Date(updates.seasonEndDate);
-      }
-      if (updates.draftDate !== void 0) {
-        updates.draftDate = !updates.draftDate || updates.draftDate === "null" ? null : new Date(updates.draftDate);
-      }
-      const league = await storage.getLeague(leagueId);
-      if (!league) {
-        return res.status(404).json({ message: "League not found" });
-      }
-      const userId = req.userId;
-      const user = await storage.getUser(userId);
-      const userRole = user?.role;
-      if (league.ownerId !== userId && userRole !== "admin") {
-        return res.status(403).json({ message: "Not authorized to update this league" });
-      }
-      const updatedLeague = await storage.updateLeague(leagueId, updates);
-      res.json(updatedLeague);
-    } catch (error) {
-      console.error("Error updating league:", error);
-      res.status(500).json({ message: "Failed to update league" });
-    }
-  });
-  app2.delete("/api/leagues/:id", requireAuth, async (req, res) => {
-    try {
-      const leagueId = parseInt(req.params.id);
-      const league = await storage.getLeague(leagueId);
-      if (!league) {
-        return res.status(404).json({ message: "League not found" });
-      }
-      const userId = req.userId;
-      const user = await storage.getUser(userId);
-      const userRole = user?.role;
-      if (league.ownerId !== userId && userRole !== "admin" && userRole !== "superadmin") {
-        return res.status(403).json({ message: "Not authorized to delete this league" });
-      }
-      await storage.deleteLeague(leagueId);
-      res.json({ message: "League deleted successfully" });
-    } catch (error) {
-      console.error("Error deleting league:", error);
-      res.status(500).json({ message: "Failed to delete league" });
-    }
-  });
-  app2.post("/api/leagues/join/:inviteCode", requireAuth, async (req, res) => {
-    try {
-      const inviteCode = req.params.inviteCode;
-      const userId = req.userId;
-      if (!userId) {
-        return res.status(401).json({ message: "User not authenticated" });
-      }
-      const success = await storage.joinLeagueByInvite(inviteCode, userId);
-      if (success) {
-        res.json({ message: "Successfully joined league" });
-      } else {
-        res.status(400).json({ message: "Invalid invite code or unable to join league" });
-      }
-    } catch (error) {
-      console.error("Error joining league by invite:", error);
-      res.status(500).json({ message: "Failed to join league" });
-    }
-  });
-  app2.post("/api/leagues/:id/join", requireAuth, async (req, res) => {
-    try {
-      const leagueId = parseInt(req.params.id);
-      const { userId } = req.body;
-      if (!userId) {
-        return res.status(400).json({ message: "User ID required" });
-      }
-      await storage.joinLeague(userId, leagueId);
-      res.json({ message: "Successfully joined league" });
-    } catch (error) {
-      res.status(400).json({ message: error.message || "Failed to join league" });
-    }
-  });
-  app2.post("/api/leagues/:id/invite", requireAuth, requireLeagueOwnerOrAdmin, async (req, res) => {
-    try {
-      const leagueId = parseInt(req.params.id);
-      const createdBy = req.session?.user?.id || req.session?.userId || req.body?.createdBy;
-      if (!createdBy)
-        return res.status(401).json({ message: "Not authenticated" });
-      const inviteCode = (0, import_nanoid.nanoid)(10);
-      const { leagueInvites: leagueInvites2 } = await Promise.resolve().then(() => (init_schema(), schema_exports));
-      await db.insert(leagueInvites2).values({
-        leagueId,
-        inviteCode,
-        createdBy,
-        maxUses: req.body?.maxUses ?? null,
-        isActive: true
-      });
-      res.json({ inviteCode, joinUrl: `/join/${inviteCode}` });
-    } catch (error) {
-      res.status(500).json({ message: error.message || "Failed to create invite" });
-    }
-  });
-  app2.get("/api/leagues/:id/members", async (req, res) => {
-    try {
-      const leagueId = parseInt(req.params.id);
-      const members = await storage.getLeagueMembers(leagueId);
-      res.json(members);
-    } catch (error) {
-      res.status(500).json({ message: "Failed to fetch league members" });
-    }
-  });
-  app2.get("/api/leagues/:id/standings", async (req, res) => {
-    try {
-      const leagueId = parseInt(req.params.id);
-      const standings = await storage.getLeagueStandings(leagueId);
-      res.json(standings);
-    } catch (error) {
-      res.status(500).json({ message: "Failed to fetch standings" });
-    }
-  });
-  app2.get("/api/leagues/:id/export-picks", requireAuth, async (req, res) => {
-    try {
-      const leagueId = parseInt(req.params.id);
-      const userId = req.userId;
-      const league = await storage.getLeague(leagueId);
-      if (!league) {
-        return res.status(404).json({ message: "League not found" });
-      }
-      const members = await storage.getLeagueMembers(leagueId);
-      const isMember = members.some((m) => m.userId === userId);
-      if (!isMember) {
-        return res.status(403).json({ message: "Not authorized to access this league's data" });
-      }
-      const allPicks = [];
-      for (const member of members) {
-        if (!member.user || !member.user.id) {
-          console.warn("Member missing user data:", member);
-          continue;
-        }
-        const draftedSongs2 = await storage.getDraftedSongs(member.user.id, leagueId);
-        for (const pick of draftedSongs2) {
-          allPicks.push({
-            username: member.user.username || "Unknown User",
-            songTitle: pick.song?.title || "Unknown",
-            category: pick.song?.category || "Unknown",
-            plays24Months: pick.song?.plays24Months || 0,
-            totalPlays: pick.song?.totalPlays || 0,
-            points: pick.points || 0,
-            draftedAt: pick.draftedAt ? new Date(pick.draftedAt).toLocaleString() : "N/A"
-          });
-        }
-      }
-      const escapeCSV = (value) => {
-        let sanitized = value;
-        sanitized = sanitized.replace(/[\x00-\x1F\x7F]/g, "");
-        sanitized = sanitized.trim();
-        const dangerousChars = /^[=+\-@]/;
-        if (dangerousChars.test(sanitized)) {
-          sanitized = "'" + sanitized;
-        }
-        sanitized = sanitized.replace(/"/g, '""');
-        return `"${sanitized}"`;
-      };
-      const csvHeaders = "Username,Song Title,Category,Plays (24 months),Total Plays,Points,Drafted At\n";
-      const csvRows = allPicks.length > 0 ? allPicks.map(
-        (pick) => `${escapeCSV(pick.username)},${escapeCSV(pick.songTitle)},${escapeCSV(pick.category)},${pick.plays24Months},${pick.totalPlays},${pick.points},${escapeCSV(pick.draftedAt)}`
-      ).join("\n") : "";
-      const csv = csvHeaders + csvRows;
-      let safeFilename = league.name.replace(/[^a-z0-9_-]/gi, "_");
-      safeFilename = safeFilename.replace(/^_+|_+$/g, "") || "league";
-      res.setHeader("Content-Type", "text/csv");
-      res.setHeader("Content-Disposition", `attachment; filename="${safeFilename}_picks_${(/* @__PURE__ */ new Date()).toISOString().split("T")[0]}.csv"`);
-      res.send(csv);
-    } catch (error) {
-      console.error("Error exporting picks:", error);
-      res.status(500).json({ message: "Failed to export picks" });
-    }
-  });
-  app2.get("/api/songs/debug", requireAuth, requireAdmin, async (req, res) => {
-    try {
-      console.log("\u{1F527} DEBUG: Testing direct Phish.net API call...");
-      const apiKey = process.env.PHISH_NET_API_KEY;
-      if (!apiKey) {
-        return res.json({ error: "API key not found" });
-      }
-      const response = await fetch(`https://api.phish.net/v5/songs.json?apikey=${apiKey}&limit=5`);
-      const data = await response.json();
-      res.json({
-        status: response.status,
-        ok: response.ok,
-        data,
-        dataLength: (data.data || []).length
-      });
-    } catch (error) {
-      res.json({ error: error.message });
-    }
-  });
-  app2.post("/api/cache/refresh", requireAuth, requireAdmin, async (req, res) => {
-    try {
-      console.log("\u{1F504} Force refreshing all caches...");
-      await storage.getCachedShows(true);
-      await storage.getCachedSongs(true);
-      res.json({ message: "Cache refreshed successfully" });
-    } catch (error) {
-      res.status(500).json({ error: error.message });
-    }
-  });
-  app2.post("/api/cache/fetch-historical", requireAuth, requireAdmin, async (req, res) => {
-    console.log("\u{1F3B8} Historical fetch endpoint HIT!");
-    try {
-      console.log("\u{1F4C5} Fetching historical shows from 2023-2024...");
-      const API_KEY = process.env.PHISH_NET_API_KEY || "6F27E04F96EAC8C2C21B";
-      const years = [2023, 2024];
-      let totalShows = 0;
-      let totalSetlists = 0;
-      for (const year of years) {
-        console.log(`  Fetching ${year}...`);
-        const response = await fetch(`https://api.phish.net/v5/shows/showyear/${year}.json?apikey=${API_KEY}`);
-        const data = await response.json();
-        const shows = data.data || [];
-        console.log(`    Found ${shows.length} shows from ${year}`);
-        for (const show of shows) {
-          try {
-            await db.insert(cachedShows).values({
-              phishNetId: show.showid || show.showdate,
-              showDate: new Date(show.showdate),
-              venue: show.venue || "Unknown Venue",
-              city: show.city || "Unknown City",
-              state: show.state || null,
-              country: show.country || "USA",
-              tourid: show.tour_id || null,
-              setlistdata: show.setlistdata || null,
-              isCompleted: new Date(show.showdate) < /* @__PURE__ */ new Date()
-            }).onConflictDoNothing();
-            totalShows++;
-          } catch (e) {
-            console.error(`Error inserting show ${show.showdate}:`, e.message);
-          }
-        }
-        const completedShows = shows.filter((s) => new Date(s.showdate) < /* @__PURE__ */ new Date()).slice(-30);
-        for (const show of completedShows) {
-          try {
-            const setlistResponse = await fetch(`https://api.phish.net/v5/setlists/showdate/${show.showdate}.json?apikey=${API_KEY}`);
-            const setlistData = await setlistResponse.json();
-            const setlist = setlistData.data || [];
-            if (setlist.length > 0) {
-              const songs2 = setlist.map((s) => s.song || s.title || s.songname).filter(Boolean);
-              await db.insert(cachedSetlists).values({
-                showDate: show.showdate,
-                setlistData: setlist,
-                songs: songs2
-              }).onConflictDoNothing();
-              totalSetlists++;
-            }
-            await new Promise((resolve) => setTimeout(resolve, 100));
-          } catch (e) {
-            console.error(`Error fetching setlist for ${show.showdate}`);
-          }
-        }
-      }
-      console.log(`\u2705 Cached ${totalShows} shows and ${totalSetlists} setlists`);
-      console.log("\u{1F504} Recalculating 24-month play counts...");
-      await storage.getCachedSongs(true);
-      res.json({
-        message: "Historical data cached successfully",
-        shows: totalShows,
-        setlists: totalSetlists
-      });
-    } catch (error) {
-      res.status(500).json({ error: error.message });
-    }
-  });
-  app2.post("/api/cache/fetch-missing-setlists", requireAuth, requireAdmin, async (req, res) => {
-    try {
-      console.log("\u{1F3B5} Fetching missing setlists...");
-      const API_KEY = process.env.PHISH_NET_API_KEY || "6F27E04F96EAC8C2C21B";
-      const limit = parseInt(req.body.limit || "50");
-      const showsWithoutSetlists = await db.execute(import_drizzle_orm4.sql`
-        SELECT TO_CHAR(cs.show_date, 'YYYY-MM-DD') as show_date
-        FROM cached_shows cs
-        LEFT JOIN cached_setlists csl ON TO_CHAR(cs.show_date, 'YYYY-MM-DD') = csl.show_date
-        WHERE cs.is_completed = true 
-        AND csl.show_date IS NULL
-        ORDER BY cs.show_date DESC
-        LIMIT ${limit}
-      `);
-      console.log(`  Found ${showsWithoutSetlists.rows.length} shows without setlists (fetching up to ${limit})`);
-      let fetchedCount = 0;
-      for (const row of showsWithoutSetlists.rows) {
-        const showDate = row.show_date;
-        try {
-          const response = await fetch(`https://api.phish.net/v5/setlists/showdate/${showDate}.json?apikey=${API_KEY}`);
-          const data = await response.json();
-          const setlist = data.data || [];
-          if (setlist.length > 0) {
-            const songs2 = setlist.map((s) => s.song || s.title || s.songname).filter(Boolean);
-            await db.insert(cachedSetlists).values({
-              showDate,
-              setlistData: setlist,
-              songs: songs2
-            }).onConflictDoNothing();
-            fetchedCount++;
-          }
-          await new Promise((resolve) => setTimeout(resolve, 100));
-        } catch (e) {
-          console.error(`Error fetching setlist for ${showDate}`);
-        }
-      }
-      console.log(`\u2705 Fetched ${fetchedCount} new setlists`);
-      console.log("\u{1F504} Recalculating 24-month play counts...");
-      await storage.getCachedSongs(true);
-      res.json({
-        message: `Fetched ${fetchedCount} missing setlists`,
-        fetched: fetchedCount,
-        remaining: Math.max(0, showsWithoutSetlists.rows.length - fetchedCount)
-      });
-    } catch (error) {
-      res.status(500).json({ error: error.message });
-    }
-  });
-  app2.get("/api/songs", async (req, res) => {
-    try {
-      const leagueId = req.query.leagueId ? parseInt(req.query.leagueId) : null;
-      console.log(`\u{1F3B5} Songs API endpoint called with leagueId: ${leagueId}`);
-      console.log("\u{1F504} Getting cached songs...");
-      const cachedSongs2 = await storage.getCachedSongs();
-      const allSongs = cachedSongs2.map((cached) => ({
-        id: cached.id,
-        title: cached.title,
-        category: cached.category,
-        rarityScore: cached.rarityScore,
-        totalPlays: cached.timesPlayed,
-        lastPlayed: cached.lastPlayed,
-        plays24Months: cached.plays24Months || 0
-      }));
-      console.log(`\u{1F4CA} Cache returned ${allSongs.length} songs`);
-      if (leagueId) {
-        console.log(`\u{1F50D} Filtering for league ${leagueId}`);
-        const draftedSongIds = await storage.getDraftedSongIdsForLeague(leagueId);
-        const availableSongs = allSongs.filter((song) => !draftedSongIds.includes(song.id));
-        console.log(`\u2705 Returning ${availableSongs.length} available songs for league`);
-        res.json(availableSongs);
-      } else {
-        console.log(`\u2705 Returning all ${allSongs.length} songs from cache`);
-        res.json(allSongs);
-      }
-    } catch (error) {
-      console.error("\u274C Error fetching cached songs:", error);
-      res.status(500).json({ message: "Failed to fetch songs" });
-    }
-  });
-  app2.get("/api/songs/search", async (req, res) => {
-    try {
-      const { q } = req.query;
-      if (!q) {
-        return res.status(400).json({ message: "Search query required" });
-      }
-      const cachedSongs2 = await storage.getCachedSongs();
-      const allSongs = cachedSongs2.map((cached, index2) => ({
-        id: index2 + 1,
-        title: cached.title,
-        category: cached.category,
-        rarityScore: cached.rarityScore,
-        totalPlays: cached.timesPlayed,
-        lastPlayed: cached.lastPlayed,
-        plays24Months: cached.plays24Months || 0
-      }));
-      const filtered = allSongs.filter(
-        (song) => song.title.toLowerCase().includes(q.toLowerCase())
-      );
-      res.json(filtered);
-    } catch (error) {
-      res.status(500).json({ message: "Failed to search songs" });
-    }
-  });
-  app2.post("/api/leagues/:id/schedule-draft", requireAuth, requireLeagueOwnerOrAdmin, async (req, res) => {
-    try {
-      const leagueId = parseInt(req.params.id);
-      const { draftDate, draftRounds, pickTimeLimit } = req.body;
-      if (!draftDate) {
-        return res.status(400).json({ message: "Draft date is required" });
-      }
-      await storage.scheduleDraft(
-        leagueId,
-        new Date(draftDate),
-        draftRounds || 10,
-        pickTimeLimit || 90
-      );
-      res.json({ message: "Draft scheduled successfully" });
-    } catch (error) {
-      res.status(500).json({ message: error.message || "Failed to schedule draft" });
-    }
-  });
-  app2.post("/api/leagues/:id/start-draft", requireAuth, requireLeagueOwnerOrAdmin, async (req, res) => {
-    try {
-      const leagueId = parseInt(req.params.id);
-      await storage.startDraft(leagueId);
-      res.json({ message: "Draft started successfully" });
-    } catch (error) {
-      res.status(500).json({ message: error.message || "Failed to start draft" });
-    }
-  });
-  app2.post("/api/leagues/:id/auto-pick", requireAuth, async (req, res) => {
-    try {
-      const leagueId = parseInt(req.params.id);
-      const { userId, preferredSongIds } = req.body;
-      if (userId !== req.userId) {
-        return res.status(403).json({ message: "You can only auto-pick for yourself" });
-      }
-      const league = await storage.getDraftStatus(leagueId);
-      if (!league || league.draftStatus !== "active") {
-        return res.status(400).json({ message: "Draft is not active" });
-      }
-      if (league.currentPlayer !== userId) {
-        return res.status(400).json({ message: "Not this player's turn" });
-      }
-      if (Array.isArray(preferredSongIds) && preferredSongIds.length > 0) {
-        for (const songId of preferredSongIds) {
-          const isDrafted = await storage.isSongDraftedInLeague(songId, leagueId);
-          if (!isDrafted) {
-            const song = await storage.getSong(songId);
-            const pick2 = await storage.makeDraftPick(leagueId, userId, songId, league.pickTimeLimit ?? 90);
-            return res.json({ ...pick2, autoPicked: true, fromQueue: true, songTitle: song?.title ?? `Song #${songId}` });
-          }
-        }
-      }
-      const available = await storage.getAvailableSongsPlayedLastYear(leagueId);
-      if (available.length === 0) {
-        return res.status(400).json({ message: "No available songs to auto-pick" });
-      }
-      const pick = await storage.makeDraftPick(leagueId, userId, available[0].id, league.pickTimeLimit ?? 90);
-      res.json({ ...pick, autoPicked: true, fromQueue: false, songTitle: available[0].title });
-    } catch (error) {
-      res.status(500).json({ message: error.message || "Failed to auto-pick" });
-    }
-  });
-  app2.get("/api/leagues/:id/player/:userId/songs", async (req, res) => {
-    try {
-      const leagueId = parseInt(req.params.id);
-      const userId = parseInt(req.params.userId);
-      const drafts = await storage.getDraftedSongs(userId, leagueId);
-      const sorted = drafts.map((d) => ({
-        songTitle: d.song?.title || "Unknown",
-        points: d.points ?? 0,
-        draftRound: d.draftRound,
-        draftPick: d.draftPick
-      })).sort((a, b) => b.points - a.points);
-      res.json(sorted);
-    } catch (error) {
-      res.status(500).json({ message: error.message || "Failed to fetch player songs" });
-    }
-  });
-  app2.get("/api/leagues/:id/setlist", async (req, res) => {
-    try {
-      const leagueId = parseInt(req.params.id);
-      const date = req.query.date;
-      if (!date)
-        return res.status(400).json({ message: "date query param required" });
-      const tracks = await phishApi.getSetlist(date);
-      if (!tracks || tracks.length === 0) {
-        return res.json({ date, songPerformances: [] });
-      }
-      const drafted = await db.select({ songId: draftedSongs.songId, userId: draftedSongs.userId }).from(draftedSongs).where((0, import_drizzle_orm4.eq)(draftedSongs.leagueId, leagueId));
-      const draftersByTitle = {};
-      for (const d of drafted) {
-        if (!d.songId)
-          continue;
-        const [song] = await db.select().from(songs).where((0, import_drizzle_orm4.eq)(songs.id, d.songId)).limit(1);
-        if (!song)
-          continue;
-        const user = await storage.getUser(d.userId);
-        if (!user)
-          continue;
-        const key = song.title.toLowerCase();
-        if (!draftersByTitle[key])
-          draftersByTitle[key] = [];
-        draftersByTitle[key].push({ userId: user.id, username: user.username });
-      }
-      const firstPosBySet = {};
-      for (const t of tracks) {
-        const setKey = t.set || "Set 1";
-        const pos = t.position || 0;
-        if (!(setKey in firstPosBySet) || pos < firstPosBySet[setKey])
-          firstPosBySet[setKey] = pos;
-      }
-      const songPerformances2 = tracks.map((track, idx) => {
-        const title = track.song || track.title || "";
-        const setKey = track.set || "Set 1";
-        const isEncore = track.isEncore || setKey.toLowerCase().includes("encore");
-        const isSetOpener = !isEncore && track.position === firstPosBySet[setKey];
-        const durationSeconds = track.duration ? Math.round(track.duration / 1e3) : 0;
-        const mins = durationSeconds / 60;
-        let points = 1;
-        if (isSetOpener)
-          points += 1;
-        if (isEncore)
-          points += 1;
-        if (mins >= 20)
-          points += 1;
-        if (mins >= 30)
-          points += 1;
-        if (mins >= 40)
-          points += 1;
-        const draftedBy = draftersByTitle[title.toLowerCase()] || [];
-        return {
-          id: idx,
-          song: { title },
-          setNumber: setKey,
-          position: track.position || idx + 1,
-          isSetOpener,
-          isEncore,
-          durationSeconds,
-          points,
-          draftedBy
-        };
-      });
-      res.json({ date, songPerformances: songPerformances2 });
-    } catch (error) {
-      res.status(500).json({ message: error.message || "Failed to fetch setlist" });
-    }
-  });
-  app2.post("/api/leagues/:id/score", requireAuth, requireLeagueOwnerOrAdmin, async (req, res) => {
-    try {
-      const leagueId = parseInt(req.params.id);
-      await cacheService.getCachedShows(true);
-      const result = await storage.scoreLeague(leagueId);
-      res.json({ message: "Scoring complete", shows: result.shows, points: result.points, perUser: result.perUser, unmappedSongIds: result.unmappedSongIds });
-    } catch (error) {
-      console.error("Score league error:", error);
-      res.status(500).json({ message: error.message || "Failed to score league" });
-    }
-  });
-  app2.get("/api/leagues/:id/draft-status", async (req, res) => {
-    try {
-      const leagueId = parseInt(req.params.id);
-      const league = await storage.getDraftStatus(leagueId);
-      if (league?.draftStatus === "active" && league?.currentPlayer) {
-        const key = `${leagueId}:${league.currentPlayer}`;
-        if (serverAutoDraftEnabled.has(key)) {
-          const lastFiredPick = serverAutoDraftRegistry.get(key) ?? -1;
-          if (lastFiredPick !== league.currentPick) {
-            serverAutoDraftRegistry.set(key, league.currentPick);
-            setTimeout(() => {
-              storage.getAvailableSongsPlayedLastYear(leagueId).then(async (available) => {
-                if (!available.length)
-                  return;
-                try {
-                  const pick = await storage.makeDraftPick(leagueId, league.currentPlayer, available[0].id, league.pickTimeLimit ?? 90);
-                  console.log(`[server-auto-draft] Picked "${available[0].title}" for user ${league.currentPlayer} (pick #${league.currentPick}) in league ${leagueId}`);
-                } catch (e) {
-                  console.warn(`[server-auto-draft] Pick failed for user ${league.currentPlayer}: ${e.message}`);
-                }
-              });
-            }, 500);
-          }
-        }
-      }
-      res.json(league);
-    } catch (error) {
-      res.status(500).json({ message: "Failed to get draft status" });
-    }
-  });
-  app2.get("/api/leagues/:id/draft-order", async (req, res) => {
-    try {
-      const leagueId = parseInt(req.params.id);
-      const draftOrder = await storage.getDraftOrder(leagueId);
-      res.json(draftOrder);
-    } catch (error) {
-      res.status(500).json({ message: "Failed to get draft order" });
-    }
-  });
-  app2.post("/api/leagues/:id/draft-order", requireAuth, requireLeagueOwnerOrAdmin, async (req, res) => {
-    try {
-      const leagueId = parseInt(req.params.id);
-      const { userIds } = req.body;
-      if (!Array.isArray(userIds)) {
-        return res.status(400).json({ message: "userIds must be an array" });
-      }
-      await storage.setDraftOrder(leagueId, userIds);
-      res.json({ message: "Draft order set successfully" });
-    } catch (error) {
-      res.status(500).json({ message: error.message || "Failed to set draft order" });
-    }
-  });
-  app2.post("/api/leagues/:id/randomize-draft-order", requireAuth, async (req, res) => {
-    try {
-      const leagueId = parseInt(req.params.id);
-      const userId = req.userId;
-      const league = await storage.getLeague(leagueId);
-      if (!league)
-        return res.status(404).json({ message: "League not found" });
-      const user = await storage.getUser(userId);
-      if (league.ownerId !== userId && user?.role !== "admin" && user?.role !== "superadmin") {
-        return res.status(403).json({ message: "Owner only" });
-      }
-      const members = await storage.getLeagueMembers(leagueId);
-      const ids = members.map((m) => m.userId);
-      for (let i = ids.length - 1; i > 0; i--) {
-        const j = Math.floor(Math.random() * (i + 1));
-        [ids[i], ids[j]] = [ids[j], ids[i]];
-      }
-      await storage.setDraftOrder(leagueId, ids);
-      res.json({ orderedUserIds: ids });
-    } catch (err) {
-      res.status(500).json({ message: err.message || "Failed to randomize order" });
-    }
-  });
-  app2.get("/api/leagues/:id/draft-picks", async (req, res) => {
-    try {
-      const leagueId = parseInt(req.params.id);
-      const picks = await storage.getDraftPicks(leagueId);
-      res.json(picks);
-    } catch (error) {
-      res.status(500).json({ message: "Failed to get draft picks" });
-    }
-  });
-  app2.post("/api/admin/leagues/:id/reset-draft", requireAuth, async (req, res) => {
-    try {
-      const leagueId = parseInt(req.params.id);
-      const userId = req.userId;
-      const user = await storage.getUser(userId);
-      if (!user || user.role !== "admin" && user.role !== "superadmin") {
-        return res.status(403).json({ message: "Admin only" });
-      }
-      await db.delete(draftPicks).where((0, import_drizzle_orm4.eq)(draftPicks.leagueId, leagueId));
-      await db.delete(draftedSongs).where((0, import_drizzle_orm4.eq)(draftedSongs.leagueId, leagueId));
-      await storage.updateLeague(leagueId, {
-        draftStatus: "scheduled",
-        currentPick: 1,
-        currentRound: 1,
-        currentPlayer: null,
-        pickDeadline: null
-      });
-      res.json({ message: `Draft reset for league ${leagueId}` });
-    } catch (error) {
-      res.status(500).json({ message: error.message || "Failed to reset draft" });
-    }
-  });
-  app2.post("/api/admin/leagues/:id/reassign-pick", requireAuth, async (req, res) => {
-    try {
-      const leagueId = parseInt(req.params.id);
-      const userId = req.userId;
-      const user = await storage.getUser(userId);
-      if (!user || user.role !== "admin" && user.role !== "superadmin") {
-        return res.status(403).json({ message: "Admin only" });
-      }
-      const { pickId, newUserId, newSongId } = req.body;
-      const [existing] = await db.select().from(draftPicks).where((0, import_drizzle_orm4.eq)(draftPicks.id, pickId)).limit(1);
-      if (!existing)
-        return res.status(404).json({ message: "Pick not found" });
-      await db.update(draftPicks).set({ userId: newUserId, songId: newSongId }).where((0, import_drizzle_orm4.eq)(draftPicks.id, pickId));
-      await db.delete(draftedSongs).where(
-        import_drizzle_orm4.sql`${draftedSongs.leagueId} = ${leagueId} AND ${draftedSongs.userId} = ${existing.userId} AND ${draftedSongs.songId} = ${existing.songId}`
-      );
-      await db.insert(draftedSongs).values({
-        leagueId,
-        userId: newUserId,
-        songId: newSongId,
-        draftRound: existing.draftRound ?? 1,
-        draftPick: existing.pickNumber ?? 1
-      }).onConflictDoNothing();
-      res.json({ message: `Pick #${existing.pickNumber} reassigned`, pickId, newUserId, newSongId });
-    } catch (error) {
-      res.status(500).json({ message: error.message || "Failed to reassign pick" });
-    }
-  });
-  app2.post("/api/admin/leagues/:id/auto-draft/:userId", requireAuth, async (req, res) => {
-    try {
-      const requestingUserId = req.userId;
-      const requester = await storage.getUser(requestingUserId);
-      if (!requester || requester.role !== "admin" && requester.role !== "superadmin") {
-        return res.status(403).json({ message: "Admin only" });
-      }
-      const leagueId = req.params.id;
-      const targetUserId = req.params.userId;
-      const key = `${leagueId}:${targetUserId}`;
-      const enable = req.body.enable !== false;
-      if (enable) {
-        serverAutoDraftEnabled.add(key);
-      } else {
-        serverAutoDraftEnabled.delete(key);
-        serverAutoDraftRegistry.delete(key);
-      }
-      console.log(`[server-auto-draft] ${enable ? "Enabled" : "Disabled"} for user ${targetUserId} in league ${leagueId}`);
-      res.json({ autoDraft: serverAutoDraftEnabled.has(key), leagueId, userId: targetUserId });
-    } catch (error) {
-      res.status(500).json({ message: error.message || "Failed to toggle auto-draft" });
-    }
-  });
-  app2.delete("/api/admin/picks/:pickId", requireAuth, async (req, res) => {
-    try {
-      const userId = req.userId;
-      const user = await storage.getUser(userId);
-      if (!user || user.role !== "admin" && user.role !== "superadmin") {
-        return res.status(403).json({ message: "Admin only" });
-      }
-      const pickId = parseInt(req.params.pickId);
-      const [existing] = await db.select().from(draftPicks).where((0, import_drizzle_orm4.eq)(draftPicks.id, pickId)).limit(1);
-      if (!existing)
-        return res.status(404).json({ message: "Pick not found" });
-      await db.delete(draftPicks).where((0, import_drizzle_orm4.eq)(draftPicks.id, pickId));
-      await db.delete(draftedSongs).where(
-        import_drizzle_orm4.sql`${draftedSongs.leagueId} = ${existing.leagueId} AND ${draftedSongs.userId} = ${existing.userId} AND ${draftedSongs.songId} = ${existing.songId}`
-      );
-      res.json({ message: `Pick #${existing.pickNumber} deleted` });
-    } catch (error) {
-      res.status(500).json({ message: error.message || "Failed to delete pick" });
-    }
-  });
-  app2.post("/api/admin/leagues/:id/add-pick", requireAuth, async (req, res) => {
-    try {
-      const adminUserId = req.userId;
-      const adminUser = await storage.getUser(adminUserId);
-      if (!adminUser || adminUser.role !== "admin" && adminUser.role !== "superadmin") {
-        return res.status(403).json({ message: "Admin only" });
-      }
-      const leagueId = parseInt(req.params.id);
-      const { userId, songId } = req.body;
-      const { cachedSongs: cachedSongsTable } = await Promise.resolve().then(() => (init_schema(), schema_exports));
-      const { songs: songsTable } = await Promise.resolve().then(() => (init_schema(), schema_exports));
-      const { inArray: inArr } = await import("drizzle-orm");
-      const [cs] = await db.select().from(cachedSongsTable).where((0, import_drizzle_orm4.eq)(cachedSongsTable.id, songId)).limit(1);
-      if (!cs)
-        return res.status(404).json({ message: "Song not found" });
-      await db.insert(songsTable).values({
-        title: cs.title,
-        category: cs.category,
-        rarityScore: cs.rarityScore ?? 0,
-        totalPlays: cs.timesPlayed ?? 0,
-        plays24Months: cs.plays24Months ?? 0
-      }).onConflictDoNothing();
-      const [song] = await db.select().from(songsTable).where((0, import_drizzle_orm4.eq)(songsTable.title, cs.title)).limit(1);
-      if (!song)
-        return res.status(500).json({ message: "Failed to resolve song" });
-      const league = await storage.getLeague(leagueId);
-      const existingPicks = await db.select().from(draftPicks).where((0, import_drizzle_orm4.eq)(draftPicks.leagueId, leagueId));
-      const nextPickNum = existingPicks.length > 0 ? Math.max(...existingPicks.map((p) => p.pickNumber ?? 0)) + 1 : 1;
-      const [pick] = await db.insert(draftPicks).values({
-        leagueId,
-        userId,
-        songId: song.id,
-        pickNumber: nextPickNum,
-        round: league?.currentRound ?? 1,
-        timeUsed: 0
-      }).returning();
-      await db.insert(draftedSongs).values({
-        leagueId,
-        userId,
-        songId: song.id,
-        draftRound: league?.currentRound ?? 1,
-        draftPick: nextPickNum
-      }).onConflictDoNothing();
-      res.json({ ...pick, songTitle: song.title });
-    } catch (error) {
-      res.status(500).json({ message: error.message || "Failed to add pick" });
-    }
-  });
-  app2.post("/api/leagues/:id/draft-pick", requireAuth, async (req, res) => {
-    try {
-      const leagueId = parseInt(req.params.id);
-      const { userId, songId, timeUsed } = req.body;
-      if (!userId || !songId) {
-        return res.status(400).json({ message: "userId and songId are required" });
-      }
-      if (userId !== req.userId) {
-        return res.status(403).json({ message: "You can only pick for yourself" });
-      }
-      const league = await storage.getDraftStatus(leagueId);
-      if (league?.currentPlayer !== userId) {
-        return res.status(400).json({ message: "It's not your turn to pick" });
-      }
-      const isTaken = await storage.isSongDraftedInLeague(songId, leagueId);
-      if (isTaken) {
-        return res.status(400).json({ message: "Song already drafted" });
-      }
-      const pick = await storage.makeDraftPick(leagueId, userId, songId, timeUsed || 0);
-      res.json(pick);
-    } catch (error) {
-      res.status(500).json({ message: error.message || "Failed to make draft pick" });
-    }
-  });
-  app2.get("/api/drafted-songs", async (req, res) => {
-    try {
-      const userIdStr = req.query.userId;
-      const leagueIdStr = req.query.leagueId;
-      if (!userIdStr || !leagueIdStr) {
-        return res.status(400).json({ message: "User ID and League ID required" });
-      }
-      const userId = parseInt(userIdStr);
-      const leagueId = parseInt(leagueIdStr);
-      if (isNaN(userId) || isNaN(leagueId)) {
-        return res.status(400).json({ message: "Invalid User ID or League ID" });
-      }
-      const draftedSongs2 = await storage.getDraftedSongs(userId, leagueId);
-      res.json(draftedSongs2);
-    } catch (error) {
-      res.status(500).json({ message: "Failed to fetch drafted songs" });
-    }
-  });
-  app2.post("/api/draft", requireAuth, async (req, res) => {
-    try {
-      const draftData = insertDraftedSongSchema.parse(req.body);
-      const isSongTaken = await storage.isSongDraftedInLeague(draftData.songId, draftData.leagueId);
-      if (isSongTaken) {
-        return res.status(400).json({ message: "Song already drafted by another player in this league" });
-      }
-      const existingDrafts = await storage.getDraftedSongs(draftData.userId, draftData.leagueId);
-      const alreadyDraftedByUser = existingDrafts.some((draft) => draft.songId === draftData.songId);
-      if (alreadyDraftedByUser) {
-        return res.status(400).json({ message: "You have already drafted this song" });
-      }
-      if (existingDrafts.length >= 10) {
-        return res.status(400).json({ message: "Maximum of 10 songs can be drafted" });
-      }
-      const draftedSong = await storage.draftSong(draftData);
-      const song = await storage.getSong(draftData.songId);
-      if (song) {
-        await storage.createActivity(
-          draftData.userId,
-          draftData.leagueId,
-          "draft",
-          `You drafted "${song.title}"`
-        );
-      }
-      res.json(draftedSong);
-    } catch (error) {
-      console.error("Draft error:", error);
-      res.status(400).json({ message: "Failed to draft song" });
-    }
-  });
-  app2.get("/api/concerts", async (req, res) => {
-    try {
-      const { cacheService: cacheService2 } = await Promise.resolve().then(() => (init_cache_service(), cache_service_exports));
-      const cachedShows2 = await cacheService2.getCachedShows();
-      console.log(`Fetched ${cachedShows2.length} shows from cache`);
-      const concerts2 = await Promise.all(cachedShows2.map(async (show) => {
-        const isCompleted = new Date(show.showDate) < /* @__PURE__ */ new Date();
-        let setlist = [];
-        let setlistData = [];
-        if (isCompleted) {
-          try {
-            const cachedSetlist = await cacheService2.getCachedSetlist(show.showDate.toISOString().split("T")[0]);
-            if (cachedSetlist) {
-              setlist = Array.isArray(cachedSetlist.songs) ? cachedSetlist.songs : [];
-              setlistData = Array.isArray(cachedSetlist.setlistData) ? cachedSetlist.setlistData : [];
-            }
-          } catch (error) {
-            console.error(`Error fetching setlist for ${show.showDate}:`, error);
-          }
-        }
-        return {
-          id: show.id,
-          tourId: 1,
-          date: new Date(show.showDate),
-          venue: show.venue,
-          city: show.city,
-          state: show.state,
-          country: show.country,
-          setlist,
-          setlistData,
-          isCompleted
-        };
-      }));
-      res.json(concerts2);
-    } catch (error) {
-      console.error("Error fetching concerts:", error);
-      res.status(500).json({ message: "Failed to fetch concerts" });
-    }
-  });
-  app2.get("/api/shows/:date/setlist", async (req, res) => {
-    const { date } = req.params;
-    try {
-      const r = await fetch(`https://phish.in/api/v2/shows/${date}`, {
-        headers: { Accept: "application/json" }
-      });
-      if (!r.ok)
-        return res.status(r.status).json({ message: "Show not found on phish.in" });
-      const data = await r.json();
-      const rawTracks = data.tracks ?? [];
-      const setMap = {};
-      for (const t of rawTracks) {
-        const key = t.set_name ?? "Set 1";
-        if (!setMap[key])
-          setMap[key] = [];
-        setMap[key].push(t);
-      }
-      const sets = Object.entries(setMap).map(([setName, tracks]) => {
-        const isEncore = setName.toLowerCase().includes("encore");
-        const firstPos = Math.min(...tracks.map((t) => t.position ?? 99));
-        return {
-          setName,
-          isEncore,
-          songs: tracks.map((t) => ({
-            title: t.title,
-            position: t.position,
-            durationSecs: t.duration ? Math.round(t.duration / 1e3) : 0,
-            isOpener: !isEncore && t.position === firstPos,
-            isEncore
-          }))
-        };
-      });
-      sets.sort((a, b) => {
-        if (a.isEncore && !b.isEncore)
-          return 1;
-        if (!a.isEncore && b.isEncore)
-          return -1;
-        return a.setName.localeCompare(b.setName);
-      });
-      res.json({ date, sets });
-    } catch (err) {
-      console.error("phish.in setlist error:", err);
-      res.status(500).json({ message: "Failed to fetch setlist" });
-    }
-  });
-  app2.get("/api/concerts/upcoming", async (req, res) => {
-    try {
-      const upcomingShows = await phishApi.getUpcomingShows();
-      const upcomingConcerts = upcomingShows.map((show) => ({
-        id: parseInt(show.showid),
-        tourId: 1,
-        date: new Date(show.showdate),
-        venue: show.venue,
-        city: show.city,
-        state: show.state,
-        country: show.country,
-        setlist: [],
-        isCompleted: false
-      })).sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime()).slice(0, 3);
-      res.json(upcomingConcerts);
-    } catch (error) {
-      console.error("Error fetching upcoming concerts:", error);
-      res.status(500).json({ message: "Failed to fetch upcoming concerts" });
-    }
-  });
-  app2.get("/api/concerts/:id/setlist", async (req, res) => {
-    try {
-      const showId = req.params.id;
-      const { cacheService: cacheService2 } = await Promise.resolve().then(() => (init_cache_service(), cache_service_exports));
-      const cachedShows2 = await cacheService2.getCachedShows();
-      const show = cachedShows2.find((s) => s.id.toString() === showId);
-      if (!show) {
-        return res.status(404).json({ message: "Show not found" });
-      }
-      const showDate = new Date(show.showDate).toISOString().split("T")[0];
-      const cachedSetlist = await cacheService2.getCachedSetlist(showDate);
-      if (!cachedSetlist) {
-        return res.status(404).json({ message: "Setlist not found" });
-      }
-      res.json(cachedSetlist.setlistData);
-    } catch (error) {
-      console.error("Error fetching setlist:", error);
-      res.status(500).json({ message: "Failed to fetch setlist" });
-    }
-  });
-  app2.post("/api/admin/cache/refresh", requireAuth, requireAdmin, async (req, res) => {
-    try {
-      const { cacheService: cacheService2 } = await Promise.resolve().then(() => (init_cache_service(), cache_service_exports));
-      await cacheService2.refreshAllCaches();
-      res.json({ message: "All caches refreshed successfully" });
-    } catch (error) {
-      console.error("Error refreshing caches:", error);
-      res.status(500).json({ message: "Failed to refresh caches" });
-    }
-  });
-  app2.post("/api/admin/cache/refresh-songs", requireAuth, requireAdmin, async (req, res) => {
-    try {
-      const { cacheService: cacheService2 } = await Promise.resolve().then(() => (init_cache_service(), cache_service_exports));
-      await cacheService2.getCachedSongs(true);
-      res.json({ message: "Songs cache refreshed successfully" });
-    } catch (error) {
-      console.error("Error refreshing songs cache:", error);
-      res.status(500).json({ message: "Failed to refresh songs cache" });
-    }
-  });
-  app2.post("/api/admin/cache/refresh-shows", requireAuth, requireAdmin, async (req, res) => {
-    try {
-      const { cacheService: cacheService2 } = await Promise.resolve().then(() => (init_cache_service(), cache_service_exports));
-      await cacheService2.getCachedShows(true);
-      res.json({ message: "Shows cache refreshed successfully" });
-    } catch (error) {
-      console.error("Error refreshing shows cache:", error);
-      res.status(500).json({ message: "Failed to refresh shows cache" });
-    }
-  });
-  app2.get("/api/admin/cache/stats", requireAuth, requireAdmin, async (req, res) => {
-    try {
-      const { cacheService: cacheService2 } = await Promise.resolve().then(() => (init_cache_service(), cache_service_exports));
-      const stats = await cacheService2.getCacheStats();
-      res.json(stats);
-    } catch (error) {
-      console.error("Error getting cache stats:", error);
-      res.status(500).json({ message: "Failed to get cache stats" });
-    }
-  });
-  app2.get("/api/activities", async (req, res) => {
-    try {
-      const userId = parseInt(req.query.userId);
-      const leagueId = req.query.leagueId ? parseInt(req.query.leagueId) : void 0;
-      if (!userId) {
-        return res.status(400).json({ message: "User ID required" });
-      }
-      const activities2 = await storage.getUserActivities(userId, leagueId);
-      res.json(activities2);
-    } catch (error) {
-      res.status(500).json({ message: "Failed to fetch activities" });
-    }
-  });
-  app2.post("/api/performances", requireAuth, requireAdmin, async (req, res) => {
-    try {
-      const performanceData = insertSongPerformanceSchema.parse(req.body);
-      const performance = await storage.createSongPerformance(performanceData);
-      await storage.calculateAndUpdatePoints(performanceData.concertId);
-      res.json(performance);
-    } catch (error) {
-      res.status(400).json({ message: "Failed to create song performance" });
-    }
-  });
-  app2.get("/api/concerts/:id/performances", async (req, res) => {
-    try {
-      const concertIdStr = req.params.id;
-      const concertId = parseInt(concertIdStr);
-      if (isNaN(concertId)) {
-        return res.status(400).json({ message: "Invalid concert ID" });
-      }
-      const performances = await storage.getConcertPerformances(concertId);
-      res.json(performances);
-    } catch (error) {
-      res.status(500).json({ message: "Failed to fetch concert performances" });
-    }
-  });
-  app2.get("/api/dashboard", async (req, res) => {
-    try {
-      const userId = parseInt(req.query.userId);
-      if (!userId) {
-        return res.status(400).json({ message: "User ID required" });
-      }
-      const user = await storage.getUser(userId);
-      if (!user) {
-        return res.status(404).json({ message: "User not found" });
-      }
-      const activeTour = await storage.getActiveTour();
-      const leagues2 = await storage.getUserLeagues(userId);
-      const currentLeague = leagues2[0];
-      if (!currentLeague) {
-        return res.json({
-          user: { id: user.id, username: user.username, totalPoints: user.totalPoints },
-          tour: activeTour,
-          league: null,
-          draftedSongs: [],
-          recentActivities: [],
-          upcomingConcerts: [],
-          leagueStandings: []
-        });
-      }
-      const draftedSongs2 = await storage.getDraftedSongs(userId, currentLeague.id);
-      const recentActivities = await storage.getUserActivities(userId, currentLeague.id);
-      const recentShows = await phishApi.getRecentShows(20);
-      const recentConcerts = recentShows.slice(0, 3).map((show) => ({
-        id: parseInt(show.showid),
-        tourId: 1,
-        date: show.showdate,
-        venue: show.venue,
-        city: show.city,
-        state: show.state,
-        country: show.country,
-        setlist: [],
-        isCompleted: true
-      }));
-      const upcomingShows = await phishApi.getUpcomingShows();
-      const upcomingConcerts = upcomingShows.map((show) => ({
-        id: parseInt(show.showid),
-        tourId: 1,
-        date: show.showdate,
-        venue: show.venue,
-        city: show.city,
-        state: show.state,
-        country: show.country,
-        setlist: [],
-        isCompleted: false
-      })).sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime()).slice(0, 3);
-      const leagueStandings = await storage.getLeagueStandings(currentLeague.id);
-      const top10 = leagueStandings.slice(0, 10);
-      const userInTop10 = top10.some((s) => s.id === userId);
-      const standingsForDashboard = userInTop10 ? top10 : [...top10, leagueStandings.find((s) => s.id === userId)].filter(Boolean);
-      res.json({
-        user: { id: user.id, username: user.username, totalPoints: user.totalPoints },
-        tour: activeTour,
-        league: currentLeague,
-        draftedSongs: draftedSongs2.slice(0, 10),
-        recentActivities: recentActivities.slice(0, 5),
-        recentConcerts,
-        upcomingConcerts,
-        leagueStandings: standingsForDashboard
-      });
-    } catch (error) {
-      res.status(500).json({ message: "Failed to fetch dashboard data" });
-    }
-  });
-  app2.post("/api/auth/forgot-password", async (req, res) => {
-    try {
-      const { email } = req.body;
-      if (!email) {
-        return res.status(400).json({ message: "Email is required" });
-      }
-      const user = await storage.getUserByEmail(email);
-      console.log(`forgot-password: user lookup for ${email}: ${user ? `found id=${user.id}` : "not found"}`);
-      if (!user) {
-        return res.json({ message: "If this email is registered, you will receive a password reset link." });
-      }
-      const resetToken = (0, import_nanoid.nanoid)(32);
-      const expiresAt = new Date(Date.now() + 60 * 60 * 1e3);
-      console.log(`forgot-password: saving reset token for user ${user.id}`);
-      await storage.createPasswordResetToken({ userId: user.id, token: resetToken, expiresAt });
-      console.log(`forgot-password: token saved, calling sendPasswordResetEmail`);
-      const baseUrl2 = "https://phishphantasy.live";
-      const sent = await sendPasswordResetEmail(email, resetToken, baseUrl2);
-      console.log(`forgot-password: sendPasswordResetEmail returned ${sent}`);
-      if (!sent) {
-        return res.status(500).json({ message: "Failed to send reset email \u2014 please contact support" });
-      }
-      res.json({ message: "If this email is registered, you will receive a password reset link." });
-    } catch (error) {
-      console.error("Forgot password error:", error);
-      res.status(500).json({ message: "Failed to process password reset request" });
-    }
-  });
-  app2.post("/api/auth/reset-password", async (req, res) => {
-    try {
-      const { token, newPassword } = req.body;
-      if (!token || !newPassword) {
-        return res.status(400).json({ message: "Token and new password are required" });
-      }
-      if (newPassword.length < 6) {
-        return res.status(400).json({ message: "Password must be at least 6 characters long" });
-      }
-      const resetToken = await storage.getPasswordResetToken(token);
-      if (!resetToken || resetToken.used || /* @__PURE__ */ new Date() > resetToken.expiresAt) {
-        return res.status(400).json({ message: "Invalid or expired reset token" });
-      }
-      const hashedPassword = await import_bcrypt3.default.hash(newPassword, 10);
-      await storage.updateUserPassword(resetToken.userId, hashedPassword);
-      await storage.markTokenAsUsed(resetToken.id);
-      res.json({ message: "Password reset successful" });
-    } catch (error) {
-      console.error("Reset password error:", error);
-      res.status(500).json({ message: "Failed to reset password" });
-    }
-  });
+  app2.use(leagues_default);
+  app2.use(draft_default);
+  app2.use(songs_default);
+  app2.use(concerts_default);
+  app2.use(cache_default);
+  app2.use(misc_default);
   const httpServer2 = (0, import_http.createServer)(app2);
   return httpServer2;
 }
@@ -17422,10 +17481,10 @@ import_serverless2.neonConfig.webSocketConstructor = import_ws2.default;
 var pool2 = new import_serverless2.Pool({
   connectionString: process.env.DATABASE_URL
 });
-var app = (0, import_express2.default)();
+var app = (0, import_express8.default)();
 app.set("trust proxy", 1);
-app.use((0, import_express2.json)());
-app.use((0, import_express2.urlencoded)({ extended: true }));
+app.use((0, import_express8.json)());
+app.use((0, import_express8.urlencoded)({ extended: true }));
 app.get("/health", (_req, res) => res.json({ status: "ok", build: "2026-04-24-v3" }));
 app.get("/api/version", (_req, res) => res.json({ build: "2026-04-24-v3" }));
 var preferredPath = process.env.CLIENT_DIST || import_path.default.resolve(process.cwd(), "server/dist/client");
@@ -17436,7 +17495,7 @@ if (import_fs.default.existsSync(clientDistPath)) {
   const files = import_fs.default.readdirSync(clientDistPath);
   console.log(`[startup] client files: ${files.join(", ")}`);
 }
-app.use(import_express2.default.static(clientDistPath));
+app.use(import_express8.default.static(clientDistPath));
 async function runMigrations() {
   const client = await pool2.connect();
   try {
@@ -17471,10 +17530,10 @@ async function runDraftAutomation() {
     const { storage: storage2 } = await Promise.resolve().then(() => (init_storage_db(), storage_db_exports));
     const { db: db2 } = await Promise.resolve().then(() => (init_db(), db_exports));
     const { leagues: leagues2 } = await Promise.resolve().then(() => (init_schema(), schema_exports));
-    const { and: and5, eq: eq5, lte, isNotNull: isNotNull2 } = await import("drizzle-orm");
+    const { and: and7, eq: eq8, lte, isNotNull: isNotNull2 } = await import("drizzle-orm");
     const now = /* @__PURE__ */ new Date();
     const toStart = await db2.select().from(leagues2).where(
-      and5(eq5(leagues2.draftStatus, "scheduled"), isNotNull2(leagues2.draftDate), lte(leagues2.draftDate, now))
+      and7(eq8(leagues2.draftStatus, "scheduled"), isNotNull2(leagues2.draftDate), lte(leagues2.draftDate, now))
     );
     for (const league of toStart) {
       try {
@@ -17485,15 +17544,15 @@ async function runDraftAutomation() {
       }
     }
     const timedOut = await db2.select().from(leagues2).where(
-      and5(eq5(leagues2.draftStatus, "active"), isNotNull2(leagues2.pickDeadline), lte(leagues2.pickDeadline, now))
+      and7(eq8(leagues2.draftStatus, "active"), isNotNull2(leagues2.pickDeadline), lte(leagues2.pickDeadline, now))
     );
     for (const league of timedOut) {
       if (!league.currentPlayer)
         continue;
       try {
-        const songs2 = await storage2.getAvailableSongsPlayedLastYear(league.id);
-        if (songs2.length > 0) {
-          await storage2.makeDraftPick(league.id, league.currentPlayer, songs2[0].id, league.pickTimeLimit ?? 90);
+        const songs3 = await storage2.getAvailableSongsPlayedLastYear(league.id);
+        if (songs3.length > 0) {
+          await storage2.makeDraftPick(league.id, league.currentPlayer, songs3[0].id, league.pickTimeLimit ?? 90);
           console.log(`[DraftAuto] Auto-picked for player ${league.currentPlayer} in league ${league.id}`);
         }
       } catch (e) {
@@ -17507,15 +17566,15 @@ async function runDraftAutomation() {
 async function runAutoScore() {
   try {
     const { cacheService: cacheService2 } = await Promise.resolve().then(() => (init_cache_service(), cache_service_exports));
-    const { storage: storage2 } = await Promise.resolve().then(() => (init_storage_db(), storage_db_exports));
+    const { scoreLeague: scoreLeague2 } = await Promise.resolve().then(() => (init_scoring(), scoring_exports));
     const { db: db2 } = await Promise.resolve().then(() => (init_db(), db_exports));
     const { leagues: leagues2 } = await Promise.resolve().then(() => (init_schema(), schema_exports));
-    const { eq: eq5 } = await import("drizzle-orm");
+    const { eq: eq8 } = await import("drizzle-orm");
     await cacheService2.refreshShowsCache();
-    const activeLeagues = await db2.select().from(leagues2).where(eq5(leagues2.draftStatus, "completed"));
+    const activeLeagues = await db2.select().from(leagues2).where(eq8(leagues2.draftStatus, "completed"));
     for (const league of activeLeagues) {
       try {
-        await storage2.scoreLeague(league.id);
+        await scoreLeague2(league.id);
         console.log(`[AutoScore] Scored league ${league.id} (${league.name})`);
       } catch (e) {
         console.error(`[AutoScore] Failed to score league ${league.id}:`, e);
