@@ -59,35 +59,32 @@ router.get("/api/concerts", async (req, res) => {
   }
 });
 
-// Proxy a single show's setlist from phish.in (has duration data for scoring)
+// Proxy a single show's setlist from phish.net
 router.get("/api/shows/:date/setlist", async (req, res) => {
   const { date } = req.params; // YYYY-MM-DD
   try {
-    const r = await fetch(`https://phish.in/api/v2/shows/${date}`, {
-      headers: { Accept: "application/json" },
-    });
-    if (!r.ok) return res.status(r.status).json({ message: "Show not found on phish.in" });
-    const data = await r.json();
-    const rawTracks: any[] = data.tracks ?? [];
+    const tracks = await phishApi.getSetlistPhishNet(date);
+    if (!tracks || tracks.length === 0) {
+      return res.status(404).json({ message: "Show not found on phish.net" });
+    }
 
-    // Group by set_name, compute opener/encore flags
+    // tracks are already normalized: { title, set_name ("Set 1"/"Encore"/…), position }
     const setMap: Record<string, any[]> = {};
-    for (const t of rawTracks) {
+    for (const t of tracks) {
       const key = t.set_name ?? "Set 1";
       if (!setMap[key]) setMap[key] = [];
       setMap[key].push(t);
     }
 
-    const sets = Object.entries(setMap).map(([setName, tracks]) => {
+    const sets = Object.entries(setMap).map(([setName, songs]) => {
       const isEncore = setName.toLowerCase().includes("encore");
-      const firstPos = Math.min(...tracks.map((t: any) => t.position ?? 99));
+      const firstPos = Math.min(...songs.map((t: any) => t.position ?? 99));
       return {
         setName,
         isEncore,
-        songs: tracks.map((t: any) => ({
+        songs: songs.map((t: any) => ({
           title: t.title,
           position: t.position,
-          durationSecs: t.duration ? Math.round(t.duration / 1000) : 0,
           isOpener: !isEncore && t.position === firstPos,
           isEncore,
         })),
@@ -103,7 +100,7 @@ router.get("/api/shows/:date/setlist", async (req, res) => {
 
     res.json({ date, sets });
   } catch (err) {
-    console.error("phish.in setlist error:", err);
+    console.error("phish.net setlist error:", err);
     res.status(500).json({ message: "Failed to fetch setlist" });
   }
 });

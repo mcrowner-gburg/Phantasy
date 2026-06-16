@@ -8,25 +8,14 @@ import { Calendar, MapPin, Clock, Music, ChevronDown, ChevronUp, Loader2 } from 
 import { format, isToday, isFuture } from "date-fns";
 import UpcomingShows from "@/components/dashboard/upcoming-shows";
 
-function pointsForSong(s: { isOpener: boolean; isEncore: boolean; durationSecs: number }) {
+function pointsForSong(s: { isOpener: boolean; isEncore: boolean }) {
   let pts = 1;
   if (s.isOpener) pts++;
   if (s.isEncore) pts++;
-  const mins = s.durationSecs / 60;
-  if (mins >= 20) pts++;
-  if (mins >= 30) pts++;
-  if (mins >= 40) pts++;
   return pts;
 }
 
-function formatMins(secs: number) {
-  if (!secs) return null;
-  const m = Math.floor(secs / 60);
-  const s = secs % 60;
-  return `${m}:${String(s).padStart(2, "0")}`;
-}
-
-// Expanded setlist for one show — fetches from phish.in via our proxy
+// Expanded setlist for one show — fetches from phish.net via our proxy
 function ShowSetlist({ dateStr }: { dateStr: string }) {
   const { data, isLoading, isError } = useQuery<any>({
     queryKey: [`/api/shows/${dateStr}/setlist`],
@@ -37,7 +26,7 @@ function ShowSetlist({ dateStr }: { dateStr: string }) {
     return (
       <div className="flex items-center gap-2 py-4 phish-text text-sm">
         <Loader2 size={16} className="animate-spin" />
-        Loading setlist from phish.in…
+        Loading setlist from phish.net…
       </div>
     );
   }
@@ -56,11 +45,9 @@ function ShowSetlist({ dateStr }: { dateStr: string }) {
           <div className="flex flex-wrap gap-1">
             {set.songs.map((song: any, i: number) => {
               const pts = pointsForSong(song);
-              const dur = formatMins(song.durationSecs);
               const tags = [
                 song.isOpener && "opener",
                 song.isEncore && "encore",
-                dur && song.durationSecs >= 20 * 60 && dur,
               ].filter(Boolean).join(" · ");
 
               return (
@@ -76,9 +63,6 @@ function ShowSetlist({ dateStr }: { dateStr: string }) {
                   }`}
                 >
                   {song.title}
-                  {dur && song.durationSecs >= 20 * 60 && (
-                    <span className="text-xs text-gray-400">{dur}</span>
-                  )}
                   <span className={`text-xs font-bold ml-0.5 ${pts > 1 ? "text-green-400" : "text-gray-500"}`}>
                     +{pts}
                   </span>
@@ -134,11 +118,11 @@ export default function Concerts() {
           <Card className="glassmorphism border-gray-600">
             <CardContent className="p-4">
               <div className="flex items-center justify-between">
-                <h3 className="text-lg font-bold">Live Data from Phish.in</h3>
+                <h3 className="text-lg font-bold">Live Data from Phish.net</h3>
                 <Badge className="bg-green-500 text-black">Connected</Badge>
               </div>
               <p className="text-sm phish-text mt-2">
-                Setlists and song durations sourced from phish.in · Set openers highlighted green · Encores highlighted yellow · +N = phantasy points
+                Setlists sourced from phish.net · Set openers highlighted green · Encores highlighted yellow · +N = phantasy points
               </p>
             </CardContent>
           </Card>
@@ -206,13 +190,13 @@ export default function Concerts() {
                             </div>
                             <div className="flex items-center gap-3 flex-shrink-0">
                               <a
-                                href={`https://phish.in/${dateStr}`}
+                                href={`https://phish.net/setlists/${dateStr}`}
                                 target="_blank"
                                 rel="noopener noreferrer"
                                 onClick={(e) => e.stopPropagation()}
                                 className="text-xs text-green-400 hover:text-green-300 underline"
                               >
-                                phish.in
+                                phish.net
                               </a>
                               {isExpanded
                                 ? <ChevronUp size={18} className="text-gray-400" />

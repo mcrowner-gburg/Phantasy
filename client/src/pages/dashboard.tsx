@@ -213,7 +213,7 @@ export default function Dashboard() {
                         <div 
                           key={concert.id || index} 
                           className="border phish-border rounded-lg p-4 hover:border-green-500 transition-colors cursor-pointer"
-                          onClick={() => window.open(`https://phish.in/${format(new Date(concert.date + "T12:00:00"), "yyyy-MM-dd")}`, '_blank')}
+                          onClick={() => window.open(`https://phish.net/setlists/${format(new Date(concert.date + "T12:00:00"), "yyyy-MM-dd")}`, '_blank')}
                         >
                           <div className="flex justify-between items-start mb-2">
                             <div>
