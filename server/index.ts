@@ -4,6 +4,7 @@ import ws from "ws";
 import path from "path";
 import { createServer } from "http";
 import { registerRoutes } from "./routes";
+import { ensureDraftAutomation } from "./draft-scheduler";
 
 // ---------- NEON WEBSOCKET CONFIG ----------
 neonConfig.webSocketConstructor = ws;
@@ -74,50 +75,6 @@ async function runMigrations() {
   }
 }
 
-// ---------- DRAFT AUTOMATION LOOP ----------
-// Runs every 30s: auto-starts scheduled drafts and auto-picks for timed-out players
-async function runDraftAutomation() {
-  try {
-    const { storage } = await import("./storage-db");
-    const { db } = await import("./db");
-    const { leagues } = await import("../shared/schema");
-    const { and, eq, lte, isNotNull } = await import("drizzle-orm");
-    const now = new Date();
-
-    // Auto-start drafts whose scheduled time has arrived
-    const toStart = await db.select().from(leagues).where(
-      and(eq(leagues.draftStatus, "scheduled"), isNotNull(leagues.draftDate), lte(leagues.draftDate, now))
-    );
-    for (const league of toStart) {
-      try {
-        await storage.startDraft(league.id);
-        console.log(`[DraftAuto] Auto-started draft for league ${league.id}`);
-      } catch (e) {
-        console.error(`[DraftAuto] Failed to start league ${league.id}:`, e);
-      }
-    }
-
-    // Auto-pick for active drafts where current player's deadline has passed
-    const timedOut = await db.select().from(leagues).where(
-      and(eq(leagues.draftStatus, "active"), isNotNull(leagues.pickDeadline), lte(leagues.pickDeadline, now))
-    );
-    for (const league of timedOut) {
-      if (!league.currentPlayer) continue;
-      try {
-        const songs = await storage.getAvailableSongsPlayedLastYear(league.id);
-        if (songs.length > 0) {
-          await storage.makeDraftPick(league.id, league.currentPlayer, songs[0].id, league.pickTimeLimit ?? 90);
-          console.log(`[DraftAuto] Auto-picked for player ${league.currentPlayer} in league ${league.id}`);
-        }
-      } catch (e) {
-        console.error(`[DraftAuto] Failed auto-pick for league ${league.id}:`, e);
-      }
-    }
-  } catch (e) {
-    console.error("[DraftAuto] Loop error:", e);
-  }
-}
-
 // ---------- AUTO-SCORE LOOP ----------
 // Runs every 2 hours: refreshes shows cache from phish.net, then rescores all
 // completed leagues so the leaderboard stays current without manual admin steps.
@@ -147,9 +104,8 @@ async function runAutoScore() {
 
 // ---------- REGISTER ALL API ROUTES ----------
 const httpServer = createServer(app);
-runMigrations().then(() => registerRoutes(app)).then(() => {
-  // Start draft automation loop every 30 seconds
-  setInterval(runDraftAutomation, 30_000);
+runMigrations().then(() => registerRoutes(app)).then(async () => {
+  await ensureDraftAutomation();
   // Auto-refresh shows + rescore all completed leagues every 2 hours
   setInterval(runAutoScore, 2 * 60 * 60 * 1000);
   // ---------- SPA FALLBACK ----------

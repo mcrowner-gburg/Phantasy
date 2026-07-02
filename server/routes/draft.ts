@@ -2,6 +2,7 @@ import { Router } from "express";
 import { storage } from "../storage-db";
 import { requireAuth } from "../auth";
 import { requireAdmin, requireLeagueOwnerOrAdmin } from "../middleware/admin";
+import { startDraftAutomation } from "../draft-scheduler";
 import { db } from "../db";
 import { sql, eq, and } from "drizzle-orm";
 import { draftPicks, draftedSongs, songs, insertDraftedSongSchema } from "@shared/schema";
@@ -41,6 +42,7 @@ router.post("/api/leagues/:id/start-draft", requireAuth, requireLeagueOwnerOrAdm
   try {
     const leagueId = parseInt(req.params.id);
     await storage.startDraft(leagueId);
+    startDraftAutomation();
     res.json({ message: "Draft started successfully" });
   } catch (error: any) {
     res.status(500).json({ message: error.message || "Failed to start draft" });
